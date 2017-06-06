@@ -8,7 +8,7 @@ Spec:
 ;
 
 Declaration:
-	VarDec | STVarDec | ElemDec | RFunDec | MFunDec | BFunDec
+	VarDec | STVarDec | ElemDec | FunDec
 ;
 
 BaseType:
@@ -28,7 +28,11 @@ STVarDec:
 ;
 
 ElemDec:
-	'elem' name=ID ':' type = Type
+	'elem' name=ID
+;
+
+FunDec:
+	(RFunDec | MFunDec | BFunDec)
 ;
 
 RFunDec:
@@ -56,15 +60,30 @@ Property:
 ;
 
 Fun:
-	name=ID '(' (args += Term)? (',' args += Term)* ')'
+	name=[FunDec] '(' (args += Term)? (',' args += Term)* ')'
 ;
 
-IDAtom:
-	name=ID
+Expression:
+	Addition;
+
+Addition returns Expression:
+	Multiplication (({ExprOperation.left=current} op=('+' | '-')) right=Multiplication)*
+;
+
+Multiplication returns Expression:
+	PrimaryExpression (({ExprOperation.left=current} op=('*' | '/')) right=PrimaryExpression)*
+;
+
+PrimaryExpression returns Expression:
+	'(' Expression ')' |
+	Const |
+	Fun |
+	Property |
+	{ID} ID
 ;
 
 Term returns TermFormula: 
-	IDAtom | Const | Property | Fun | '(' TermFormula ')'
+	'(' TermFormula ')' | (=> Expression)
 ;
 
 TermFormula returns TermFormula:
@@ -72,11 +91,11 @@ TermFormula returns TermFormula:
 ;
 
 TAtom:
-	op=ALWAYS '(' exp=Formula ')' | op=NEXT '(' exp=Formula ')' | op=UNTIL '(' exp=Formula ')'
+	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')'
 ;
 
 QAtom:
-	'forall' var=IDAtom ':' set=Term ',' exp=Formula 
+	op=(FORALL | 'exists') var=ID ':' set=Term ',' exp=Formula 
 ;
 
 Formula:
@@ -84,10 +103,10 @@ Formula:
 ;
 
 NegFormula returns Formula:
-	{Negation} NOT child=NegFormula | FormulaAtom
+	{Negation} NOT child=NegFormula | FormulaBase
 ;
 
-FormulaAtom returns Formula:
+FormulaBase returns Formula:
 	(=> TermFormula) | '(' Formula ')' | TAtom
 ;
 
@@ -141,4 +160,16 @@ terminal ALWAYS:
 
 terminal UNTIL:
 	'U' | 'UNTIL'
+;
+
+terminal EVENTUALLY:
+	'F' | 'EVENTUALLY'
+;
+
+terminal FORALL:
+	'forall' | 'A'
+;
+
+terminal EXISTS:
+	'exists' | 'E'
 ;
