@@ -1,0 +1,4 @@
+include 'org.xtext.example.ipl'
+include 'org.xtext.example.ipl.ide'
+include 'org.xtext.example.ipl.web'
+include 'org.xtext.example.ipl.tests'
