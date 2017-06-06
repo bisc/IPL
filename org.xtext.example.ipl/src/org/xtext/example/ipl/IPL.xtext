@@ -1,0 +1,144 @@
+grammar org.xtext.example.ipl.IPL with org.eclipse.xtext.common.Terminals
+
+generate iPL "http://www.xtext.org/example/ipl/IPL"
+
+Spec:
+	(decls += Declaration ';')*
+	(formulas += Formula ';')*
+;
+
+Declaration:
+	VarDec | STVarDec | ElemDec | RFunDec | MFunDec | BFunDec
+;
+
+BaseType:
+	('int' | 'real' | 'bool' | 'string')
+;
+
+Type:
+	{Type} BaseType | {SetType} '{' elem=BaseType '}'
+;
+
+VarDec:
+	'var' name=ID ':' type = Type
+;
+
+STVarDec:
+	'stvar' name=ID ':' type = Type
+;
+
+ElemDec:
+	'elem' name=ID ':' type = Type
+;
+
+RFunDec:
+	'vrfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
+;
+
+MFunDec:
+	'mfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
+;
+
+BFunDec:
+	'bfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
+;
+
+Bool:
+	value=('true' | 'false')
+;
+
+Const:
+	{EInt} INT | {EReal} (INT '.' INT (('e' | 'E') INT)?) | Bool | {EString} STRING
+;
+
+Property:
+	elem=[ElemDec] '.' member=ID
+;
+
+Fun:
+	name=ID '(' (args += Term)? (',' args += Term)* ')'
+;
+
+IDAtom:
+	name=ID
+;
+
+Term returns TermFormula: 
+	IDAtom | Const | Property | Fun | '(' TermFormula ')'
+;
+
+TermFormula returns TermFormula:
+		Term ({TermOperation.left=current} op=(LT | LTE | GT | GTE | EQ | NE) right=Term)*
+;
+
+TAtom:
+	op=ALWAYS '(' exp=Formula ')' | op=NEXT '(' exp=Formula ')' | op=UNTIL '(' exp=Formula ')'
+;
+
+QAtom:
+	'forall' var=IDAtom ':' set=Term ',' exp=Formula 
+;
+
+Formula:
+	NegFormula ({FormulaOperation.left=current} op=(AND | OR | IMP) right=NegFormula)* | (-> QAtom)
+;
+
+NegFormula returns Formula:
+	{Negation} NOT child=NegFormula | FormulaAtom
+;
+
+FormulaAtom returns Formula:
+	(=> TermFormula) | '(' Formula ')' | TAtom
+;
+
+terminal AND:
+	('&' | '^')
+;
+
+terminal OR:
+	('|' | 'V')
+;
+
+terminal NOT:
+	('!' | '-')
+;
+
+terminal IMP:
+	'->'
+;
+
+terminal LT:
+	'<'
+;
+
+terminal LTE:
+	'<='
+;
+
+terminal GT:
+	'>'
+;
+
+terminal GTE:
+	'>='
+;
+
+terminal EQ:
+	'='
+;
+
+terminal NE:
+	'!='
+;
+
+terminal NEXT:
+	'X' | 'N' | 'NEXT'
+;
+
+terminal ALWAYS:
+	'G' | 'ALWAYS'
+;
+
+terminal UNTIL:
+	'U' | 'UNTIL'
+;
