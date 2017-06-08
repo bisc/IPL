@@ -13,7 +13,6 @@ import org.xtext.example.ipl.iPL.Fun
  */
 class IPLOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def _text(Fun f) {
-		System::out.println(f.name)
 		f.name.name.toString
 	}
 }
