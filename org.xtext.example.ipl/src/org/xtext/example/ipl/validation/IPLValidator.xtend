@@ -12,6 +12,7 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Fun
+import org.xtext.example.ipl.iPL.ID
 
 /**
  * This class contains custom validation rules. 
@@ -152,6 +153,14 @@ class IPLValidator extends AbstractIPLValidator {
 				}
 			}
 		}
+	}
+	
+	@Check
+	def checkDefined(ID id) {
+		val type = typeProvider.typeOf(id)
+		if (type == null)
+			error("Undefined symbol " + id.id,
+						IPLPackage.Literals.ID__ID, WRONG_TYPE)
 	}
 	
 	
