@@ -20,7 +20,7 @@ import org.xtext.example.ipl.iPL.TypeSet
 import org.xtext.example.ipl.iPL.Spec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.iPL.VarDec
+import org.xtext.example.ipl.iPL.TypedDec
 
 class IPLTypeProvider {
 	
@@ -39,7 +39,7 @@ class IPLTypeProvider {
 		
 		val decls = e.getContainerOfType(Spec).decls
 		
-		val decl = decls.findLast[it instanceof VarDec && it.name == name] as VarDec
+		val decl = decls.findLast[it instanceof TypedDec && it.name == name] as TypedDec
 		
 		if (decl != null) 
 			return fromType(decl.type) 

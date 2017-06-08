@@ -8,7 +8,7 @@ Spec:
 ;
 
 Declaration:
-	VarDec | STVarDec | ElemDec | FunDec
+	TypedDec | ElemDec | FunDec
 ;
 
 BaseType:
@@ -17,6 +17,10 @@ BaseType:
 
 Type:
 	BaseType | {TypeSet} '{' elem=BaseType '}'
+;
+
+TypedDec:
+	VarDec | STVarDec
 ;
 
 VarDec:
