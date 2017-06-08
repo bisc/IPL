@@ -47,7 +47,12 @@ class IPLTypeProvider {
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
 				if (q != null && q.^var == name)
-					return (typeOf(q.set) as SetType).elemType
+					if (typeOf(q.set) instanceof SetType)
+						return (typeOf(q.set) as SetType).elemType
+					else
+					// This is an error, but assume this is what the user meant
+						return typeOf(q.set) 
+						
 			}
 			return null
 		}
