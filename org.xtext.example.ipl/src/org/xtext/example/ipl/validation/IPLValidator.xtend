@@ -14,6 +14,9 @@ import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 
+import static extension org.eclipse.xtext.EcoreUtil2.*
+import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
+
 /**
  * This class contains custom validation rules. 
  *
@@ -24,6 +27,8 @@ class IPLValidator extends AbstractIPLValidator {
 	val typeProvider = new IPLTypeProvider
 	
 	public static val WRONG_TYPE = 'wrongType'
+	public static val UNDEFINED = 'undefined'
+	public static val INV_FLEXIBLE = 'invalidFlexible'
 
 	def IPLType getType(Formula f) {
 		val type = typeProvider.typeOf(f)
@@ -160,7 +165,22 @@ class IPLValidator extends AbstractIPLValidator {
 		val type = typeProvider.typeOf(id)
 		if (type == null)
 			error("Undefined symbol " + id.id,
-						IPLPackage.Literals.ID__ID, WRONG_TYPE)
+						IPLPackage.Literals.ID__ID, UNDEFINED)
+	}
+	
+	@Check
+	def checkFlexibleQuant(QAtom t) {
+		val inModality = t.getContainerOfType(TAtom) != null
+		
+		if (inModality && !t.exp.rigid) {
+			error("Flexible quantification used inside modality",
+						IPLPackage.Literals.QATOM__EXP, INV_FLEXIBLE)
+		}
+		
+		if (inModality && !t.set.rigid) {
+			error("Flexible quantification used inside modality",
+						IPLPackage.Literals.QATOM__SET, INV_FLEXIBLE)
+		}
 	}
 	
 	
