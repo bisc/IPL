@@ -16,10 +16,6 @@ import org.eclipse.xtext.generator.IGeneratorContext
 class IPLGenerator extends AbstractGenerator {
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
-//		fsa.generateFile('greetings.txt', 'People to greet: ' + 
-//			resource.allContents
-//				.filter(typeof(Greeting))
-//				.map[name]
-//				.join(', '))
+		fsa.generateFile('ipl.z3', '(assert true)')
 	}
 }

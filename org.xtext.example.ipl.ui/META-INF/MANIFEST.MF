@@ -21,5 +21,7 @@ Import-Package: org.apache.log4j
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Export-Package: org.xtext.example.ipl.ui.quickfix,
  org.xtext.example.ipl.ui.internal,
- org.xtext.example.ipl.ui.contentassist
+ org.xtext.example.ipl.ui.contentassist,
+ org.osate.xtext.aadl2.ui.quickfix,
+ org.osate.xtext.aadl2.ui.contentassist
 Bundle-Activator: org.xtext.example.ipl.ui.internal.IplActivator

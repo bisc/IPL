@@ -3,9 +3,13 @@
  */
 package org.xtext.example.ipl
 
-
 /**
  * Use this class to register components to be used at runtime / without the Equinox extension registry.
  */
 class IPLRuntimeModule extends AbstractIPLRuntimeModule {
+	
+	override bindILinkingService() {
+		return IPLLinkingService;
+	}
+	
 }

@@ -2,17 +2,32 @@ grammar org.xtext.example.ipl.IPL with org.eclipse.xtext.common.Terminals
 
 generate iPL "http://www.xtext.org/example/ipl/IPL"
 
+import "http://aadl.info/AADL/2.0" as aadl2
+
 Spec:
+	(imports += Import ';')*
 	(decls += Declaration ';')*
 	(formulas += Formula ';')*
 ;
 
+Import:
+	'import' importedNamespace=WQCREF
+;
+
 Declaration:
-	TypedDec | ElemDec | FunDec
+	TypedDec | FunDec
+;
+
+ViewDec:
+	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID
+;
+
+ModelDec:
+	'use' 'model' name=ID
 ;
 
 BaseType:
-	{TypeInt} 'int' | {TypeReal} 'real' | {TypeBool} 'bool' //| 'string'
+	{TypeInt} 'int' | {TypeReal} 'real' | {TypeBool} 'bool' | {TypeElem} 'elem' //| 'string'
 ;
 
 Type:
@@ -20,7 +35,7 @@ Type:
 ;
 
 TypedDec:
-	VarDec | STVarDec
+	VarDec | STVarDec | SortDec | ViewDec
 ;
 
 VarDec:
@@ -31,8 +46,23 @@ STVarDec:
 	'stvar' name=ID ':' type = Type
 ;
 
+WQCREF:
+	ID ('.' ID)* '.*'?
+;
+
+QCREF:
+	ID ('::' ID)*;
+
+CIREF:
+	ID ('.' ID)?
+;
+
 ElemDec:
-	'elem' name=ID
+	'elem' ref=[aadl2::ComponentImplementation | CIREF]
+;
+
+SortDec:
+	'sort' name=ID ':' ref=[aadl2::ComponentImplementation | CIREF]
 ;
 
 FunDec:
@@ -63,12 +93,12 @@ Const:
 	({Int} value=INT) | ({Real} value=Real ) | Bool //| {EString} STRING
 ;
 
-Property:
-	elem=[ElemDec] '.' member=ID
-;
-
 Fun:
 	name=[FunDec] '(' (args += Term)? (',' args += Term)* ')'
+;
+
+Prop returns Prop:
+	{Prop} id=ID
 ;
 
 Expression:
@@ -79,14 +109,19 @@ Addition returns Expression:
 ;
 
 Multiplication returns Expression:
-	PrimaryExpression (({ExprOperation.left=current} op=('*' | '/')) right=PrimaryExpression)*
+	PropertyExpression (({ExprOperation.left=current} op=('*' | '/')) right=PropertyExpression)*
 ;
+
+PropertyExpression returns Expression:
+	//elem=Property '::' member=Ident
+	PrimaryExpression (({PropertyExpression.left=current} '::') right=Prop)*
+;
+
 
 PrimaryExpression returns Expression:
 	'(' Expression ')' |
 	Const |
 	Fun |
-	Property |
 	{ID} id=ID
 ;
 

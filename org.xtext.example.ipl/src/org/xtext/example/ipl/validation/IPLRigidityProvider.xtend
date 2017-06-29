@@ -5,13 +5,15 @@ import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.MFunDec
-import org.xtext.example.ipl.iPL.Property
+import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Spec
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.VarDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
+import org.xtext.example.ipl.iPL.TypedDec
+import org.xtext.example.ipl.iPL.SortDec
 
 class IPLRigidityProvider {
 	
@@ -27,7 +29,7 @@ class IPLRigidityProvider {
 		true
 	}
 	
-	static def dispatch boolean isRigid(Property p) {
+	static def dispatch boolean isRigid(PropertyExpression p) {
 		true
 	}
 	
@@ -40,10 +42,10 @@ class IPLRigidityProvider {
 		
 		val decls = e.getContainerOfType(Spec).decls
 		
-		val decl = decls.findLast[it.name == name]
+		val decl = decls.filter[it instanceof TypedDec].findLast[(it as TypedDec).name == name]
 		
-		if (decl != null) 
-			return (decl instanceof VarDec)
+		if (decl !== null) 
+			return (decl instanceof VarDec || decl instanceof SortDec)
 		else 
 			return true
 	}
