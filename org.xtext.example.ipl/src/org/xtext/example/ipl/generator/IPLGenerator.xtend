@@ -3,10 +3,52 @@
  */
 package org.xtext.example.ipl.generator
 
+import java.util.ArrayList
+import java.util.HashMap
+import java.util.List
+import java.util.Map
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
+import org.eclipse.xtext.resource.IEObjectDescription
+import org.osate.aadl2.AadlBoolean
+import org.osate.aadl2.AadlInteger
+import org.osate.aadl2.AadlReal
+import org.osate.aadl2.BooleanLiteral
+import org.osate.aadl2.ComponentImplementation
+import org.osate.aadl2.IntegerLiteral
+import org.osate.aadl2.Property
+import org.osate.aadl2.PropertySet
+import org.osate.aadl2.RealLiteral
+import org.osate.aadl2.SubprogramGroupImplementation
+import org.osate.aadl2.SubprogramImplementation
+import org.osate.aadl2.instance.ComponentInstance
+import org.osate.aadl2.instance.util.InstanceUtil
+import org.osate.aadl2.instantiation.InstantiateModel
+import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
+import org.osate.aadl2.properties.PropertyNotPresentException
+import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
+import org.osate.xtext.aadl2.properties.util.PropertyUtils
+import org.xtext.example.ipl.iPL.Spec
+import org.xtext.example.ipl.iPL.ViewDec
+
+import static extension org.eclipse.xtext.EcoreUtil2.*
+import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.isRigid
+import org.xtext.example.ipl.iPL.Formula
+import org.xtext.example.ipl.iPL.FormulaOperation
+import org.xtext.example.ipl.iPL.Negation
+import org.xtext.example.ipl.iPL.QAtom
+import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.Int
+import org.xtext.example.ipl.iPL.Real
+import org.xtext.example.ipl.iPL.Bool
+import org.xtext.example.ipl.iPL.Fun
+import org.xtext.example.ipl.iPL.PropertyExpression
+import org.xtext.example.ipl.validation.IPLTypeProvider
+import org.xtext.example.ipl.validation.SetType
+import org.xtext.example.ipl.validation.ComponentType
 
 /**
  * Generates code from your model files on save.
@@ -16,6 +58,280 @@ import org.eclipse.xtext.generator.IGeneratorContext
 class IPLGenerator extends AbstractGenerator {
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
-		fsa.generateFile('ipl.z3', '(assert true)')
+		
+		//System::out.println(resource.URI.trimFileExtension.lastSegment)
+		//System::out.println(resource.normalizedURI)
+		//System::out.println(resource.allContents.toList)
+		
+		val specs = resource.allContents.filter(Spec).toList
+		
+		val compMap = new HashMap<String, List<Integer>>
+		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
+		val subCompMap = new HashMap<Integer, List<Integer>>
+		
+		specs.forEach[ spec | spec.eAllOfType(ViewDec).forEach[ viewDec |
+				generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
+			]
+		]
+		
+		val formulas = specs.map [ formulas.map[
+				generateIPLSMT
+			].join('\n')
+		].join('\n')
+		
+		val decls = compMap.keySet.map['(declare-fun ' + it + '(ArchElem) Bool)'].join('\n')
+		
+		val defns = compMap.entrySet.map[if (value.empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''].join('\n')
+		
+		val props = propMap.keySet.map['(declare-fun ' + first + ' (ArchElem) ' + second + ')\n'].join + '\n' +
+			propMap.entrySet.map[ 
+				val name = key.first
+				value.entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
+			].join
+			
+		val subComps = subCompMap.entrySet.map[
+				'''(assert (forall ((x ArchElem)) (= (isSubcomponentOf «key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR»))))'''
+		].join('\n')
+		
+		fsa.generateFile(resource.URI.trimFileExtension.lastSegment + '.z3', 
+'''
+(define-sort ArchElem () Int)
+
+
+; Components
+«decls»
+
+«defns»
+
+
+; Properties and subcomponents
+«props»
+
+; isSubcomponentOf
+(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)
+«subComps»
+
+; Rigid IPL
+«formulas»
+
+(check-sat)
+'''
+		)
+	}
+	
+	def generateIPLSMT(Formula f) {
+		if (f.rigid) {
+			'(assert ' + generateFormula(f) + ')'
+		} else {
+			''
+		}
+	}
+	
+	def dispatch String generateFormula(FormulaOperation fop) {
+		
+		val op = if (fop.op == '&' || fop.op == '^') {
+			'and'
+		} else if (fop.op == '|' || fop.op == 'V') {
+			'or'
+		} else if (fop.op == '->') {
+			'=>'
+		} else {
+			throw new RuntimeException
+		}
+		
+		'''(«op» «generateFormula(fop.left)» «generateFormula(fop.right)»)'''
+	}
+	
+	def dispatch String generateFormula(Negation neg) {
+		'''(! «generateFormula(neg.child)»)'''
+	}
+	
+	def dispatch String generateFormula(Formula f) {
+		f.toString
+	}
+	
+	def dispatch String generateFormula(QAtom q) {
+		
+		val tp = new IPLTypeProvider
+		
+		val varType = (tp.typeOf(q.set) as SetType).elemType;
+		
+		val quant = if (q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
+		
+		switch (varType) {
+			ComponentType: '''(«quant» ((«q.^var» ArchElem)) (=> («'is' + varType.name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
+			default: '; Unimplemented set type'
+		}
+	}
+	
+	def dispatch String generateFormula(TermOperation top) {
+	 	if (top.op == '!=') 
+	 		'''(! (= «generateFormula(top.left)» «generateFormula(top.right)»))'''
+	 	else
+	 		'''(«top.op» «generateFormula(top.left)» «generateFormula(top.right)»)'''
+	}
+	
+	def dispatch String generateFormula(Fun f) {
+		if (f.args.length > 0)
+			'''(«f.name.name»«FOR arg : f.args» «generateFormula(arg)»«ENDFOR»)'''
+		else
+			'''(«f.name.name» ())'''
+	}
+	
+	def dispatch String generateFormula(PropertyExpression pe) {
+		'''(«pe.right.id» «generateFormula(pe.left)»)'''
+	}
+	
+	def dispatch String generateFormula(ID id) {
+		//TODO: ArchElem support
+		id.id
+	}
+	
+	def dispatch String generateFormula(Int i) {
+		i.value.toString
+	}
+	
+	def dispatch String generateFormula(Real r) {
+		r.value.toString
+	}
+	
+	def dispatch String generateFormula(Bool b) {
+		b.value.toString
+	}
+	
+	def <K, V> add(Map<K, List<V>> map, K key, V item) { 
+		if (map.get(key) === null) {
+			map.put(key, new ArrayList<V>)
+		}
+		
+		map.get(key).add(item)	
+	}
+	
+	def <K, L, V> add(Map<K, HashMap<L, V>> map, K key, L key2, V value) { 
+		if (map.get(key) === null) {
+			map.put(key, new HashMap<L, V>)
+		}
+		
+		map.get(key).put(key2, value)
+	}
+	
+	def generateAADLSMT(ComponentImplementation comp, Map<String, List<Integer>> typeMap, HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
+		
+		if (comp instanceof SubprogramImplementation
+			|| comp instanceof SubprogramGroupImplementation) {
+			//Fail...
+			throw new RuntimeException("Can't instantiate subprogram")			
+		}
+	
+		val inst = InstantiateModel::buildInstanceModelFile(comp)
+		val cic = new ComponentIndexCache
+		
+		inst.allComponentInstances.forEach[ generateComponentInst(it, typeMap, cic, propMap, subCompMap) ]
+	}
+	
+	def generateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map, ComponentIndexCache cic, HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
+		
+		val index = cic.indexForComp(comp)
+		
+		//System::out.println(index + ") " + comp.category.toString + ': ' + InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended + ' ' + comp.name)
+		
+		map.add('isArchElem', index)
+		map.add('is' + comp.category.toString.toFirstUpper, index)
+		InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended.forEach[map.add('is' + name, index)]
+		
+		val ci = InstanceUtil::getComponentImplementation(comp, 0, null)
+		if (ci !== null) { 
+			map.add('is' + ci.name.replace('.', '_'), index)
+		}
+		
+		comp.children.forEach[
+			switch (it) {
+				ComponentInstance: {
+					val scIndex = cic.indexForComp(it)
+					propMap.add(new Pair(name, 'ArchElem'), index, scIndex.toString)
+					subCompMap.add(index, scIndex)
+				}
+			}
+		]
+		
+		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(comp.getComponentClassifier())) { 
+
+			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
+			for (prop : ps.ownedProperties) {
+				if (comp.acceptsProperty(prop)) {
+					val type = fromPropType(prop)
+					if (type !== null) {
+						
+						val propExp = try { 
+							PropertyUtils::getSimplePropertyValue(comp, prop)
+						} catch (PropertyNotPresentException e) {
+							null
+						}
+						
+						val value = switch propExp {
+							BooleanLiteral: String::valueOf(propExp.getValue())
+							IntegerLiteral: String::valueOf(propExp.getValue())
+							RealLiteral: String::valueOf(propExp.getValue())
+							default: null
+						}
+						
+						if (value !== null) {
+							propMap.add(new Pair(prop.name, type), index, value)
+						}
+					}
+				}
+			}
+		}	
+	}
+	
+	def String fromPropType(Property property) {
+		switch (property.propertyType) {
+			AadlBoolean: 'Bool'
+			AadlInteger: 'Int'
+			AadlReal: 'Real'
+			default: null
+		}
+	}
+	
+	static class ComponentIndexCache {
+		var next = 0
+		val map = new HashMap<ComponentInstance, Integer>
+		
+		def indexForComp(ComponentInstance comp) {
+			val entry = map.get(comp) 
+			if (entry === null) {
+				map.put(comp, next)
+				next++
+			} else {
+				entry
+			} 
+		}
+		
+	}
+	
+	static class Pair<T, U> {
+		
+		val T first
+		val U second
+		
+		new(T first, U second) {
+			this.first = first
+			this.second = second
+		}
+		
+		override equals(Object that) {
+			switch (that) {
+				Pair<T, U>: first == that.first && second == that.second
+				default: false
+			}
+		}
+		
+		override hashCode() {
+			37 * first.hashCode + second.hashCode
+		}
+		
+		override toString() {
+			'<' + first.toString + ', ' + second.toString + '>'
+		}
 	}
 }

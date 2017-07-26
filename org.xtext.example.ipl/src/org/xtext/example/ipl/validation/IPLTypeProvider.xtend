@@ -38,6 +38,12 @@ import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
 import org.osate.aadl2.AadlReal
 
+import org.osate.aadl2.Property
+import java.util.List
+import java.util.ArrayList
+import org.osate.aadl2.instance.util.InstanceUtil
+import org.xtext.example.ipl.iPL.Set
+
 class IPLTypeProvider {
 	
 	def IPLType fromType(Type t) {
@@ -53,6 +59,8 @@ class IPLTypeProvider {
 		// Resolve id here
 		val name = e.id
 		
+//		System::out.println("####<" + e.id + ">####")
+		
 		val decls = e.getContainerOfType(Spec).decls
 		
 		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
@@ -67,13 +75,15 @@ class IPLTypeProvider {
 		} else {
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
-				if (q !== null && q.^var == name)
-					if (typeOf(q.set) instanceof SetType)
-						return (typeOf(q.set) as SetType).elemType
+				if (q !== null && q.^var == name) {
+//					System::out.println("****<" + q.set + ">****")
+					val type = typeOf(q.set)
+					if (type instanceof SetType)
+						return (type as SetType).elemType
 					else
 					// This is an error, but assume this is what the user meant
-						return typeOf(q.set) 
-						
+						return type
+				}
 			}
 			return null
 		}
@@ -95,38 +105,38 @@ class IPLTypeProvider {
 	
 		val inst = InstantiateModel::buildInstanceModelFile(ref)
 		
-
+		val cache = new ArrayList<Property>
 		
-		return fromComponentInst(inst)
+		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst.getComponentClassifier())) { 
+
+			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
+			for (prop : ps.ownedProperties) {
+				if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
+					cache.add(prop);
+				}
+			}
+		}
+		
+		return fromComponentInst(inst, cache)
 	}
 	
-	def IPLType fromComponentInst(ComponentInstance inst) {
+	def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
 //		System::out.println(inst.children.map[switch (it) {
 //			ComponentInstance: it.name
 //			PropertyAssociationInstance: it.property.name
 //			default: "N/A"
 //		}])
 		
+		val impl = InstanceUtil::getComponentImplementation(inst, 0, null)
+		val ct = new ComponentType(if (impl === null) inst.name else impl.name)
 		
-		System::out.println()
-		
-		
-		val ct = new ComponentType(inst.name)
-		
-		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, fromComponentInst(it))}]
+		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, fromComponentInst(it, prop_cache))}]
 
-		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst.getComponentClassifier())) { 
-
-			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
-			for (prop : ps.ownedProperties) {
-				if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
-					ct.addMember(prop.name, fromPropType(prop));
-				}
+		for (prop : prop_cache) {
+			if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
+				ct.addMember(prop.name, fromPropType(prop));
 			}
 		}
-		
-		System::out.println(ct)
-		System::out.println()
 		 
 		return ct
 	}
@@ -147,6 +157,10 @@ class IPLTypeProvider {
 			Bool: new BoolType
 			//String: new StringType
 		}
+	}
+	
+	def dispatch IPLType typeOf(Set s) {
+		null //TODO
 	}
 	
 	def dispatch IPLType typeOf(Formula f) {
@@ -177,7 +191,9 @@ class IPLTypeProvider {
 	}
 	
 	def dispatch IPLType typeOf(PropertyExpression p) {
+//		System::out.println("++++<" + p.right.id + ">++++")
 		val type = typeOf(p.left)
+		
 		switch (type) {
 			ComponentType: type.getMemberType(p.right.id)
 			default: null
@@ -186,6 +202,27 @@ class IPLTypeProvider {
 	
 	def getParamTypes(Fun fun) {		
 		fun.name.paramTypes.map[fromType]
+	}
+	
+	def isDef(ID e) {
+		// Resolve id here
+		val name = e.id
+		
+		val decls = e.getContainerOfType(Spec).decls
+		
+		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
+		
+		if (decl !== null) {
+			true
+		} else {
+			for (c : (e.allContainers.filter[it instanceof QAtom])) {
+				val q = c as QAtom
+				if (q !== null && q.^var == name)
+					return true
+						
+			}
+			return false
+		}
 	}
 	
 	

@@ -17,6 +17,7 @@ import org.xtext.example.ipl.iPL.PropertyExpression
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
+import java.util.HashMap
 
 /**
  * This class contains custom validation rules. 
@@ -30,9 +31,17 @@ class IPLValidator extends AbstractIPLValidator {
 	public static val WRONG_TYPE = 'wrongType'
 	public static val UNDEFINED = 'undefined'
 	public static val INV_FLEXIBLE = 'invalidFlexible'
+	
+	private static val cache = new HashMap<Formula, IPLType>
 
 	def IPLType getType(Formula f) {
-		val type = typeProvider.typeOf(f)
+		
+		var type = cache.get(f)
+		
+		if (type === null) {
+			type = typeProvider.typeOf(f)
+			cache.put(f, type);
+		}
 	
 //		// Apparently we can't have a StructRef to a child of a container?	
 //		if (type == null && f instanceof ID)
@@ -42,146 +51,146 @@ class IPLValidator extends AbstractIPLValidator {
 		type
 	}
 
-//	@Check
-//	def checkTypes(FormulaOperation op) {
-//		
-//		val leftType = getType(op.left)
-//		
-//		if (!(leftType instanceof BoolType)) {
-//			error("expected bool type, but was " + leftType,
-//				IPLPackage.Literals.FORMULA_OPERATION__LEFT, WRONG_TYPE)
-//		}
-//		
-//		val rightType = getType(op.right)
-//		
-//		if (!(rightType instanceof BoolType)) {
-//			error("expected bool type, but was " + rightType,
-//				IPLPackage.Literals.FORMULA_OPERATION__RIGHT, WRONG_TYPE)
-//		}
-//		
-//	}
-//	
-//	@Check
-//	def checkTypes(QAtom q) {
-//		
-//		val expType = getType(q.exp)
-//		
-//		if (!(expType instanceof BoolType)) {
-//			error("expected bool type, but was " + expType,
-//				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
-//		}
-//		
-//		val setType = getType(q.set);
-//		
-//		if (!(setType instanceof SetType)) {
-//			error("expected set type, but was " + setType,
-//				IPLPackage.Literals.QATOM__SET, WRONG_TYPE)
-//		}
-//		
-//	}
-//	
-//	@Check
-//	def checkTypes(TAtom t) {
-//		
-//		val expType = getType(t.exp)
-//		
-//		if (!(expType instanceof BoolType)) {
-//			error("expected bool type, but was " + expType,
-//				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
-//		}
-//	}
-//	
-//	@Check
-//	def checkTypes(TermOperation op) {
-//		
-//		val leftType = getType(op.left)
-//		val rightType = getType(op.left)
-//		
-//		switch (op.op) {
-//			case "<",
-//			case ">",
-//			case "<=",
-//			case ">=": {		
-//				if (!(leftType instanceof IntType || leftType instanceof RealType)) {
-//					error("expected numeric type, but was " + leftType,
-//						IPLPackage.Literals.TERM_OPERATION__LEFT, WRONG_TYPE)
-//				}
-//				
-//				if (!(rightType instanceof IntType || rightType instanceof RealType)) {
-//					error("expected numeric type, but was " + rightType,
-//						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
-//				}
-//			}
-//			
-//			case "=",
-//			case "!=": {
-//				if (leftType != rightType) {
-//					error("expected equal types, but left was " + leftType +
-//						" and right was " + rightType,
-//						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
-//				}
-//			}
-//		}
-//	}
-//	
-//	@Check
-//	def checkTypes(ExprOperation op) {
-//		
-//		val leftType = getType(op.left)
-//		val rightType = getType(op.left)
-//		
-//		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
-//			error("expected numeric type, but was " + leftType,
-//				IPLPackage.Literals.EXPR_OPERATION__LEFT, WRONG_TYPE)
-//		}
-//		
-//		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
-//			error("expected numeric type, but was " + rightType,
-//				IPLPackage.Literals.EXPR_OPERATION__RIGHT, WRONG_TYPE)
-//		}
-//	}
-//	
-//	@Check
-//	def checkTypes(Fun f) {
-//		val paramTypesIt = typeProvider.getParamTypes(f).iterator()
-//		
-//		for (a : f.args) {
-//			
-//			if (!paramTypesIt.hasNext) {
-//				error("wrong number of arguments to function",
-//					IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
-//			} else {
-//				val expType = paramTypesIt.next
-//				val actType = getType(a)
-//				if (actType != expType) {
-//					error("expected " + expType + " type, but was " + actType,
-//						IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
-//				}
-//			}
-//		}
-//	}
-//	
-//	@Check
-//	def checkTypes(PropertyExpression p) {
-//		val type = typeProvider.typeOf(p.left)
-//		switch (type) {
-//			ComponentType: if (type.getMemberType(p.right.id) === null) {
-//								error("Not a property: " + p.right.id,
-//									IPLPackage.Literals.PROPERTY_EXPRESSION__RIGHT, UNDEFINED)
-//							}
-//			default: error("Not an archelem",
-//									IPLPackage.Literals.PROPERTY_EXPRESSION__LEFT, WRONG_TYPE)
-//		}
-//	}
-//	
-//	@Check
-//	def checkDefined(ID id) {
-//		val type = typeProvider.typeOf(id)
-//		if (type === null) {
-//			error("Undefined symbol " + id.id,
-//						IPLPackage.Literals.ID__ID, UNDEFINED)
-//		}
-//	}
+	@Check
+	def checkTypes(FormulaOperation op) {
+		
+		val leftType = getType(op.left)
+		
+		if (!(leftType instanceof BoolType)) {
+			error("expected bool type, but was " + leftType,
+				IPLPackage.Literals.FORMULA_OPERATION__LEFT, WRONG_TYPE)
+		}
+		
+		val rightType = getType(op.right)
+		
+		if (!(rightType instanceof BoolType)) {
+			error("expected bool type, but was " + rightType,
+				IPLPackage.Literals.FORMULA_OPERATION__RIGHT, WRONG_TYPE)
+		}
+		
+	}
+	
+	@Check
+	def checkTypes(QAtom q) {
+		
+		val expType = getType(q.exp)
+		
+		if (!(expType instanceof BoolType)) {
+			error("expected bool type, but was " + expType,
+				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
+		}
+		
+		val setType = getType(q.set);
+		
+		if (!(setType instanceof SetType)) {
+			error("expected set type, but was " + setType,
+				IPLPackage.Literals.QATOM__SET, WRONG_TYPE)
+		}
+		
+	}
+	
+	@Check
+	def checkTypes(TAtom t) {
+		
+		val expType = getType(t.exp)
+		
+		if (!(expType instanceof BoolType)) {
+			error("expected bool type, but was " + expType,
+				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
+		}
+	}
+	
+	@Check
+	def checkTypes(TermOperation op) {
+		
+		val leftType = getType(op.left)
+		val rightType = getType(op.left)
+		
+		switch (op.op) {
+			case "<",
+			case ">",
+			case "<=",
+			case ">=": {		
+				if (!(leftType instanceof IntType || leftType instanceof RealType)) {
+					error("expected numeric type, but was " + leftType,
+						IPLPackage.Literals.TERM_OPERATION__LEFT, WRONG_TYPE)
+				}
+				
+				if (!(rightType instanceof IntType || rightType instanceof RealType)) {
+					error("expected numeric type, but was " + rightType,
+						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
+				}
+			}
+			
+			case "=",
+			case "!=": {
+				if (leftType != rightType) {
+					error("expected equal types, but left was " + leftType +
+						" and right was " + rightType,
+						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
+				}
+			}
+		}
+	}
+	
+	@Check
+	def checkTypes(ExprOperation op) {
+		
+		val leftType = getType(op.left)
+		val rightType = getType(op.left)
+		
+		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
+			error("expected numeric type, but was " + leftType,
+				IPLPackage.Literals.EXPR_OPERATION__LEFT, WRONG_TYPE)
+		}
+		
+		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
+			error("expected numeric type, but was " + rightType,
+				IPLPackage.Literals.EXPR_OPERATION__RIGHT, WRONG_TYPE)
+		}
+	}
+	
+	@Check
+	def checkTypes(Fun f) {
+		val paramTypesIt = typeProvider.getParamTypes(f).iterator()
+		
+		for (a : f.args) {
+			
+			if (!paramTypesIt.hasNext) {
+				error("wrong number of arguments to function",
+					IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
+			} else {
+				val expType = paramTypesIt.next
+				val actType = getType(a)
+				if (actType != expType) {
+					error("expected " + expType + " type, but was " + actType,
+						IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
+				}
+			}
+		}
+	}
+	
+	@Check
+	def checkTypes(PropertyExpression p) {
+		val type = getType(p.left)
+		
+		switch (type) {
+			ComponentType: if (type.getMemberType(p.right.id) === null) {
+								error("Not a property: " + p.right.id,
+									IPLPackage.Literals.PROPERTY_EXPRESSION__RIGHT, UNDEFINED)
+							}
+			default: error("Not an archelem",
+									IPLPackage.Literals.PROPERTY_EXPRESSION__LEFT, WRONG_TYPE)
+		}
+	}
+	
+	@Check
+	def checkDefined(ID id) {
+		if (!typeProvider.isDef(id)) {
+			error("Undefined symbol " + id.id,
+						IPLPackage.Literals.ID__ID, UNDEFINED)
+		}
+	}
 	
 	@Check
 	def checkFlexibleQuant(QAtom t) {

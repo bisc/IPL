@@ -240,11 +240,13 @@
 		<super type="org.eclipse.xtext.ui.check.expensive"/>
 		<persistent value="true"/>
 	</extension>
+<!-- -->
 	<extension point="org.eclipse.xtext.builder.participant">
 		<participant
 			class="org.xtext.example.ipl.ui.IPLExecutableExtensionFactory:org.eclipse.xtext.builder.IXtextBuilderParticipant"
 			fileExtensions="ipl"/>
 	</extension>
+<!---->
 	<extension point="org.eclipse.ui.preferencePages">
 		<page
 			category="org.xtext.example.ipl.IPL"
