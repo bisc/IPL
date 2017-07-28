@@ -85,8 +85,8 @@ Bool:
 	value=('true' | 'false')
 ;
 
-Real:
-	{EString} INT '.' INT (('e' | 'E') INT)?
+Real returns EDouble:
+	{EDouble} INT '.' INT (('e' | 'E') INT)?
 ;
 
 Set:
@@ -154,8 +154,39 @@ NegFormula returns Formula:
 ;
 
 FormulaBase returns Formula:
-	(=> TermFormula) | '(' Formula ')' | TAtom
+	(=> TermFormula) | '(' Formula ')' | TAtom | ModelExpr
 ;
+
+ModelExpr:
+	PrismExpr
+;
+
+//-----------------------------------------------------------------------------
+// Prism specific stuff
+
+PrismExpr:
+	'$' (ProbQuery | RewardQuery) '$'
+;
+
+PrismComp:
+	EQ | LT | GT
+;
+
+PrismValue:
+	 Expression | {QM} '?'
+;
+
+ProbQuery:
+	'P' comp=PrismComp value=PrismValue '[' expr=Formula ']' 
+;
+
+RewardQuery:
+	'R' ('{"' rewardName=ID '"}')?  EQ value=PrismValue '[' expr=Formula ']'
+;
+
+
+
+//-----------------------------------------------------------------------------
 
 terminal AND:
 	('&' | '^')

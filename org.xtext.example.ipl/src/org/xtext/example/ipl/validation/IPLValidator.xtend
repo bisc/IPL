@@ -18,6 +18,8 @@ import org.xtext.example.ipl.iPL.PropertyExpression
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
 import java.util.HashMap
+import org.xtext.example.ipl.iPL.ModelExpr
+import org.xtext.example.ipl.iPL.PrismExpr
 
 /**
  * This class contains custom validation rules. 
@@ -204,6 +206,27 @@ class IPLValidator extends AbstractIPLValidator {
 		if (inModality && !t.set.rigid) {
 			error("Flexible quantification used inside modality",
 						IPLPackage.Literals.QATOM__SET, INV_FLEXIBLE)
+		}
+	}
+	
+	@Check
+	def checkModality(TAtom t) {
+		val inModelExpr = t.getContainerOfType(ModelExpr) !== null
+		
+		if (!inModelExpr) {
+			error("Modality used outside behavioral model expression",
+						IPLPackage.Literals.TATOM__OP, INV_FLEXIBLE)
+		}
+	}
+	
+	@Check
+	def checkModelExpr(PrismExpr t) {
+		System::out.println(t.allContainers.toList)
+		val inModelExpr = t.allContainers.findFirst[it instanceof ModelExpr] !== null
+		
+		if (inModelExpr) {
+			error("Nested model expressions",
+						IPLPackage.Literals.PRISM_EXPR__EXPR, INV_FLEXIBLE)
 		}
 	}
 	
