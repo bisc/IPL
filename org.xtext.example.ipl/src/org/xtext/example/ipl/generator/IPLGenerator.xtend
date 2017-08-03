@@ -49,6 +49,7 @@ import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.validation.IPLTypeProvider
 import org.xtext.example.ipl.validation.SetType
 import org.xtext.example.ipl.validation.ComponentType
+import org.xtext.example.ipl.iPL.ExprOperation
 
 /**
  * Generates code from your model files on save.
@@ -169,6 +170,10 @@ class IPLGenerator extends AbstractGenerator {
 	 		'''(! (= «generateFormula(top.left)» «generateFormula(top.right)»))'''
 	 	else
 	 		'''(«top.op» «generateFormula(top.left)» «generateFormula(top.right)»)'''
+	}
+	
+	def dispatch String generateFormula(ExprOperation eop) {
+	 	'''(«eop.op» «generateFormula(eop.left)» «generateFormula(eop.right)»)'''
 	}
 	
 	def dispatch String generateFormula(Fun f) {
