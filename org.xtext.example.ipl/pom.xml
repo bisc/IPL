@@ -51,6 +51,14 @@
 						<artifactId>org.eclipse.xtext.xbase</artifactId>
 						<version>${xtextVersion}</version>
 					</dependency>
+					
+					<dependency>
+						<groupId>org.xtext.example.ipl</groupId>
+						<artifactId>prism</artifactId>
+						<version>4.3.1</version>
+						<scope>system</scope>
+						<systemPath>${project.basedir}/lib/prism.jar</systemPath>
+					</dependency>          
 				</dependencies>
 			</plugin>
 			<plugin>
