@@ -192,9 +192,9 @@ class IPLGenerator extends AbstractGenerator {
 		'''(! «generateFormula(neg.child)»)'''
 	}
 	
-	def dispatch String generateFormula(Formula f) {
-		f.toString
-	}
+//	def dispatch String generateFormula(Formula f) {
+//		f.toString
+//	}
 	
 	def dispatch String generateFormula(QAtom q) {
 		
