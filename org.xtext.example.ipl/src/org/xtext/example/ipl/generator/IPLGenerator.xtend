@@ -50,6 +50,11 @@ import org.xtext.example.ipl.validation.IPLTypeProvider
 import org.xtext.example.ipl.validation.SetType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.iPL.ExprOperation
+import org.xtext.example.ipl.PrismConnectorAPI
+import org.eclipse.core.resources.ResourcesPlugin
+import java.net.URL
+import org.eclipse.core.runtime.FileLocator
+import org.eclipse.core.runtime.Platform
 
 /**
  * Generates code from your model files on save.
@@ -118,6 +123,46 @@ class IPLGenerator extends AbstractGenerator {
 (check-sat)
 '''
 		)
+		
+		// call smt first? 
+		
+		System::out.println("done with generation, see file " + resource.URI.trimFileExtension.lastSegment + '.z3')
+		// call prism if needed?  
+		
+		System.out.println(System.getProperty("java.library.path"));
+		
+		val PrismConnectorAPI pc = new PrismConnectorAPI() 
+		
+
+        var prismModelUri = fsa.getURI("../model/prism/prismtmp.prism")
+        var prismPropsUri = fsa.getURI("../model/prism/mapbot.props")
+        var prismPolUri = fsa.getURI("../model/prism/strat-out")
+        System::out.println(prismModelUri)
+        
+//        irrelevant
+//        var homePath = ResourcesPlugin.getWorkspace().getRoot().getLocation().toString()
+//        System::out.println(homePath)
+		println(new URL(prismModelUri.toString))
+        
+        var prismModelPath = FileLocator.toFileURL(new URL(prismModelUri.toString)).path
+        var prismPropsPath = FileLocator.toFileURL(new URL(prismPropsUri.toString)).path
+        var prismPolPath = FileLocator.toFileURL(new URL(prismPolUri.toString)).path
+        
+        println("path: " + prismModelPath)
+             
+        var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
+        System::out.println(res)
+        //val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
+        
+        
+        
+        /*var URL templateUrl = FileLocator.toFileURL(
+        	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
+        )
+        System::out.println(templateUrl)*/
+        
+		//getResource("res/sched/sched-model-template.pml"))
+		
 	}
 	
 	def generateIPLSMT(Formula f) {
