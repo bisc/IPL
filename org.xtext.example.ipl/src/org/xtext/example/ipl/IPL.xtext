@@ -144,7 +144,7 @@ TAtom:
 ;
 
 QAtom:
-	op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression ',' exp=Formula 
+	op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression '|' exp=Formula 
 ;
 
 Formula:
@@ -200,7 +200,7 @@ terminal AND:
 ;
 
 terminal OR:
-	('|' | 'V')
+	('||' | 'V')
 ;
 
 terminal NOT:

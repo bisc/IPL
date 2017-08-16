@@ -56,6 +56,11 @@ import org.eclipse.core.resources.ResourcesPlugin
 import java.net.URL
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Platform
+import org.xtext.example.ipl.validation.IntType
+import org.xtext.example.ipl.iPL.Set
+import org.xtext.example.ipl.validation.RealType
+import org.xtext.example.ipl.validation.BoolType
+
 //import org.xtext.example.ipl.iPL.EDouble
 
 /**
@@ -64,6 +69,9 @@ import org.eclipse.core.runtime.Platform
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#code-generation
  */
 class IPLGenerator extends AbstractGenerator {
+
+	private var setDecls = ""
+	private var anonSetNum = 0
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		
@@ -76,6 +84,8 @@ class IPLGenerator extends AbstractGenerator {
 		val compMap = new HashMap<String, List<Integer>>
 		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
 		val subCompMap = new HashMap<Integer, List<Integer>>
+		setDecls = ""
+		anonSetNum = 0
 		
 		specs.forEach[ spec | spec.eAllOfType(ViewDec).forEach[ viewDec |
 				generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
@@ -105,6 +115,8 @@ class IPLGenerator extends AbstractGenerator {
 '''
 (define-sort ArchElem () Int)
 
+; Anonymous sets
+«setDecls»
 
 ; Components
 «decls»
@@ -182,7 +194,7 @@ class IPLGenerator extends AbstractGenerator {
 		}
 	}
 	
-	def generateIPLSMT(Formula f) {
+	def String generateIPLSMT(Formula f) {
 		if (f.rigid) {
 			'(assert ' + generateFormula(f) + ')'
 		} else {
@@ -206,7 +218,7 @@ class IPLGenerator extends AbstractGenerator {
 	}
 	
 	def dispatch String generateFormula(Negation neg) {
-		'''(! «generateFormula(neg.child)»)'''
+		'''(not «generateFormula(neg.child)»)'''
 	}
 	
 //	def dispatch String generateFormula(Formula f) {
@@ -219,17 +231,30 @@ class IPLGenerator extends AbstractGenerator {
 		
 		val varType = (tp.typeOf(q.set) as SetType).elemType;
 		
-		val quant = if (q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		
+		val quant = if (q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
+		val quantOp = if (quant == 'forall') '=>' else 'and' // forall with implication, exists with conjunction
+		// switching on the set member type
 		switch (varType) {
-			ComponentType: '''(«quant» ((«q.^var» ArchElem)) (=> («'is' + varType.name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
-			default: '; Unimplemented set type'
+			ComponentType: '''(«quant» ((«q.^var» ArchElem)) («quantOp» («'is' + (varType as ComponentType).name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
+			IntType, RealType, BoolType: {
+				val funName = '''anonSetMb«anonSetNum++»''';
+				val z3TypeName = switch(varType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
+				
+				// declaring an anonymous set	 
+				setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
+				(or «(q.set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
+				) ) 
+				''';
+				// actual quantified expression
+				'''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» («funName» «q.^var») «generateFormula(q.exp)»))'''}
+			default: '; Unimplemented set member type'
 		}
 	}
 	
 	def dispatch String generateFormula(TermOperation top) {
 	 	if (top.op == '!=') 
-	 		'''(! (= «generateFormula(top.left)» «generateFormula(top.right)»))'''
+	 		'''(not (= «generateFormula(top.left)» «generateFormula(top.right)»))'''
 	 	else
 	 		'''(«top.op» «generateFormula(top.left)» «generateFormula(top.right)»)'''
 	}

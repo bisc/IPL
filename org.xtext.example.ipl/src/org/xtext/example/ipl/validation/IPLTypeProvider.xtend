@@ -160,7 +160,11 @@ class IPLTypeProvider {
 	}
 	
 	def dispatch IPLType typeOf(Set s) {
-		null //TODO
+		if (s.members.size != 0)
+			new SetType(typeOf(s.members.get(0))) 
+		else 
+			new SetType(null)
+		
 	}
 	
 	def dispatch IPLType typeOf(Formula f) {
