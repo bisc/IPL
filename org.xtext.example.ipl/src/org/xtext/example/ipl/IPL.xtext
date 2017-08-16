@@ -87,8 +87,8 @@ Bool:
 ;
 
 
-Real returns EDouble:
-	{EDouble} INT '.' INT (('e' | 'E') INT)?
+Real returns ecore::EDouble:
+	INT '.' INT (('e' | 'E') INT)?
 ;
 
 Set:
@@ -159,8 +159,13 @@ FormulaBase returns Formula:
 	(=> TermFormula) | '(' Formula ')' | TAtom | ModelExpr
 ;
 
-ModelExpr:
-	PrismExpr
+ModelParamExpr: 
+	'{|' vals+=TermFormula (',' vals+=TermFormula)* '|}' |
+		 {ModelParamExpr} '{|' '|}' 
+;
+
+ModelExpr returns ModelExpr:
+	PrismExpr params=ModelParamExpr 
 ;
 
 //-----------------------------------------------------------------------------

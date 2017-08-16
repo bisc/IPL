@@ -12,6 +12,7 @@ import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.eclipse.xtext.resource.IEObjectDescription
+import org.xtext.example.ipl.Utils
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
 import org.osate.aadl2.AadlReal
@@ -55,6 +56,7 @@ import org.eclipse.core.resources.ResourcesPlugin
 import java.net.URL
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Platform
+//import org.xtext.example.ipl.iPL.EDouble
 
 /**
  * Generates code from your model files on save.
@@ -124,45 +126,60 @@ class IPLGenerator extends AbstractGenerator {
 '''
 		)
 		
-		// call smt first? 
+		// call smt first 
 		
 		System::out.println("done with generation, see file " + resource.URI.trimFileExtension.lastSegment + '.z3')
-		// call prism if needed?  
+		var z3Filename = fsa.getURI(resource.URI.trimFileExtension.lastSegment + '.z3')
+		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 		
-		System.out.println(System.getProperty("java.library.path"));
+		var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null) 
+		z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		
-		val PrismConnectorAPI pc = new PrismConnectorAPI() 
+		if (z3Res.equals("unsat"))
+			println("unsat")
+		else if (z3Res.equals("sat"))
+			println("sat")
+		else  
+			println("error: " + z3Res)
+			
 		
-
-        var prismModelUri = fsa.getURI("../model/prism/prismtmp.prism")
-        var prismPropsUri = fsa.getURI("../model/prism/mapbot.props")
-        var prismPolUri = fsa.getURI("../model/prism/strat-out")
-        System::out.println(prismModelUri)
-        
-//        irrelevant
-//        var homePath = ResourcesPlugin.getWorkspace().getRoot().getLocation().toString()
-//        System::out.println(homePath)
-		println(new URL(prismModelUri.toString))
-        
-        var prismModelPath = FileLocator.toFileURL(new URL(prismModelUri.toString)).path
-        var prismPropsPath = FileLocator.toFileURL(new URL(prismPropsUri.toString)).path
-        var prismPolPath = FileLocator.toFileURL(new URL(prismPolUri.toString)).path
-        
-        println("path: " + prismModelPath)
-             
-        var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
-        System::out.println(res)
-        //val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
-        
-        
-        
-        /*var URL templateUrl = FileLocator.toFileURL(
-        	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
-        )
-        System::out.println(templateUrl)*/
-        
-		//getResource("res/sched/sched-model-template.pml"))
 		
+		// call prism if needed  
+		if (false) { 
+			System.out.println(System.getProperty("java.library.path"));
+			
+			val PrismConnectorAPI pc = new PrismConnectorAPI() 
+			
+	
+	        var prismModelUri = fsa.getURI("../model/prism/prismtmp.prism")
+	        var prismPropsUri = fsa.getURI("../model/prism/mapbot.props")
+	        var prismPolUri = fsa.getURI("../model/prism/strat-out")
+	        System::out.println(prismModelUri)
+	        
+//	        irrelevant
+//	        var homePath = ResourcesPlugin.getWorkspace().getRoot().getLocation().toString()
+//	        System::out.println(homePath)
+			println(new URL(prismModelUri.toString))
+	        
+	        var prismModelPath = FileLocator.toFileURL(new URL(prismModelUri.toString)).path
+	        var prismPropsPath = FileLocator.toFileURL(new URL(prismPropsUri.toString)).path
+	        var prismPolPath = FileLocator.toFileURL(new URL(prismPolUri.toString)).path
+	        
+	        println("path: " + prismModelPath)
+	             
+	        var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
+	        System::out.println(res)
+	        //val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
+	        
+	        
+	        
+	        /*var URL templateUrl = FileLocator.toFileURL(
+	        	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
+	        )
+	        System::out.println(templateUrl)*/
+	        
+			//getResource("res/sched/sched-model-template.pml"))
+		}
 	}
 	
 	def generateIPLSMT(Formula f) {
@@ -244,6 +261,10 @@ class IPLGenerator extends AbstractGenerator {
 	def dispatch String generateFormula(Real r) {
 		r.value.toString
 	}
+	
+	/*def dispatch String generateFormula(EDouble r) {
+		r.toString
+	}*/
 	
 	def dispatch String generateFormula(Bool b) {
 		b.value.toString
