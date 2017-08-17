@@ -63,7 +63,7 @@ ElemDec:
 ;
 
 SortDec:
-	'set' name=ID ':' ref=[aadl2::ComponentImplementation | CIREF]
+	'set' name=ID ':' ref=[aadl2::ComponentClassifier | CIREF] // used to be ComponentImplementation
 ;
 
 FunDec:

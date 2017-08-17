@@ -45,8 +45,13 @@ import org.osate.aadl2.instance.util.InstanceUtil
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TypeLst
 import org.xtext.example.ipl.iPL.Lst
+import org.osate.aadl2.ComponentClassifier
+import java.util.HashMap
 
 class IPLTypeProvider {
+	
+	HashMap<ComponentInstance, List<Property>> instPropCache = new HashMap
+	HashMap<ComponentClassifier, List<Property>> classifierPropCache = new HashMap
 	
 	def IPLType fromType(Type t) {
 		switch (t) {
@@ -58,6 +63,7 @@ class IPLTypeProvider {
 		}
 	}
 	
+	// declarations and IDs
 	def dispatch IPLType typeOf(ID e) {
 		// Resolve id here
 		val name = e.id
@@ -72,8 +78,8 @@ class IPLTypeProvider {
 			return switch (decl) {
 				VarDec: fromType(decl.type)
 				STVarDec: fromType(decl.type)
-				SortDec: new SetType(fromComponent(decl.ref))
-				ViewDec: fromComponent(decl.ref)
+				SortDec: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
+				ViewDec: fromComponentImpl(decl.ref)
 			}
 		} else {
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
@@ -92,35 +98,38 @@ class IPLTypeProvider {
 		}
 	}
 	
-	def IPLType fromComponent(ComponentImplementation ref) {
+	// accepts a reference to the topmost element 
+	def populatePropCache(ComponentImplementation ref) { 
+		// TODO: do for all components and all properties at once? 
+	}
+	
+	def IPLType fromComponentImpl(ComponentImplementation ref) {
 		
-		
-//		System::out.println("--------------------------------------------------------------------------------")
-//	
-//		System::out.println()
-//		System::out.println()
-
 		if (ref instanceof SubprogramImplementation
 			|| ref instanceof SubprogramGroupImplementation) {
 			//Fail...
 			return null			
 		}
 	
+		// a BIG bottleneck here, maybe
 		val inst = InstantiateModel::buildInstanceModelFile(ref)
 		
-		val cache = new ArrayList<Property>
-		
-		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst.getComponentClassifier())) { 
+		val prop_cache = new ArrayList<Property>
 
+
+		val allPropSets = EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst);
+		println(allPropSets)
+		// cache all applicable properties 		
+		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst.getComponentClassifier())) { 
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 			for (prop : ps.ownedProperties) {
 				if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
-					cache.add(prop);
+					prop_cache.add(prop);
 				}
 			}
 		}
 		
-		return fromComponentInst(inst, cache)
+		fromComponentInst(inst, prop_cache)
 	}
 	
 	def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
@@ -133,6 +142,7 @@ class IPLTypeProvider {
 		val impl = InstanceUtil::getComponentImplementation(inst, 0, null)
 		val ct = new ComponentType(if (impl === null) inst.name else impl.name)
 		
+		// add subcomponent instances as members
 		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, fromComponentInst(it, prop_cache))}]
 
 		for (prop : prop_cache) {
@@ -141,7 +151,50 @@ class IPLTypeProvider {
 			}
 		}
 		 
-		return ct
+		ct
+	}
+	
+	def IPLType fromComponentClassifier(ComponentClassifier ref) {
+		
+		val ct = new ComponentType(ref.name) 
+		
+		// populate the cache if needed
+		if (classifierPropCache.get(ref) === null) {
+			classifierPropCache.put(ref, newArrayList())
+			for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(ref)) {
+				val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
+				for (prop : ps.ownedProperties) {
+
+					val propType = fromPropType(prop)
+					if (propType !== null) {
+						val metaclasses = prop.appliesToMetaclasses
+						metaclasses.forEach [
+							it.metaclass.name
+							// val owningClassifier = it.containingClassifier
+							if (it.metaclass.name.equalsIgnoreCase(ref.category.getName())) // if (ref.isDescendentOf(owningClassifier))
+								classifierPropCache.get(ref).add(prop) 
+								//ct.addMember(prop.name, propType);
+								
+						]
+					/*val classifiers = prop.appliesToClassifiers
+
+					 * classifiers.forEach[
+					 * 	if (ref.isDescendentOf(it) || ref == it) 
+					 * 		ct.addMember(prop.name, propType);					
+					 ]*/
+					}
+				// val applies = ref.checkAppliesToClassifier(prop)
+				// if (applies && propType !== null) 
+				// ct.addMember(prop.name, fromPropType(prop));
+				}
+			}
+		}
+		
+		// use cache
+		classifierPropCache.get(ref).forEach[ct.addMember(it.name, fromPropType(it))]
+		
+		ct
+
 	}
 	
 	def IPLType fromPropType(org.osate.aadl2.Property property) {
@@ -160,6 +213,11 @@ class IPLTypeProvider {
 			Bool: new BoolType
 			//String: new StringType
 		}
+	}
+	
+	// for null - incomplete and incorrect parsing results
+	def dispatch IPLType typeOf(Void x) {
+		null
 	}
 	
 	def dispatch IPLType typeOf(Set s) {
