@@ -43,6 +43,8 @@ import java.util.List
 import java.util.ArrayList
 import org.osate.aadl2.instance.util.InstanceUtil
 import org.xtext.example.ipl.iPL.Set
+import org.xtext.example.ipl.iPL.TypeLst
+import org.xtext.example.ipl.iPL.Lst
 
 class IPLTypeProvider {
 	
@@ -52,6 +54,7 @@ class IPLTypeProvider {
 			TypeReal: new RealType
 			TypeBool: new BoolType
 			TypeSet: new SetType(fromType((t as TypeSet).elem))
+			TypeLst: new ListType(fromType((t as TypeLst).elem))
 		}
 	}
 	
@@ -164,7 +167,13 @@ class IPLTypeProvider {
 			new SetType(typeOf(s.members.get(0))) 
 		else 
 			new SetType(null)
-		
+	}
+	
+	def dispatch IPLType typeOf(Lst s) {
+		if (s.members.size != 0)
+			new ListType(typeOf(s.members.get(0))) 
+		else 
+			new ListType(null)
 	}
 	
 	def dispatch IPLType typeOf(Formula f) {

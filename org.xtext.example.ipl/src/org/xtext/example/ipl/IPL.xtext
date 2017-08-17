@@ -32,7 +32,7 @@ BaseType:
 ;
 
 Type:
-	BaseType | {TypeSet} '{' elem=BaseType '}'
+	BaseType | {TypeSet} '{' elem=BaseType '}' | {TypeLst} '<<' elem=BaseType '>>'
 ;
 
 TypedDec:
@@ -95,8 +95,12 @@ Set:
 	{Set} '{' (members += Expression)? (',' members += Expression)* '}'
 ;
 
+Lst:
+	{Lst} '<<' (members += Expression)? (',' members += Expression)* '>>'
+;
+
 Const:
-	Set | ({Int} value=INT) | ({Real} value=Real ) | Bool //| {EString} STRING
+	Set | Lst | ({Int} value=INT) | ({Real} value=Real ) | Bool //| {EString} STRING
 ;
 
 Fun:

@@ -60,6 +60,7 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.BoolType
+import org.xtext.example.ipl.iPL.Expression
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -225,31 +226,46 @@ class IPLGenerator extends AbstractGenerator {
 //		f.toString
 //	}
 	
+	def dispatch String generateFormula(Set f) {
+		generateAnonSet(f) // TODO: this will need to be augmented for membership-check functions
+	}
+	
 	def dispatch String generateFormula(QAtom q) {
 		
 		val tp = new IPLTypeProvider
 		
 		val varType = (tp.typeOf(q.set) as SetType).elemType;
 		
-		
 		val quant = if (q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		val quantOp = if (quant == 'forall') '=>' else 'and' // forall with implication, exists with conjunction
+		
 		// switching on the set member type
 		switch (varType) {
 			ComponentType: '''(«quant» ((«q.^var» ArchElem)) («quantOp» («'is' + (varType as ComponentType).name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
 			IntType, RealType, BoolType: {
-				val funName = '''anonSetMb«anonSetNum++»''';
+				val funName = generateAnonSet(q.set); 
 				val z3TypeName = switch(varType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
 				
-				// declaring an anonymous set	 
-				setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
-				(or «(q.set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
-				) ) 
-				''';
 				// actual quantified expression
 				'''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» («funName» «q.^var») «generateFormula(q.exp)»))'''}
 			default: '; Unimplemented set member type'
 		}
+	}
+	
+	// helper function to generate anonymous sets, returning membership f-n name
+	def String generateAnonSet(Expression set) { 
+		val tp = new IPLTypeProvider
+		val elemType =  (tp.typeOf(set) as SetType).elemType;
+		
+		val funName = '''anonSetMb«anonSetNum++»''';
+		val z3TypeName = switch(elemType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
+		
+		// declaring an anonymous set	 
+		setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
+		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
+		) ) 
+		''';
+		funName
 	}
 	
 	def dispatch String generateFormula(TermOperation top) {
