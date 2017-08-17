@@ -4,16 +4,16 @@ import org.eclipse.emf.ecore.EObject
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.MFunDec
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
-import org.xtext.example.ipl.iPL.Spec
+import org.xtext.example.ipl.iPL.SortDec
 import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TypedDec
 import org.xtext.example.ipl.iPL.VarDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.iPL.TypedDec
-import org.xtext.example.ipl.iPL.SortDec
 
 class IPLRigidityProvider {
 	
@@ -40,7 +40,7 @@ class IPLRigidityProvider {
 	static def dispatch boolean isRigid(ID e) {
 		val name = e.id
 		
-		val decls = e.getContainerOfType(Spec).decls
+		val decls = e.getContainerOfType(IPLSpec).decls
 		
 		val decl = decls.filter[it instanceof TypedDec].findLast[(it as TypedDec).name == name]
 		

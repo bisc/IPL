@@ -10,14 +10,14 @@ import org.eclipse.xtext.testing.util.ParseHelper
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.xtext.example.ipl.iPL.Spec
+import org.xtext.example.ipl.iPL.IPLSpec
 
 @RunWith(XtextRunner)
 @InjectWith(IPLInjectorProvider)
 class IPLParsingTestSpec{
 
 	@Inject
-	ParseHelper<Spec> specParseHelper
+	ParseHelper<IPLSpec> specParseHelper
 	
 	@Test 
 	def void loadSpecs() {

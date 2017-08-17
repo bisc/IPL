@@ -10,14 +10,14 @@ import org.eclipse.xtext.testing.util.ParseHelper
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.xtext.example.ipl.iPL.Spec
+import org.xtext.example.ipl.iPL.IPLSpec
 
 @RunWith(XtextRunner)
 @InjectWith(IPLInjectorProvider)
 class IPLParsingTestExpr{
 
 	@Inject
-	ParseHelper<Spec> formulaParseHelper
+	ParseHelper<IPLSpec> formulaParseHelper
 
 	@Test 
 	def void loadArithm() {

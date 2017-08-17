@@ -1,11 +1,20 @@
 package org.xtext.example.ipl.validation
 
+import java.util.ArrayList
+import java.util.HashMap
+import java.util.List
 import org.eclipse.xtext.resource.IEObjectDescription
+import org.osate.aadl2.AadlBoolean
+import org.osate.aadl2.AadlInteger
+import org.osate.aadl2.AadlReal
+import org.osate.aadl2.ComponentClassifier
 import org.osate.aadl2.ComponentImplementation
+import org.osate.aadl2.Property
 import org.osate.aadl2.PropertySet
 import org.osate.aadl2.SubprogramGroupImplementation
 import org.osate.aadl2.SubprogramImplementation
 import org.osate.aadl2.instance.ComponentInstance
+import org.osate.aadl2.instance.util.InstanceUtil
 import org.osate.aadl2.instantiation.InstantiateModel
 import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
@@ -15,18 +24,21 @@ import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.Int
+import org.xtext.example.ipl.iPL.Lst
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.STVarDec
+import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDec
-import org.xtext.example.ipl.iPL.Spec
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypeBool
 import org.xtext.example.ipl.iPL.TypeInt
+import org.xtext.example.ipl.iPL.TypeLst
 import org.xtext.example.ipl.iPL.TypeReal
 import org.xtext.example.ipl.iPL.TypeSet
 import org.xtext.example.ipl.iPL.TypedDec
@@ -34,19 +46,6 @@ import org.xtext.example.ipl.iPL.VarDec
 import org.xtext.example.ipl.iPL.ViewDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.osate.aadl2.AadlBoolean
-import org.osate.aadl2.AadlInteger
-import org.osate.aadl2.AadlReal
-
-import org.osate.aadl2.Property
-import java.util.List
-import java.util.ArrayList
-import org.osate.aadl2.instance.util.InstanceUtil
-import org.xtext.example.ipl.iPL.Set
-import org.xtext.example.ipl.iPL.TypeLst
-import org.xtext.example.ipl.iPL.Lst
-import org.osate.aadl2.ComponentClassifier
-import java.util.HashMap
 
 class IPLTypeProvider {
 	
@@ -70,7 +69,7 @@ class IPLTypeProvider {
 		
 //		System::out.println("####<" + e.id + ">####")
 		
-		val decls = e.getContainerOfType(Spec).decls
+		val decls = e.getContainerOfType(IPLSpec).decls
 		
 		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
 		
@@ -197,7 +196,7 @@ class IPLTypeProvider {
 
 	}
 	
-	def IPLType fromPropType(org.osate.aadl2.Property property) {
+	def IPLType fromPropType(Property property) {
 		switch (property.propertyType) {
 			AadlBoolean: new BoolType
 			AadlInteger: new IntType
@@ -279,7 +278,7 @@ class IPLTypeProvider {
 		// Resolve id here
 		val name = e.id
 		
-		val decls = e.getContainerOfType(Spec).decls
+		val decls = e.getContainerOfType(IPLSpec).decls
 		
 		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
 		

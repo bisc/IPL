@@ -31,7 +31,7 @@ import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
 import org.osate.aadl2.properties.PropertyNotPresentException
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
-import org.xtext.example.ipl.iPL.Spec
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ViewDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
@@ -80,7 +80,7 @@ class IPLGenerator extends AbstractGenerator {
 		//System::out.println(resource.normalizedURI)
 		//System::out.println(resource.allContents.toList)
 		
-		val specs = resource.allContents.filter(Spec).toList
+		val specs = resource.allContents.filter(IPLSpec).toList
 		
 		val compMap = new HashMap<String, List<Integer>>
 		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
@@ -92,6 +92,7 @@ class IPLGenerator extends AbstractGenerator {
 				generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
 			]
 		]
+		println("Done generating AADL SMT")
 		
 		val formulas = specs.map [ formulas.map[
 				generateIPLSMT
@@ -139,9 +140,9 @@ class IPLGenerator extends AbstractGenerator {
 '''
 		)
 		
-		// call smt first 
-		
 		System::out.println("done with generation, see file " + resource.URI.trimFileExtension.lastSegment + '.z3')
+		
+		// call smt first 
 		var z3Filename = fsa.getURI(resource.URI.trimFileExtension.lastSegment + '.z3')
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 		
