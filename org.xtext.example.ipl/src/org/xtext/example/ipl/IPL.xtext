@@ -173,7 +173,7 @@ ModelExpr returns ModelExpr:
 ;
 
 //-----------------------------------------------------------------------------
-// Prism specific stuff
+// PCTL-specific syntax
 
 PrismExpr:
 	'$' (ProbQuery | RewardQuery) '$'
@@ -198,7 +198,13 @@ RewardQuery:
 
 
 //-----------------------------------------------------------------------------
+// LTL-specific syntax
+// TODO add
 
+
+
+
+//-----------------------------------------------------------------------------
 terminal AND:
 	('&' | '^')
 ;

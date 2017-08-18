@@ -27,6 +27,7 @@ import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
+import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
@@ -216,6 +217,7 @@ class IPLTypeProvider {
 	
 	// for null - incomplete and incorrect parsing results
 	def dispatch IPLType typeOf(Void x) {
+		println('Null typing results - possible error')
 		null
 	}
 	
@@ -261,13 +263,16 @@ class IPLTypeProvider {
 	}
 	
 	def dispatch IPLType typeOf(PropertyExpression p) {
-//		System::out.println("++++<" + p.right.id + ">++++")
 		val type = typeOf(p.left)
 		
 		switch (type) {
 			ComponentType: type.getMemberType(p.right.id)
 			default: null
 		}
+	}
+	
+	def dispatch IPLType typeOf(ProbQuery pq) { 
+		new BoolType
 	}
 	
 	def getParamTypes(Fun fun) {		
