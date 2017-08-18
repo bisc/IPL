@@ -71,71 +71,25 @@ import org.xtext.example.ipl.iPL.Expression
  */
 class IPLGenerator extends AbstractGenerator {
 
-	private val smtGenerator = new SmtGenerator
+	private val smtVerifier = new SmtVerifier
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
-		val String backgr = smtGenerator.generateBackgroundSmt(specs)
-		
 		// generation of SMT for IPL formulas
-		val formulasSMT = specs.map [
-			formulas.map [
-				smtGenerator.generateSMTFormula(it)
+		/*val formulasSMT = specs.map [ IPLSpec s |
+			s.formulas.map [ Formula f |
+				smtVerifier.verifyRigidFormula(f, s, resource, fsa)
 			].join('\n')
-		].join('\n')
-		println("Done generating IPL SMT")
-
-		val filename = resource.URI.trimFileExtension.lastSegment + '.z3'; 
-		fsa.generateFile(filename,
-			backgr + formulasSMT + ''' 
-			
-			(check-sat) 
-			
-			''') 
-			/*'''
-(define-sort ArchElem () Int)
-
-; Anonymous sets
-«setDecls»
-
-; Components
-«decls»
-
-«defns»
-
-
-; Properties and subcomponents
-«props»
-
-; isSubcomponentOf
-(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)
-«subComps»
-
-; Rigid IPL
-«formulasSMT»
-
-(check-sat)
-'''
-		)*/
+		].join('\n')*/
 		
-		System::out.println("Done generating SMT, see file " + filename)
-		
-		// call smt first 
-		var z3Filename = fsa.getURI(resource.URI.trimFileExtension.lastSegment + '.z3')
-		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
-		
-		var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null) 
-		z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
-		
-		if (z3Res.equals("unsat"))
-			println("unsat")
-		else if (z3Res.equals("sat"))
-			println("sat")
-		else  
-			println("error: " + z3Res)
-			
-		
+		specs.forEach[ s |
+			s.formulas.forEach[ f, i |
+				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.z3' 
+				//smtVerifier.verifyRigidFormula(f, s, filename, fsa)
+				smtVerifier.findModels(f, s, filename, fsa)
+			]
+		]
 		
 		// call prism if needed  
 		if (false) { 
@@ -161,7 +115,7 @@ class IPLGenerator extends AbstractGenerator {
 	        println("path: " + prismModelPath)
 	             
 	        var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
-	        System::out.println(res)
+	        println(res)
 	        //val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
 	        
 	        

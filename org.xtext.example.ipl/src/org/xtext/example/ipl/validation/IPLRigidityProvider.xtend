@@ -14,6 +14,8 @@ import org.xtext.example.ipl.iPL.TypedDec
 import org.xtext.example.ipl.iPL.VarDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
+import org.xtext.example.ipl.iPL.ProbQuery
+import org.xtext.example.ipl.iPL.RewardQuery
 
 class IPLRigidityProvider {
 	
@@ -24,6 +26,14 @@ class IPLRigidityProvider {
 	static def dispatch boolean isRigid(TAtom t) {
 		false
 	}
+	
+	static def dispatch boolean isRigid(ProbQuery p) {
+		false
+	}
+	
+	static def dispatch boolean isRigid(RewardQuery r) {
+		false
+	}	
 	
 	static def dispatch boolean isRigid(Const c) {
 		true

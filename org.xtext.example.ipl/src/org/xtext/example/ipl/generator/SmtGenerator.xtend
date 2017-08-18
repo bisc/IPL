@@ -2,10 +2,9 @@ package org.xtext.example.ipl.generator
 
 import java.util.ArrayList
 import java.util.HashMap
+import java.util.LinkedList
 import java.util.List
 import java.util.Map
-import org.osate.aadl2.Property
-import org.osate.aadl2.PropertySet
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
@@ -13,6 +12,7 @@ import org.osate.aadl2.AadlReal
 import org.osate.aadl2.BooleanLiteral
 import org.osate.aadl2.ComponentImplementation
 import org.osate.aadl2.IntegerLiteral
+import org.osate.aadl2.Property
 import org.osate.aadl2.PropertySet
 import org.osate.aadl2.RealLiteral
 import org.osate.aadl2.SubprogramGroupImplementation
@@ -49,18 +49,20 @@ import org.xtext.example.ipl.validation.SetType
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.isRigid
+import org.xtext.example.ipl.validation.IPLType
 
 class SmtGenerator {
 
-	
+	private val tp = new IPLTypeProvider
+
+	// state for formula part
+	// all quantified variables: name, type
+	private var List<Pair<String, IPLType>> scope = new LinkedList 
 	private var setDecls = ""
 	private var anonSetNum = 0
 	
 	// does not touch IPL formulas 
-	public def String generateBackgroundSmt(List<IPLSpec> specs) { 
-		
-		setDecls = ""
-		anonSetNum = 0
+	public def String generateBackgroundSmt(IPLSpec spec) { 
 		
 		val compMap = new HashMap<String, List<Integer>>
 		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
@@ -68,19 +70,21 @@ class SmtGenerator {
 		setDecls = ""
 		anonSetNum = 0
 		
-		specs.forEach[ spec | spec.eAllOfType(ViewDec).forEach[ viewDec |
-				generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
-			]
+		spec.eAllOfType(ViewDec).forEach [ viewDec |
+			generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
 		]
+		
 		println("Done populating AADL SMT")
 		
 		val decls = compMap.keySet.map['(declare-fun ' + it + '(ArchElem) Bool)'].join('\n')
 		
-		val defns = compMap.entrySet.map[if (value.empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''].join('\n')
+		val defns = compMap.entrySet.map[if (value.empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' 
+			else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
+		].join('\n')
 		
-		val props = propMap.keySet.map['(declare-fun ' + first + ' (ArchElem) ' + second + ')\n'].join + '\n' +
+		val props = propMap.keySet.map['(declare-fun ' + it.key + ' (ArchElem) ' + it.value + ')\n'].join + '\n' +
 			propMap.entrySet.map[ 
-				val name = key.first
+				val name = key.key
 				value.entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
 			].join
 			
@@ -91,17 +95,15 @@ class SmtGenerator {
 		println("Done generating AADL SMT")
 		
 		'''
-		(define-sort ArchElem () Int)
+		(set-option :model_completion true)
 		
-		; Anonymous sets
-		«setDecls»
+		(define-sort ArchElem () Int)
 		
 		; Components
 		«decls»
 		
 		«defns»
-		
-		
+				
 		; Properties and subcomponents
 		«props»
 		
@@ -112,21 +114,52 @@ class SmtGenerator {
 		'''
 	}
 
-	public def String generateSMTFormula(Formula f) { 
+	public def String generateSmtFormula(Formula f) { 
+		scope.clear()
+		setDecls = ""
+		anonSetNum = 0
+		
+		// this populates anonymous sets
+		val formulaStr = generateFormula(f)
+		
 		if (f.rigid) {
-			'(assert ' + generateFormula(f) + ')'
+			
+			'''
+			; Anonymous sets
+			«setDecls»
+			
+			(assert «formulaStr»)'''
 		} else {
 			''
 		}
 	}
 	
-	public def String generateSMTFormulaNeg(Formula f) { 
+	public def String generateSmtFormulaNeg(Formula f) {
+		scope.clear()
+		setDecls = ""
+		anonSetNum = 0
+		
+		// this populates anonymous sets
+		val formulaStr = generateFormula(f)
+		 
 		if (f.rigid) {
-			'(assert (not ' + generateFormula(f) + '))'
+			'''
+			; Anonymous sets
+			«setDecls»
+			
+			(assert (not «formulaStr»))'''
 		} else {
 			''
 		}
 	}
+	
+	public def getLastFormulaScope() { 
+		scope
+	}
+	
+	/*public def String getLastFormulaScopeEvals(){
+		scope.map[ v | '''(eval «v.key»)'''].join('\n')
+	}*/
 	
 	private def dispatch String generateFormula(FormulaOperation fop) {
 		
@@ -153,16 +186,17 @@ class SmtGenerator {
 	
 	private def dispatch String generateFormula(QAtom q) {
 		
-		val tp = new IPLTypeProvider
-		
 		val varType = (tp.typeOf(q.set) as SetType).elemType;
+		scope.add(q.^var -> varType) 
 		
 		val quant = if (q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
-		val quantOp = if (quant == 'forall') '=>' else 'and' // forall with implication, exists with conjunction
+		// forall comes with implication, exists with conjunction
+		val quantOp = if (quant == 'forall') '=>' else 'and' 
 		
 		// switching on the set member type
 		switch (varType) {
-			ComponentType: '''(«quant» ((«q.^var» ArchElem)) («quantOp» («'is' + (varType as ComponentType).name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
+			ComponentType: '''(«quant» ((«q.^var» ArchElem)) («quantOp» («'is' + (varType as ComponentType)
+				.name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
 			IntType, RealType, BoolType: {
 				val funName = generateAnonSet(q.set); 
 				val z3TypeName = switch(varType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
@@ -216,6 +250,20 @@ class SmtGenerator {
 		b.value.toString
 	}
 	
+	// helper function to generate anonymous sets, returning membership f-n name
+	private def String generateAnonSet(Expression set) { 
+		val elemType =  (tp.typeOf(set) as SetType).elemType;
+		
+		val funName = '''anonSetMb«anonSetNum++»''';
+		val z3TypeName = switch(elemType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
+		
+		// declaring an anonymous set	 
+		setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
+		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
+		) ) 
+		''';
+		funName
+	}
 
 	private def generateAADLSMT(ComponentImplementation comp, Map<String, List<Integer>> typeMap, HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
 		
@@ -286,22 +334,6 @@ class SmtGenerator {
 		}	
 	}
 	
-	// helper function to generate anonymous sets, returning membership f-n name
-	def String generateAnonSet(Expression set) { 
-		val tp = new IPLTypeProvider
-		val elemType =  (tp.typeOf(set) as SetType).elemType;
-		
-		val funName = '''anonSetMb«anonSetNum++»''';
-		val z3TypeName = switch(elemType) { IntType: "Int" RealType: "Real" BoolType:"Bool"	}
-		
-		// declaring an anonymous set	 
-		setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
-		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
-		) ) 
-		''';
-		funName
-	}
-	
 	private def String fromPropType(Property property) {
 		switch (property.propertyType) {
 			AadlBoolean: 'Bool'
@@ -327,7 +359,7 @@ class SmtGenerator {
 		
 	}
 	
-	static class Pair<T, U> {
+	/*static class Pair<T, U> {
 		
 		val T first
 		val U second
@@ -351,7 +383,7 @@ class SmtGenerator {
 		override toString() {
 			'<' + first.toString + ', ' + second.toString + '>'
 		}
-	}
+	}*/
 	
 		def <K, V> add(Map<K, List<V>> map, K key, V item) { 
 		if (map.get(key) === null) {
