@@ -3,64 +3,14 @@
  */
 package org.xtext.example.ipl.generator
 
-import java.util.ArrayList
-import java.util.HashMap
-import java.util.List
-import java.util.Map
+import java.net.URL
+import org.eclipse.core.runtime.FileLocator
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
-import org.eclipse.xtext.resource.IEObjectDescription
-import org.xtext.example.ipl.Utils
-import org.osate.aadl2.AadlBoolean
-import org.osate.aadl2.AadlInteger
-import org.osate.aadl2.AadlReal
-import org.osate.aadl2.BooleanLiteral
-import org.osate.aadl2.ComponentImplementation
-import org.osate.aadl2.IntegerLiteral
-import org.osate.aadl2.Property
-import org.osate.aadl2.PropertySet
-import org.osate.aadl2.RealLiteral
-import org.osate.aadl2.SubprogramGroupImplementation
-import org.osate.aadl2.SubprogramImplementation
-import org.osate.aadl2.instance.ComponentInstance
-import org.osate.aadl2.instance.util.InstanceUtil
-import org.osate.aadl2.instantiation.InstantiateModel
-import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
-import org.osate.aadl2.properties.PropertyNotPresentException
-import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
-import org.osate.xtext.aadl2.properties.util.PropertyUtils
 import org.xtext.example.ipl.iPL.IPLSpec
-import org.xtext.example.ipl.iPL.ViewDec
-
-import static extension org.eclipse.xtext.EcoreUtil2.*
-import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.isRigid
-import org.xtext.example.ipl.iPL.Formula
-import org.xtext.example.ipl.iPL.FormulaOperation
-import org.xtext.example.ipl.iPL.Negation
-import org.xtext.example.ipl.iPL.QAtom
-import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.ID
-import org.xtext.example.ipl.iPL.Int
-import org.xtext.example.ipl.iPL.Real
-import org.xtext.example.ipl.iPL.Bool
-import org.xtext.example.ipl.iPL.Fun
-import org.xtext.example.ipl.iPL.PropertyExpression
-import org.xtext.example.ipl.validation.IPLTypeProvider
-import org.xtext.example.ipl.validation.SetType
-import org.xtext.example.ipl.validation.ComponentType
-import org.xtext.example.ipl.iPL.ExprOperation
-import org.xtext.example.ipl.PrismConnectorAPI
-import org.eclipse.core.resources.ResourcesPlugin
-import java.net.URL
-import org.eclipse.core.runtime.FileLocator
-import org.eclipse.core.runtime.Platform
-import org.xtext.example.ipl.validation.IntType
-import org.xtext.example.ipl.iPL.Set
-import org.xtext.example.ipl.validation.RealType
-import org.xtext.example.ipl.validation.BoolType
-import org.xtext.example.ipl.iPL.Expression
+import org.xtext.example.ipl.validation.IPLRigidityProvider
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -86,47 +36,14 @@ class IPLGenerator extends AbstractGenerator {
 		specs.forEach[ s |
 			s.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.z3' 
-				//smtVerifier.verifyRigidFormula(f, s, filename, fsa)
-				smtVerifier.findModels(f, s, filename, fsa)
+				if(IPLRigidityProvider::isRigid(f))
+					smtVerifier.verifyRigidFormula(f, s, filename, fsa)
+				else // TODO preprocessing needed
+					smtVerifier.findNegModels(f, s, filename, fsa)
 			]
 		]
 		
-		// call prism if needed  
-		if (false) { 
-			System.out.println(System.getProperty("java.library.path"));
-			
-			val PrismConnectorAPI pc = new PrismConnectorAPI() 
-			
-	
-	        var prismModelUri = fsa.getURI("../model/prism/prismtmp.prism")
-	        var prismPropsUri = fsa.getURI("../model/prism/mapbot.props")
-	        var prismPolUri = fsa.getURI("../model/prism/strat-out")
-	        System::out.println(prismModelUri)
-	        
-//	        irrelevant
-//	        var homePath = ResourcesPlugin.getWorkspace().getRoot().getLocation().toString()
-//	        System::out.println(homePath)
-			println(new URL(prismModelUri.toString))
-	        
-	        var prismModelPath = FileLocator.toFileURL(new URL(prismModelUri.toString)).path
-	        var prismPropsPath = FileLocator.toFileURL(new URL(prismPropsUri.toString)).path
-	        var prismPolPath = FileLocator.toFileURL(new URL(prismPolUri.toString)).path
-	        
-	        println("path: " + prismModelPath)
-	             
-	        var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
-	        println(res)
-	        //val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
-	        
-	        
-	        
-	        /*var URL templateUrl = FileLocator.toFileURL(
-	        	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
-	        )
-	        System::out.println(templateUrl)*/
-	        
-			//getResource("res/sched/sched-model-template.pml"))
-		}
+
 	}
 	
 }

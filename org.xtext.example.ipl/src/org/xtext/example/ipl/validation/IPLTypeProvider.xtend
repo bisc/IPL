@@ -104,7 +104,7 @@ class IPLTypeProvider {
 	}
 	
 	def IPLType fromComponentImpl(ComponentImplementation ref) {
-		
+		// this function never seems to be called...
 		if (ref instanceof SubprogramImplementation
 			|| ref instanceof SubprogramGroupImplementation) {
 			//Fail...

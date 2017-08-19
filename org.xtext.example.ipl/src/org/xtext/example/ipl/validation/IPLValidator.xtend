@@ -221,7 +221,6 @@ class IPLValidator extends AbstractIPLValidator {
 	
 	@Check
 	def checkModelExpr(PrismExpr t) {
-		System::out.println(t.allContainers.toList)
 		val inModelExpr = t.allContainers.findFirst[it instanceof ModelExpr] !== null
 		
 		if (inModelExpr) {
