@@ -59,6 +59,7 @@ class IPLTransformerDadUpdater {
 	
 	dispatch def updateDad(PrismExpr f, EObject son){ 
 		f.expr = son as Formula
+		//TODO: not sure, maybe we're updating parameters? ugh
 	}
 	
 	dispatch def updateDad(ProbQuery f, EObject son){ 

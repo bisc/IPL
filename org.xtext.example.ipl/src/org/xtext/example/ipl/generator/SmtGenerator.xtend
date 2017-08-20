@@ -53,6 +53,7 @@ import org.xtext.example.ipl.validation.SetType
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.isRigid
+import org.xtext.example.ipl.IPLConfig
 
 class SmtGenerator {
 
@@ -63,9 +64,15 @@ class SmtGenerator {
 	private var Map<String, IPLType> scopeDecls = new HashMap
 	
 	// flexible "variables"
-	private var Map<String, IPLType> flexDecls = new HashMap // type details of flex "variables"
-	private var Map<String, EObject> flexClauses = new HashMap // mapping between clauses and var names
+	private var Map<String, IPLType> flexDecls = new HashMap // type details of flex "variables"; flexName -> flexVarType
+	private var Map<String, List<String>> flexArgs = new HashMap // argument names of flex clauses; flexName -> <varName>
+	private var Map<String, EObject> flexClauses = new HashMap // mapping between clauses and var names; flexName -> <IPL lang elem>
+	
+	private var Map<String, String> probingClauses = new HashMap  
+	
 	private var flexNum = 0
+	
+	
 
 	private var List<Map<String, Object>> blockingValues = new ArrayList
 	private var setDecls = ""
@@ -77,7 +84,13 @@ class SmtGenerator {
 		setDecls = ""
 		anonSetNum = 0
 
-		val preamble = '(set-option :model_evaluator.completion true)\n\n'
+		val preamble = '''(set-logic ALL)
+(set-option :produce-models true)
+(set-option :model_evaluator.completion true)
+
+'''
+
+						
 			
 		// gather view declarations
 		val viewDecs = spec.eAllOfType(ViewDec)
@@ -132,11 +145,8 @@ class SmtGenerator {
 			«subComps»
 			
 		'''
-		
 	}
 	
-	
-
 	public def String generateSmtFormula(Formula f) {
 		reset
 
@@ -149,16 +159,6 @@ class SmtGenerator {
 				«setDecls» '''»
 		
 		(assert «formulaStr»)'''
-		/*if (f.rigid) {
-
-			'''
-			; Anonymous sets
-			«setDecls»
-			
-			(assert «formulaStr»)'''
-		} else {
-			''
-		}*/
 	}
 	
 
@@ -169,26 +169,30 @@ class SmtGenerator {
 		val formulaStr = generateFormula(f)
 
 		'''
+		«if (setDecls.length > 0)
+			'''; Anonymous sets
+«setDecls» '''»
+
+		«if (IPLConfig.ENABLE_PROBING_VARS) 
+			'''«scopeDecls.keySet.map['(declare-const ' + probe(it) +' '
+					+ typesIPL2Smt(scopeDecls.get(it))+')'
+			].join('\n')»'''»
 		
-		; Anonymous sets
-		«setDecls»
+		«probingClauses.values.join('\n')»
 		
 		(assert (not «formulaStr»))'''
-		/*if (f.rigid) {
-			'''
-			; Anonymous sets
-			«setDecls»
-			
-			(assert (not «formulaStr»))'''
-		} else {
-			''
-		}*/
 	}
 	
 	public def String generateSmtFlexDecl() { 
-		flexDecls.keySet.map[
-			'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
-		].join('\n')+'\n'
+		if(IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) // with args
+			flexDecls.keySet.map[
+				'''(declare-fun «it» («flexArgs.get(it).map[typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
+					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
+			].join('\n')+'\n'
+		else // no args
+			flexDecls.keySet.map[
+				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
+			].join('\n')+'\n'
 	}
 
 	public def setBlockingValues(List<Map<String, Object>>  blocks) {
@@ -261,12 +265,24 @@ class SmtGenerator {
 				val setMbFunName = generateAnonSet(q.set);
 				val z3TypeName = switch (varType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
 
+				// probing constraint - set
+				if (IPLConfig.ENABLE_PROBING_VARS){
+					probingClauses.put(probe(q.^var), '''(assert («setMbFunName» «probe(q.^var)»))''')
+				}
+				
+				
 				// if we have any blocking to do for this variable...
 				var blockingClauses = ''
 				blockingClauses = blockingValues.map[ nameValueMap |
-					if (nameValueMap.containsKey(q.^var)) 
+					if (nameValueMap.containsKey(q.^var)) {
+						if (IPLConfig.ENABLE_PROBING_VARS){
+							probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
+							
+							(assert (distinct «probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
+						}
+						
 						'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
-					else 
+					} else 
 						''
 				].join(' ') 
 				
@@ -326,20 +342,41 @@ class SmtGenerator {
 	// === FLEXIBLE GENERATION FUNCTIONS ===
 	
 	private def dispatch String generateFormula(ProbQuery pq) {
-		val String name = '''_flex«flexNum++»'''
-		flexClauses.put(name, pq )
-		flexDecls.put(name, new BoolType)
 		
-		name
+		if(IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) {
+			var String abst = createFlexAbstractionWithArgs
+			flexClauses.put(abst, pq )
+			'''(«abst» «flexArgs.get(abst).map[it].join(' ')»)'''
+		} else {
+			var String abst = createFlexAbstraction
+			flexClauses.put(abst, pq )
+			abst
+		}
 	}
-	
-	
 	
 	// === HELPER FUNCTIONS === 
 
-	private def createFlexAbstraction() {
-		
+	private def String probe(String varName){
+		varName + '_probe'
+	}
+	private def String createFlexAbstraction() {
+		val String name = '''_flex«flexNum++»'''
+		flexDecls.put(name, new BoolType)
+		name
 	} 
+	
+	// alternative to previous - with arguments! 
+	private def String createFlexAbstractionWithArgs() {
+		val String name = '''_flex«flexNum++»'''
+		flexDecls.put(name, new BoolType)
+		
+		flexArgs.put(name, new ArrayList)	
+		scopeDecls.forEach[varName, varType|
+			flexArgs.get(name).add(varName)
+		]
+		name
+	} 
+	
 
 	// reset the formula parsing state
 	private def reset() {
@@ -441,6 +478,15 @@ class SmtGenerator {
 			AadlInteger: 'Int'
 			AadlReal: 'Real'
 			default: null
+		}
+	}
+	
+	private def String typesIPL2Smt(IPLType t) {
+		switch (t) {
+			BoolType: 'Bool'
+			IntType: 'Int'
+			RealType: 'Real'
+			default: 'UNKNOWN TYPE'
 		}
 	}
 

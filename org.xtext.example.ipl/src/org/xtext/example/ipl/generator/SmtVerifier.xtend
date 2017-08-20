@@ -18,6 +18,7 @@ import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
+import org.xtext.example.ipl.IPLConfig
 
 public class SmtVerifier {
 
@@ -53,6 +54,7 @@ public class SmtVerifier {
 					println('Flexible formula: ' + smtGenerator.lastFormulaFlexClauses.get(flexName).toString())
 					
 					// put rigid values into it 
+					(new IPLTransformerValueReplacer).replaceQvarsWithValues(f, nameValueMap)
 					
 					// pass parameters to the model 
 					
@@ -186,54 +188,39 @@ public class SmtVerifier {
 		scopeVals.add(newEval)
 		
 		scopeDecls.forEach [ varName, varType |
-			// decoding: (define fun, then var name, then ! followed by any digits, 
-			// then parentheses with something, then a type (word, 1st group) in parentheses
-			// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
-			// zero group - everything that matched
-			// first group - the type
-			// second group - the value 
-			val Pattern p = Pattern.compile('''\(define-fun «varName»!\d* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)''')
 
-			val Matcher m = p.matcher(z3Res)
+			var Pattern p = Pattern.compile(modelParsingPattern(varName))
+			var Matcher m = p.matcher(z3Res)
 
-			if (m.find) {
-				//println('Match:' + m.group)
-				val typeSmt = m.group(1)
-				val valueSmt = m.group(2)  
-					
-				// if evals don't have a var, add a list
-		  		if (!newEval.containsKey(varName)) 
-		  			newEval.put(varName, new LinkedList)
-		  			
-
-				switch(varType) { // variable type from scope
-				  	IntType: {
-				  		if (typeSmt != 'Int') 
-				  			print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''' );
-				  		
-				  		newEval.put(varName, Integer.parseInt(valueSmt))	
-				  	}
-				  	RealType: {
-				  		if (typeSmt != 'Real') 
-				  			print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''' );
-				  			
-		  				newEval.put(varName, Float.parseFloat(valueSmt))
-			  		}
-				  	BoolType: {
-				  		if (typeSmt != 'Bool') 
-				  			print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''' );
-				  			
-			  			newEval.put(varName, Boolean.parseBoolean(valueSmt))
-		  			}
-		  			default: 
-				  	 	println('''Type error: undefined type «varType» of variable «varName»''')
-				 }
-				 
-			} else {
+			// some sequential logic here to simplify code
+			var matchFound = false
+			
+			if (m.find) 
+				matchFound = true
+			else if (!IPLConfig.ENABLE_PROBING_VARS)
 				println('''Error parsing z3 output: match for «varName» (type «varType») not found in:
 					 «z3Res»''')
+
+			if (!matchFound && IPLConfig.ENABLE_PROBING_VARS) {
+				p = Pattern.compile(modelParsingPattern(varName + '_probe'))
+				m = p.matcher(z3Res)
+				if (m.find)
+					matchFound = true
+				else {
+					println('''Error parsing z3 output: match for «varName» and «varName»_probe (type «varType») not found in:
+					 «z3Res»''')
+					modelFound = false
+				}
+			} 
+			
+			if (matchFound) {
+				val typeSmt = m.group(2)
+				val valueSmt = m.group(3)   
+				addValueToEval(newEval, varName, valueSmt, varType, typeSmt)
+			} else 
 				modelFound = false
-			}
+
+			
 			
 			// has to be only one match per variable
 			if(m.find) {
@@ -243,5 +230,46 @@ public class SmtVerifier {
 		]
 		println('Values found:' + scopeVals)
 		modelFound
+	}
+	
+	private def String modelParsingPattern(String varName) { 
+			// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
+			// then parentheses with something, then a type (word, 1st group) in parentheses
+			// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
+			// zero group - everything that matched
+			// first group - exclamation signs (may be not there for probes)
+			// second ground - the type
+			// third group - the value 
+		'''\(define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
+	}
+	
+	private def addValueToEval(Map<String, Object> eval, String varName, String valueSmt, IPLType varType,
+			String smtType) {
+		// if evals don't have a var, add a list
+		if (!eval.containsKey(varName))
+			eval.put(varName, new LinkedList)
+
+		switch (varType) { // variable type from scope
+			IntType: {
+				if (smtType != 'Int')
+					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
+
+				eval.put(varName, Integer.parseInt(valueSmt))
+			}
+			RealType: {
+				if (smtType != 'Real')
+					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
+
+				eval.put(varName, Float.parseFloat(valueSmt))
+			}
+			BoolType: {
+				if (smtType != 'Bool')
+					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
+
+				eval.put(varName, Boolean.parseBoolean(valueSmt))
+			}
+			default:
+				println('''Type error: undefined type «varType» of variable «varName»''')
+		}
 	}
 }
