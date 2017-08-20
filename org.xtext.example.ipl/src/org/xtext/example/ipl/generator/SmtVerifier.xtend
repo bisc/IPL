@@ -1,6 +1,7 @@
 package org.xtext.example.ipl.generator;
 
 import java.net.URL
+import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.LinkedList
@@ -9,7 +10,9 @@ import java.util.Map
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
+import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.generator.IFileSystemAccess2
+import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
@@ -18,7 +21,6 @@ import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
-import org.xtext.example.ipl.IPLConfig
 
 public class SmtVerifier {
 
@@ -35,29 +37,37 @@ public class SmtVerifier {
 		scopeVals.clear
 		
 		// check if it's valid anyway, regardless of flexible terms
+		println('Checking if rigid verification discharges the formula')
 		if (verifyRigidFormula(f, s, filename, fsa))
 			return true
 		
 		// find models: candidate valuations for sat of negformula
-		findNegModels(f,s,filename,fsa)
+		if (!findNegModels(f,s,filename,fsa)) 
+			throw new UnexpectedException("Failed to find models, check the formula")
 			
-		// TODO maybe just add an empty one? 
+		// if scope vals are empty, add one just to continue 
+		if(scopeVals.size == 0)
+			scopeVals.add(new HashMap)
+		 
 		// basically go through candidate valuations one by one, obtaining MC results for each
 		return scopeVals.map[ nameValueMap | 
 				println("Considering valuation " + nameValueMap)
 				
-				
 				flexDecls.forEach[flexName, flexType|
-					println("Considering flex variable " + flexName)
+					println("Considering flex variable: " + flexName)
 					
 					// find a flexible subformula
-					println('Flexible formula: ' + smtGenerator.lastFormulaFlexClauses.get(flexName).toString())
+					val EObject flexFormula = smtGenerator.lastFormulaFlexClauses.get(flexName)
+					println('Flexible formula: ' + flexFormula)
 					
-					// put rigid values into it 
-					(new IPLTransformerValueReplacer).replaceQvarsWithValues(f, nameValueMap)
+					// find its flexible subtree
+					// TODO assuming now it's the same thing
 					
-					// pass parameters to the model 
+					// put rigid values into it (including model parameters)
+					(new IPLTransformerValueReplacer).replaceQvarsWithValues(flexFormula, nameValueMap)
 					
+					println('Transformed formula:' + flexFormula)
+										
 					// call model checker
 					(new PrismPlugin).verify('', fsa)
 					
@@ -78,6 +88,7 @@ public class SmtVerifier {
 
 	// finds all variable assignments that satisfy a negated formula
 	// thus, these are candidates for the formula to NOT be valid
+	// @returns true if managed to find all models, false otherwise 
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
@@ -85,7 +96,14 @@ public class SmtVerifier {
 		// initial run of formula to initialize scope declarations 
 		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
 		println("Done generating IPL SMT")
+		
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
+		// no variables -> no need to look for models
+		if (scopeDecls.size == 0) {
+			print('No quantified variables; aborting model search')			
+			return true
+		}
+		
 		flexDecls = smtGenerator.lastFormulaFlexDecls
 		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
 		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl	
@@ -143,8 +161,11 @@ public class SmtVerifier {
 		println("Done generating IPL SMT")
 		
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
+		flexDecls = smtGenerator.lastFormulaFlexDecls
+		println('''Flex: «flexDecls»''')
+		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl	
 
-		fsa.generateFile(filename, backgrSmt + formulaSmt + ''' 
+		fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
 			
 			(check-sat) 
 			(get-model)
@@ -232,6 +253,7 @@ public class SmtVerifier {
 		modelFound
 	}
 	
+	// returns a model parsing pattern (complex enough that deserves its own function) 
 	private def String modelParsingPattern(String varName) { 
 			// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
 			// then parentheses with something, then a type (word, 1st group) in parentheses
@@ -243,6 +265,7 @@ public class SmtVerifier {
 		'''\(define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
 	
+	// helper function: adds a value to a valuation, doing all the checks as well 
 	private def addValueToEval(Map<String, Object> eval, String varName, String valueSmt, IPLType varType,
 			String smtType) {
 		// if evals don't have a var, add a list

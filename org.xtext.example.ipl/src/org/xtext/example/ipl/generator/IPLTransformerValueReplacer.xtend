@@ -1,12 +1,14 @@
 package org.xtext.example.ipl.generator
 
+import java.rmi.UnexpectedException
 import java.util.Map
+import org.eclipse.emf.ecore.EObject
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
-import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.PrismExpr
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
@@ -14,11 +16,10 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
-import java.rmi.UnexpectedException
 
 // replaces values of rigid variables/constants in IPL formulas
 class IPLTransformerValueReplacer {
-	public def replaceQvarsWithValues (Formula f, Map<String, Object> valuation) { 
+	public def replaceQvarsWithValues (EObject f, Map<String, Object> valuation) { 
 		replaceQvars(f, valuation)
 	}
 	
@@ -70,6 +71,10 @@ class IPLTransformerValueReplacer {
 		replaceQvars(f.left, valuation)
 		replaceQvars(f.right, valuation)
 	}
+	
+	private dispatch def replaceQvars(ModelParamExpr f, Map<String, Object> valuation){
+		f.vals.forEach[replaceQvars(it, valuation)]
+	}	
 	
 	private dispatch def replaceQvars(PrismExpr f, Map<String, Object> valuation){ 
 		replaceQvars(f.expr, valuation)

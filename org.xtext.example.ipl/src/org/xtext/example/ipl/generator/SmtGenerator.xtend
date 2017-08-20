@@ -67,18 +67,19 @@ class SmtGenerator {
 	private var Map<String, IPLType> flexDecls = new HashMap // type details of flex "variables"; flexName -> flexVarType
 	private var Map<String, List<String>> flexArgs = new HashMap // argument names of flex clauses; flexName -> <varName>
 	private var Map<String, EObject> flexClauses = new HashMap // mapping between clauses and var names; flexName -> <IPL lang elem>
-	
-	private var Map<String, String> probingClauses = new HashMap  
-	
 	private var flexNum = 0
-	
-	
 
+	// probes for finding model values	
+	private var Map<String, String> probingClauses = new HashMap  
+
+	// blocking clauses for finding model values
 	private var List<Map<String, Object>> blockingValues = new ArrayList
+	
+	// anonymous sets encoded as functions
 	private var setDecls = ""
 	private var anonSetNum = 0
 
-	// does not touch IPL formulas 
+	// generates a preamble and AADL SMT; does not touch IPL formulas 
 	public def String generateBackgroundSmt(IPLSpec spec) {
 
 		setDecls = ""
@@ -90,8 +91,6 @@ class SmtGenerator {
 
 '''
 
-						
-			
 		// gather view declarations
 		val viewDecs = spec.eAllOfType(ViewDec)
 			
@@ -102,14 +101,14 @@ class SmtGenerator {
 		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
 		val subCompMap = new HashMap<Integer, List<Integer>>
 
-
+		// parse aadl structures to prep for smt generation
 		viewDecs.forEach [ viewDec |
-			generateAADLSMT(viewDec.ref, compMap, propMap, subCompMap)
+			populateAadlSmtStructures(viewDec.ref, compMap, propMap, subCompMap)
 		]
-		
 		
 		println("Done populating AADL SMT")
 		
+		// generate aadl->smt 
 		var decls = "(define-sort ArchElem () Int)\n"
 		decls += compMap.keySet.map['(declare-fun ' + it + '(ArchElem) Bool)'].join('\n')
 
@@ -131,6 +130,7 @@ class SmtGenerator {
 
 		println("Done generating AADL SMT")
 
+		// final output
 		'''	«preamble»
 			
 			; Arch elements
@@ -270,8 +270,7 @@ class SmtGenerator {
 					probingClauses.put(probe(q.^var), '''(assert («setMbFunName» «probe(q.^var)»))''')
 				}
 				
-				
-				// if we have any blocking to do for this variable...
+				// do blocking for this variable if needed
 				var blockingClauses = ''
 				blockingClauses = blockingValues.map[ nameValueMap |
 					if (nameValueMap.containsKey(q.^var)) {
@@ -286,6 +285,7 @@ class SmtGenerator {
 						''
 				].join(' ') 
 				
+				// the old way of doing blocking: 
 				//if (blockingValues.get(q.^var) !== null)
 //					 blockingClauses = blockingValues.get(q.^var).map['''(distinct «q.^var» «it» )'''].join(' ') // forEach[blockingClauses += it]	
 				// actual quantified expression
@@ -342,14 +342,20 @@ class SmtGenerator {
 	// === FLEXIBLE GENERATION FUNCTIONS ===
 	
 	private def dispatch String generateFormula(ProbQuery pq) {
-		
-		if(IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) {
-			var String abst = createFlexAbstractionWithArgs
-			flexClauses.put(abst, pq )
-			'''(«abst» «flexArgs.get(abst).map[it].join(' ')»)'''
+		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) {
+			val String abst = createFlexAbstractionWithArgs
+			val args = flexArgs.get(abst)
+			flexClauses.put(abst, pq)
+			
+			// non-nullary functions need extra ( ) around them
+			if (args.length > 0)
+				'''(«abst» «args.map[it].join(' ')»)'''
+			else
+				abst
+				
 		} else {
 			var String abst = createFlexAbstraction
-			flexClauses.put(abst, pq )
+			flexClauses.put(abst, pq)
 			abst
 		}
 	}
@@ -376,13 +382,19 @@ class SmtGenerator {
 		]
 		name
 	} 
-	
 
 	// reset the formula parsing state
 	private def reset() {
-		scopeDecls.clear()
-		flexDecls.clear()
+		scopeDecls.clear
+		
+		flexDecls.clear
+		flexArgs.clear
+		flexClauses.clear
 		flexNum = 0
+		
+		probingClauses.clear
+		blockingValues.clear
+		
 		setDecls = ""
 		anonSetNum = 0
 	}
@@ -402,7 +414,7 @@ class SmtGenerator {
 		funName
 	}
 
-	private def generateAADLSMT(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
+	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
 		HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
 
 		if (comp instanceof SubprogramImplementation || comp instanceof SubprogramGroupImplementation) {

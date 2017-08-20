@@ -36,10 +36,11 @@ class IPLGenerator extends AbstractGenerator {
 		specs.forEach[ s |
 			s.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.z3' 
+				println('\n\nVerifying ' + f.toString)
 				if(IPLRigidityProvider::isRigid(f))
 					smtVerifier.verifyRigidFormula(f, s, filename, fsa)
 				else // TODO preprocessing needed
-					smtVerifier.findNegModels(f, s, filename, fsa)
+					smtVerifier.verifyNonRigidFormula(f, s, filename, fsa)
 			]
 		]
 		
