@@ -16,6 +16,7 @@ import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
+import org.xtext.example.ipl.prism.plugin.PrismConnectorAPI
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType

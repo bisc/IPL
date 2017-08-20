@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Prism
+Bundle-Name: org.xtext.example.ipl.prism
 Bundle-SymbolicName: org.xtext.example.ipl.prism
 Bundle-Version: 1.0.0
 Bundle-ClassPath: jhoafparser.jar,
@@ -140,3 +140,4 @@ Export-Package: .,
  userinterface.simulator.networking,
  userinterface.util
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy

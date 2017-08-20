@@ -1,11 +1,9 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Prism
+Bundle-Name: org.xtext.example.ipl.prism.plugin
 Bundle-SymbolicName: org.xtext.example.ipl.prism.plugin
 Bundle-Version: 1.0.0
 Bundle-ClassPath: .
-Export-Package: .,
- org.xtext.example.ipl.prism.plugin
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Require-Bundle: com.google.guava,
  org.eclipse.xtext.xbase.lib,
@@ -14,4 +12,6 @@ Require-Bundle: com.google.guava,
  org.xtext.example.ipl.prism;bundle-version="1.0.0",
  org.eclipse.xtext.generator;bundle-version="2.12.0",
  org.eclipse.core.runtime;bundle-version="3.12.0"
+Bundle-ActivationPolicy: lazy
+Export-Package: org.xtext.example.ipl.prism.plugin
 
