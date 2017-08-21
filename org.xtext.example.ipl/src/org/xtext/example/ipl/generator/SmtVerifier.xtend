@@ -39,6 +39,7 @@ public class SmtVerifier {
 	private var List<Map<String, Object>> scopeVals = new ArrayList<Map<String, Object>>
 
 	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
+	private var Map<String, ModelExpr> flexClauses // pointers to flexible clauses, by name 
 	private var Boolean modelFound = false
 
 	public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
@@ -54,6 +55,13 @@ public class SmtVerifier {
 		if (!findNegModels(origFormula, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
 
+		// now the current formula state is populated: 
+		// scope decls are set
+		// scope vals populated
+		// flex decls are also set
+		// what remains is to save flex clauses
+		flexClauses = smtGenerator.lastFormulaFlexClauses
+		
 		// if scope vals are empty, add one just to continue 
 		if (scopeVals.size == 0)
 			scopeVals.add(new HashMap)
@@ -63,15 +71,22 @@ public class SmtVerifier {
 		// need an immutable copy because verifyRigidFormula clears evals for itself
 		return scopeVals.immutableCopy.map [ nameValueMap |
 			println("Considering valuation " + nameValueMap)
-
-			val flexVerRes = flexDecls.immutableCopy.keySet.map[String flexName |
-				val flexType = flexDecls.immutableCopy.get(flexName)
+			
+			var boolean flexVerRes = true
+			
+			// iterate through flexible parts (although not expecting > 1)
+			for (e : flexDecls.entrySet) {
+				val flexName = e.key
+				val flexType = e.value
+			
+				//val flexVerRes = flexDecls.[String flexName | //keySet.map[String flexName |
+				//val flexType = flexDecls.get(flexName)
 				
 				//String flexName, IPLType flexType |
 				println("Considering flex variable: " + flexName)
 
 				// find a flexible subformula; original in the formula
-				val ModelExpr origflexMdlExpr = smtGenerator.lastFormulaFlexClauses.get(flexName)
+				val ModelExpr origflexMdlExpr = flexClauses.get(flexName)
 
 				// make a copy to feed to prism, to not spoil it for further iterations
 				val newflexMdlExpr = EcoreUtil::copy(origflexMdlExpr)
@@ -133,8 +148,8 @@ public class SmtVerifier {
 				
 				EcoreUtil::delete(flexVal)
 				
-				verRes
-			].reduce[resSoFar, thisRes | resSoFar && thisRes]
+				flexVerRes = flexVerRes && verRes
+			}//.reduce[resSoFar, thisRes | resSoFar && thisRes]
 
 			// pushing the verification results up
 			flexVerRes
@@ -145,6 +160,7 @@ public class SmtVerifier {
 	// finds all variable assignments that satisfy a negated formula
 	// thus, these are candidates for the formula to NOT be valid
 	// @returns true if managed to find all models, false otherwise 
+	// implicit result: populates flexDecls
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
@@ -210,6 +226,7 @@ public class SmtVerifier {
 	}
 
 	// simple verification of negated formula
+	// populates scope decls but not flexDecls
 	public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		// scopeVals.clear -- not needed?
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
@@ -217,8 +234,8 @@ public class SmtVerifier {
 		println("Done generating IPL SMT")
 
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
-		flexDecls = smtGenerator.lastFormulaFlexDecls
-		println('''Flex: «flexDecls»''')
+		//val flexDecls = smtGenerator.lastFormulaFlexDecls
+		//println('''Flex: «flexDecls»''')
 		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
 
 		fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
@@ -271,12 +288,14 @@ public class SmtVerifier {
 			// some sequential logic here to simplify code
 			var matchFound = false
 
+			// try to find the actual variable first
 			if (m.find)
 				matchFound = true
 			else if (!IPLConfig.ENABLE_PROBING_VARS)
 				println('''Error parsing z3 output: match for «varName» (type «varType») not found in:
 					 «z3Res»''')
 
+			// if failed, try to find its probe
 			if (!matchFound && IPLConfig.ENABLE_PROBING_VARS) {
 				p = Pattern.compile(modelParsingPattern(varName + '_probe'))
 				m = p.matcher(z3Res)
@@ -290,7 +309,7 @@ public class SmtVerifier {
 			}
 
 			if (matchFound) {
-				val typeSmt = m.group(2)
+				val typeSmt = m.group(2) // see modelParsingPattern
 				val valueSmt = m.group(3)
 				addValueToEval(newEval, varName, valueSmt, varType, typeSmt)
 			} else

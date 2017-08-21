@@ -198,14 +198,18 @@ class SmtGenerator {
 		blockingValues = blocks
 	}
 
+	// returns the scope declaration
+	// won't clear it later
 	public def getLastFormulaScopeDecls() {
 		scopeDecls
 	}
 
+	// won't clear it later
 	public def getLastFormulaFlexDecls() {
 		flexDecls
 	}
 
+	// won't clear it later
 	public def getLastFormulaFlexClauses() {
 		flexClauses
 	}
@@ -390,13 +394,13 @@ class SmtGenerator {
 
 	// reset the formula parsing state
 	private def reset() {
-		scopeDecls.clear
-
-		flexDecls.clear
+		// creating new ones to be independent from its clients
+		scopeDecls = new HashMap//scopeDecls.clear
+		flexDecls = new HashMap//flexDecls.clear
+		flexClauses = new HashMap//flexClauses.clear
+		
 		flexArgs.clear
-		flexClauses.clear
 		flexNum = 0
-
 		probingClauses.clear
 
 		setDecls = ""
