@@ -13,6 +13,7 @@ import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
+import org.xtext.example.ipl.iPL.QM
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
@@ -92,12 +93,20 @@ class IPLPrettyPrinter {
 		 print(f.expr)
 	}
 	
-	dispatch def String print(ProbQuery f){ 
-		'''P«f.comp»«print(f.value)»[«print(f.expr)»]'''
+	dispatch def String print(QM f){
+		 '?'
+	}
+	
+	dispatch def String print(ProbQuery f){
+		val mm = f.minmax?.^val ?: ''
+		//var mm = if (f.minmax !== null)	f.minmax.^val else ''
+			
+		'''P«mm»«f.comp»«print(f.value)»[«print(f.expr)»]'''
 	}
 	
 	dispatch def String print(RewardQuery f){ 
-		'''R{'«f.rewardName»'} «print(f.value)» [«f.expr»]'''
+		val mm = f.minmax?.^val ?: ''
+		'''R{«f.rewardName»}«mm»«f.comp»«print(f.value)» [«print(f.expr)»]'''
 	}
 	
 	/*dispatch def print(PrismValue f){

@@ -38,14 +38,17 @@ class IPLGenerator extends AbstractGenerator {
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.smt' 
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 				if(IPLRigidityProvider::isRigid(f)) { //rigid
-					smtVerifier.verifyRigidFormula(f, spec, filename, fsa)
+					val res = smtVerifier.verifyRigidFormula(f, spec, filename, fsa)
+					println("Rigid formula verified, result: " + res)
 				} else { // non-rigid 
-					// find a model 
+					// find a model declaration
 					val mdls = spec.decls.filter[it instanceof ModelDecl]
 					if (mdls.size == 0) {
 						println('Error: cannot verify non-rigid formulas without a model')
-					} else					
-						smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+					} else {					
+						val res = smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+						println("Non-rigid formula verified, result: " + res)
+					}
 				}
 			]
 		]

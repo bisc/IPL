@@ -5,6 +5,8 @@ import java.net.URL
 import java.util.List
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.xtext.generator.IFileSystemAccess2
+import java.io.FileNotFoundException
+import java.rmi.UnexpectedException
 
 class PrismPlugin {
 	val String relativePrismLoc = "../model/prism/"
@@ -25,11 +27,26 @@ class PrismPlugin {
 		}
 	
 	
-	public def boolean verifyProbQuery(String prop, List<String> params) {
+	public def boolean verifyPrismBooleanProp(String property, List<String> paramsDecl, List<String> paramVals) {
+		Boolean.parseBoolean(modelCheck(property, paramsDecl, paramVals))
+	}
+	
+	public def double runPrismQuery(String property, List<String> paramsDecl, List<String> paramVals) {
+		val res = modelCheck(property, paramsDecl, paramVals)
+		if (res == 'infinity')
+			throw new UnexpectedException("Received infinity from prism: check that the path formula holds with P=1")
+		
+		Double.parseDouble(res)
+	}
+	
+	private def String modelCheck(String property, List<String> paramsDecl, List<String> paramVals) {
+		
+		if (paramsDecl.size != paramVals.size)
+			throw new IllegalArgumentException("Need the same quantity of parameter declarations and values")
 
 		// put property into a file
 		val String propsRelativePath = relativePrismLoc + "myprops.props"
-		fsa.generateFile(propsRelativePath, prop)
+		fsa.generateFile(propsRelativePath, property+'\n')
 
 		var propsAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(propsRelativePath/*"mapbot.props"*/).toString)).path
 		var prismPolPath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + 'strat-out').toString)).path
@@ -37,16 +54,26 @@ class PrismPlugin {
 		println("Model path: " + prismModelAbsolutePath)
 		println("Props path: " + propsAbsolutePath)
 
-		if(!new File(prismModelAbsolutePath).exists) {
-			println("Error: prism model not found in " + prismModelAbsolutePath) 
-			return false
+		if(!new File(prismModelAbsolutePath).exists) 
+			throw new FileNotFoundException("Error: prism model not found in " + prismModelAbsolutePath)
+		
+		
+		//prep parameter string
+		var String paramInst = ''
+		
+		for (i : 0 ..< paramsDecl.size) {
+			if (paramInst.length > 0)
+				 paramInst += ','
+				
+			paramInst += '''«paramsDecl.get(i)»=«paramVals.get(i)»'''
 		}
 		
 		// call prism   
-		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, propsAbsolutePath, prismPolPath);
-		println(res)
+		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, 
+			propsAbsolutePath, prismPolPath, -1/*prop to check - all*/, paramInst) 
 		
-		true
+		println('Prism result: ' + res)
+		res
 	// val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
 	/*var URL templateUrl = FileLocator.toFileURL(
 	 * 	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
@@ -55,7 +82,7 @@ class PrismPlugin {
 	// getResource("res/sched/sched-model-template.pml"))
 	}
 	
-	public def double verifyRewardQuery(){
+	/*public def double verifyRewardQuery(){
 		1.0
-	}
+	}*/
 }

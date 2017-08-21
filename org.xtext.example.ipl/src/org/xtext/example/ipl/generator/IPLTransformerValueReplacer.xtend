@@ -35,6 +35,9 @@ class IPLTransformerValueReplacer {
 
 	// replaces all occurences of variables with their valuations
 	public def replaceVarsWithValues(EObject f, Map<String, Object> valuation, Map<String, IPLType> declarations) {
+		if (valuation.size == 0 )
+			return
+		
 		vals = valuation
 		decls = declarations
 		replaceVars(f)
@@ -96,6 +99,7 @@ class IPLTransformerValueReplacer {
 				default: throw new UnexpectedException("Unknown type")
 			}
 			
+			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, v)
 		}
 	}

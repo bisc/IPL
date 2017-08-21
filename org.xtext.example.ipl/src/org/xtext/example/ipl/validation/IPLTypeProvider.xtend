@@ -27,9 +27,11 @@ import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
-import org.xtext.example.ipl.iPL.ProbQuery
+import org.xtext.example.ipl.iPL.ModelExpr
+import org.xtext.example.ipl.iPL.PrismExpr
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
+import org.xtext.example.ipl.iPL.QM
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.STVarDecl
 import org.xtext.example.ipl.iPL.Set
@@ -271,8 +273,15 @@ class IPLTypeProvider {
 		}
 	}
 	
-	def dispatch IPLType typeOf(ProbQuery pq) { 
-		new BoolType
+	def dispatch IPLType typeOf(ModelExpr me) {
+		typeOf(me.expr)
+	}
+	
+	def dispatch IPLType typeOf(PrismExpr pq) {//used to be ProbQuery
+		if(pq.value instanceof QM)
+			new RealType
+		else 
+			new BoolType
 	}
 	
 	def getParamTypes(Fun fun) {		

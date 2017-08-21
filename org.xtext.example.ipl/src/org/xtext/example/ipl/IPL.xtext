@@ -20,11 +20,11 @@ Declaration:
 ;
 
 ViewDecl:
-	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID
+	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID 
 ;
 
 ModelDecl:
-	'use' 'model' name=ID
+	'use' 'model' name=ID ('(' (params+=ID)? (',' params+=ID)* ')')?
 ;
 
 BaseType:
@@ -107,9 +107,7 @@ Fun:
 	name=[FunDecl] '(' (args += Term)? (',' args += Term)* ')'
 ;
 
-Prop returns Prop:
-	{Prop} id=ID
-;
+// EXPRESSIONS
 
 Expression:
 	Addition;
@@ -127,13 +125,19 @@ PropertyExpression returns Expression:
 	PrimaryExpression (({PropertyExpression.left=current} '::') right=Prop)*
 ;
 
+Prop returns Prop:
+	{Prop} id=ID
+;
 
 PrimaryExpression returns Expression:
 	'(' Expression ')' |
 	Const |
 	Fun |
-	{ID} id=ID
+	{ID} id=ID | 
+	ModelExpr
 ;
+
+// TERMS
 
 Term returns TermFormula: 
 	'(' TermFormula ')' | (=> Expression)
@@ -143,8 +147,10 @@ TermFormula returns TermFormula:
 		Term ({TermOperation.left=current} op=(LT | LTE | GT | GTE | EQ | NE) right=Term)*
 ;
 
+// ATOMS
+
 TAtom: //TODO: make until binary
-	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')'
+	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')' //used to have parentheses 
 ;
 
 QAtom:
@@ -163,18 +169,21 @@ FormulaBase returns Formula:
 	(=> TermFormula) | '(' Formula ')' | TAtom | ModelExpr
 ;
 
-ModelParamExpr: 
-	'{|' vals+=TermFormula (',' vals+=TermFormula)* '|}' |
-		 {ModelParamExpr} '{|' '|}' 
-;
+// BEHAVIORAL MODEL 
 
 ModelExpr returns ModelExpr:
 	expr=PrismExpr params=ModelParamExpr 
 ;
 
+ModelParamExpr: 
+	'{|' vals+=TermFormula (',' vals+=TermFormula)* '|}' |
+		 {ModelParamExpr} '{|' '|}' 
+;
+
 //-----------------------------------------------------------------------------
 // PCTL-specific syntax
 
+			
 PrismExpr:
 	 (ProbQuery | RewardQuery) 
 ;
@@ -184,15 +193,19 @@ PrismComp:
 ;
 
 PrismValue:
-	 Expression | {QM} '?'
+	Expression | {QM} '?' 
+;
+
+PrismMinMax: 
+	val='min' | val='max'
 ;
 
 ProbQuery:
-	'P' comp=PrismComp value=PrismValue '[' expr=Formula ']' 
+	'P' (minmax=PrismMinMax)? comp=PrismComp value=PrismValue '[' expr=Formula ']' 
 ;
 
 RewardQuery:
-	'R' ('{"' rewardName=ID '"}')?  EQ value=PrismValue '[' expr=Formula ']'
+	'R' ('{' rewardName=QUOTED_STRING /*rewardName=ID*/ '}')? (minmax=PrismMinMax)?  comp=PrismComp value=PrismValue '[' expr=Formula ']'
 ;
 
 
@@ -246,7 +259,7 @@ terminal NE:
 ;
 
 terminal NEXT:
-	'X' | 'N' | 'NEXT'
+	'X' | 'NEXT'
 ;
 
 terminal ALWAYS:
@@ -269,4 +282,7 @@ terminal EXISTS:
 	'exists' | 'E'
 ;
 
+terminal QUOTED_STRING	: 
+			'"' ( '\\' . /* 'b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\' */ | !('\\'|'"') )* '"'
+;
 

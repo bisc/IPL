@@ -146,7 +146,7 @@ class IPLValidator extends AbstractIPLValidator {
 				IPLPackage.Literals.EXPR_OPERATION__LEFT, WRONG_TYPE)
 		}
 		
-		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
+		if (!(rightType instanceof IntType || rightType instanceof RealType)) {
 			error("expected numeric type, but was " + rightType,
 				IPLPackage.Literals.EXPR_OPERATION__RIGHT, WRONG_TYPE)
 		}
@@ -229,6 +229,7 @@ class IPLValidator extends AbstractIPLValidator {
 		}
 	}
 	
-	// TODO: check that no more than one model 
+	// TODO check that no more than one model 
 	
+	// TODO check that declared and passed model parameters match 	
 }
