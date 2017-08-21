@@ -9,6 +9,7 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.iPL.IPLSpec
+import org.xtext.example.ipl.iPL.ModelDec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
 //import org.xtext.example.ipl.iPL.EDouble
@@ -32,14 +33,20 @@ class IPLGenerator extends AbstractGenerator {
 			].join('\n')
 		].join('\n')*/
 		
-		specs.forEach[ s |
-			s.formulas.forEach[ f, i |
+		specs.forEach[ spec |
+			spec.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.smt' 
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
-				if(IPLRigidityProvider::isRigid(f))
-					smtVerifier.verifyRigidFormula(f, s, filename, fsa)
-				else 
-					smtVerifier.verifyNonRigidFormula(f, s, filename, fsa)
+				if(IPLRigidityProvider::isRigid(f)) { //rigid
+					smtVerifier.verifyRigidFormula(f, spec, filename, fsa)
+				} else { // non-rigid 
+					// find a model 
+					val mdls = spec.decls.filter[it instanceof ModelDec]
+					if (mdls.size == 0) {
+						println('Error: cannot verify non-rigid formulas without a model')
+					} else					
+						smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDec, spec, filename, fsa)
+				}
 			]
 		]
 		

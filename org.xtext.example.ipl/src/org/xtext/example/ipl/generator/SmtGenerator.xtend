@@ -102,8 +102,8 @@ class SmtGenerator {
 		val subCompMap = new HashMap<Integer, List<Integer>>
 
 		// parse aadl structures to prep for smt generation
-		viewDecs.forEach [ viewDec |
-			populateAadlSmtStructures(viewDec.ref, compMap, propMap, subCompMap)
+		viewDecs.forEach [ viewDecl |
+			populateAadlSmtStructures(viewDecl.ref, compMap, propMap, subCompMap)
 		]
 
 		println("Done populating AADL SMT")

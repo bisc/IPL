@@ -16,6 +16,7 @@ import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
+import org.xtext.example.ipl.iPL.ModelDec
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
@@ -34,16 +35,16 @@ public class SmtVerifier {
 	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
 	private var Boolean modelFound = false 
 
-	public def boolean verifyNonRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+	public def boolean verifyNonRigidFormula(Formula f, ModelDec md, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		
 		// check if it's valid anyway, regardless of flexible terms
 		println('Checking if rigid verification discharges the formula')
-		if (verifyRigidFormula(f, s, filename, fsa))
+		if (verifyRigidFormula(f, spec, filename, fsa))
 			return true
 		
 		// find models: candidate valuations for sat of negformula
-		if (!findNegModels(f,s,filename,fsa)) 
+		if (!findNegModels(f, spec, filename, fsa)) 
 			throw new UnexpectedException("Failed to find models, check the formula")
 			
 		// if scope vals are empty, add one just to continue 
@@ -61,20 +62,19 @@ public class SmtVerifier {
 					// find a flexible subformula
 					val ModelExpr flexMdlExpr = smtGenerator.lastFormulaFlexClauses.get(flexName)
 					println('Flexible formula: ' + pp.print(flexMdlExpr))
-					 
-					// find its flexible subtree
-					// FIXME assuming now it's the same thing
 					
 					// put rigid values into it (including model parameters)
 					(new IPLTransformerValueReplacer).replaceVarsWithValues(flexMdlExpr, nameValueMap, scopeDecls)
 					
-					println('Transformed formula:' + pp.print(flexMdlExpr))
-										
+					// set up prism data
+					val prop = pp.print(flexMdlExpr)
+					val params = flexMdlExpr.params.vals.map[pp.print(it)]
 					// TODO get parameters and pass them to model checker		
-					println('Prism parameters ' + pp.print(flexMdlExpr.params))			
+					println('''Invoking PRISM: model «md.name», params «params», prop «prop»''')
 					
 					// call model checker
-					(new PrismPlugin).verify('', fsa)
+					val PrismPlugin prism = new PrismPlugin(md.name/*'prismtmp'*/,  fsa)//new PrismPlugin('', fsa) 
+					prism.verifyProbQuery(prop, params)
 					
 					// record result in flexEvals 
 				]

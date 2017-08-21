@@ -1,33 +1,43 @@
 package org.xtext.example.ipl.prism.plugin
 
 import java.net.URL
+import java.util.List
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 
 class PrismPlugin {
-	def boolean verify(String prop, IFileSystemAccess2 fsa) {
+	val String relativePrismLoc = "../model/prism/"
+	
+	var String modelName
+	var PrismConnectorAPI pc
+	var IFileSystemAccess2 fsa
+	
+	var String prismModelAbsolutePath
+	
+	new(String _modelName, IFileSystemAccess2 _fsa) { 
+		modelName = _modelName
+		fsa = _fsa
+		
+		pc = new PrismConnectorAPI()
+		prismModelAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + 
+			_modelName + ".prism").toString)).path
+		}
+	
+	
+	public def boolean verifyProbQuery(String prop, List<String> params) {
+
+		// put property into a file
+		val String propsRelativePath = relativePrismLoc + "myprops.props"
+		fsa.generateFile(propsRelativePath, prop)
+
+		var propsAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + "mapbot.props").toString)).path
+		var prismPolPath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + 'strat-out').toString)).path
+
+		println("Model path: " + prismModelAbsolutePath)
+		println("Props path: " + propsAbsolutePath)
 
 		// call prism   
-
-		val PrismConnectorAPI pc = new PrismConnectorAPI()
-
-		var prismModelUri = fsa.getURI("../model/prism/prismtmp.prism")
-		var prismPropsUri = fsa.getURI("../model/prism/mapbot.props")
-		var prismPolUri = fsa.getURI("../model/prism/strat-out")
-		System::out.println(prismModelUri)
-
-//	        irrelevant
-//	        var homePath = ResourcesPlugin.getWorkspace().getRoot().getLocation().toString()
-//	        System::out.println(homePath)
-		println(new URL(prismModelUri.toString))
-
-		var prismModelPath = FileLocator.toFileURL(new URL(prismModelUri.toString)).path
-		var prismPropsPath = FileLocator.toFileURL(new URL(prismPropsUri.toString)).path
-		var prismPolPath = FileLocator.toFileURL(new URL(prismPolUri.toString)).path
-
-		println("path: " + prismModelPath)
-
-		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
+		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, propsAbsolutePath, prismPolPath);
 		println(res)
 		
 		true
@@ -37,5 +47,9 @@ class PrismPlugin {
 	 * )
 	 System::out.println(templateUrl)*/
 	// getResource("res/sched/sched-model-template.pml"))
+	}
+	
+	public def double verifyRewardQuery(){
+		1.0
 	}
 }

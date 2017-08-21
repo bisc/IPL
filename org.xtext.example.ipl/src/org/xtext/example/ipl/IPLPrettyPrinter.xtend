@@ -24,8 +24,8 @@ class IPLPrettyPrinter {
 		
 	}*/
 	
-	public static def print_formula(EObject f) { 
-		(new IPLPrettyPrinter).print(f)
+	public static def String print_formula(EObject f) { 
+		(new IPLPrettyPrinter).print(f) as String
 	}
 		
 	dispatch def String print(FormulaOperation f){ 
@@ -87,16 +87,16 @@ class IPLPrettyPrinter {
 		'''{|«f.vals.map[print(it)].join(', ')»|}'''
 	}	
 	
-	dispatch def print(ModelExpr f){
+	dispatch def String print(ModelExpr f){
 		 // intentionally not printing the parameters
 		 print(f.expr)
 	}
 	
-	dispatch def print(ProbQuery f){ 
+	dispatch def String print(ProbQuery f){ 
 		'''$P«f.comp»«print(f.value)»[«print(f.expr)»]$'''
 	}
 	
-	dispatch def print(RewardQuery f){ 
+	dispatch def String print(RewardQuery f){ 
 		'''$R{'«f.rewardName»'} «print(f.value)» [«f.expr»]$'''
 	}
 	

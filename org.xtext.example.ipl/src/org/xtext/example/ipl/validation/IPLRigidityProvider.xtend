@@ -6,16 +6,16 @@ import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.MFunDec
+import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
+import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.SortDec
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TypedDec
 import org.xtext.example.ipl.iPL.VarDec
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.iPL.ProbQuery
-import org.xtext.example.ipl.iPL.RewardQuery
 
 class IPLRigidityProvider {
 	
