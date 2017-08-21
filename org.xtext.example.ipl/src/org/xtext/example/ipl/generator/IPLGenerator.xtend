@@ -9,7 +9,7 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.iPL.IPLSpec
-import org.xtext.example.ipl.iPL.ModelDec
+import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
 //import org.xtext.example.ipl.iPL.EDouble
@@ -41,11 +41,11 @@ class IPLGenerator extends AbstractGenerator {
 					smtVerifier.verifyRigidFormula(f, spec, filename, fsa)
 				} else { // non-rigid 
 					// find a model 
-					val mdls = spec.decls.filter[it instanceof ModelDec]
+					val mdls = spec.decls.filter[it instanceof ModelDecl]
 					if (mdls.size == 0) {
 						println('Error: cannot verify non-rigid formulas without a model')
 					} else					
-						smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDec, spec, filename, fsa)
+						smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
 				}
 			]
 		]

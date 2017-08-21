@@ -1,5 +1,6 @@
 package org.xtext.example.ipl.prism.plugin
 
+import java.io.File
 import java.net.URL
 import java.util.List
 import org.eclipse.core.runtime.FileLocator
@@ -30,12 +31,17 @@ class PrismPlugin {
 		val String propsRelativePath = relativePrismLoc + "myprops.props"
 		fsa.generateFile(propsRelativePath, prop)
 
-		var propsAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + "mapbot.props").toString)).path
+		var propsAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(propsRelativePath/*"mapbot.props"*/).toString)).path
 		var prismPolPath = FileLocator.toFileURL(new URL(fsa.getURI(relativePrismLoc + 'strat-out').toString)).path
 
 		println("Model path: " + prismModelAbsolutePath)
 		println("Props path: " + propsAbsolutePath)
 
+		if(!new File(prismModelAbsolutePath).exists) {
+			println("Error: prism model not found in " + prismModelAbsolutePath) 
+			return false
+		}
+		
 		// call prism   
 		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, propsAbsolutePath, prismPolPath);
 		println(res)

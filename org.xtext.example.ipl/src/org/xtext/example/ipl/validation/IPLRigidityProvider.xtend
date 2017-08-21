@@ -5,15 +5,15 @@ import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLSpec
-import org.xtext.example.ipl.iPL.MFunDec
+import org.xtext.example.ipl.iPL.MFunDecl
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
-import org.xtext.example.ipl.iPL.SortDec
+import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtom
-import org.xtext.example.ipl.iPL.TypedDec
-import org.xtext.example.ipl.iPL.VarDec
+import org.xtext.example.ipl.iPL.TypedDecl
+import org.xtext.example.ipl.iPL.VarDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
@@ -44,7 +44,7 @@ class IPLRigidityProvider {
 	}
 	
 	static def dispatch boolean isRigid(Fun f) {
-		!(f.name instanceof MFunDec)
+		!(f.name instanceof MFunDecl)
 	}
 
 	static def dispatch boolean isRigid(ID e) {
@@ -52,10 +52,10 @@ class IPLRigidityProvider {
 		
 		val decls = e.getContainerOfType(IPLSpec).decls
 		
-		val decl = decls.filter[it instanceof TypedDec].findLast[(it as TypedDec).name == name]
+		val decl = decls.filter[it instanceof TypedDecl].findLast[(it as TypedDecl).name == name]
 		
 		if (decl !== null) 
-			return (decl instanceof VarDec || decl instanceof SortDec)
+			return (decl instanceof VarDecl || decl instanceof SortDecl)
 		else 
 			return true
 	}

@@ -22,51 +22,16 @@ Require-Bundle: org.eclipse.xtext,
  org.xtext.example.ipl.prism;bundle-version="1.0.0",
  org.xtext.example.ipl.prism.plugin;bundle-version="1.0.0"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
-Export-Package: org.xtext.example.ipl;
-  uses:="org.eclipse.emf.ecore,
-   org.eclipse.xtext.nodemodel,
-   org.eclipse.xtext.linking.impl,
-   org.eclipse.xtext.scoping",
- org.xtext.example.ipl.generator;
-  uses:="org.osate.aadl2,
-   org.xtext.example.ipl.iPL,
-   org.osate.aadl2.instance,
-   org.eclipse.xtext.generator,
-   org.eclipse.emf.ecore.resource",
+Export-Package: org.xtext.example.ipl; uses:="org.eclipse.emf.ecore,  org.eclipse.xtext.nodemodel,  org.eclipse.xtext.linking.impl,  org.eclipse.xtext.scoping",
+ org.xtext.example.ipl.generator; uses:="org.osate.aadl2,  org.xtext.example.ipl.iPL,  org.osate.aadl2.instance,  org.eclipse.xtext.generator,  org.eclipse.emf.ecore.resource",
  org.xtext.example.ipl.iPL;uses:="org.eclipse.emf.ecore,org.osate.aadl2,org.eclipse.emf.common.util",
- org.xtext.example.ipl.iPL.impl;
-  uses:="org.eclipse.emf.ecore,
-   org.osate.aadl2,
-   org.eclipse.emf.ecore.impl,
-   org.xtext.example.ipl.iPL,
-   org.eclipse.emf.common.util,
-   org.eclipse.emf.common.notify",
- org.xtext.example.ipl.iPL.util;
-  uses:="org.eclipse.emf.ecore,
-   org.xtext.example.ipl.iPL,
-   org.eclipse.emf.common.notify,
-   org.eclipse.emf.common.notify.impl,
-   org.eclipse.emf.ecore.util",
+ org.xtext.example.ipl.iPL.impl; uses:="org.eclipse.emf.ecore,  org.osate.aadl2,  org.eclipse.emf.ecore.impl,  org.xtext.example.ipl.iPL,  org.eclipse.emf.common.util,  org.eclipse.emf.common.notify",
+ org.xtext.example.ipl.iPL.util; uses:="org.eclipse.emf.ecore,  org.xtext.example.ipl.iPL,  org.eclipse.emf.common.notify,  org.eclipse.emf.common.notify.impl,  org.eclipse.emf.ecore.util",
  org.xtext.example.ipl.parser.antlr;uses:="org.eclipse.xtext.parser.antlr,org.xtext.example.ipl.parser.antlr.internal,org.xtext.example.ipl.services",
- org.xtext.example.ipl.parser.antlr.internal;
-  uses:="org.eclipse.emf.ecore,
-   org.eclipse.xtext.parser.antlr,
-   org.xtext.example.ipl.services,
-   org.antlr.runtime",
+ org.xtext.example.ipl.parser.antlr.internal; uses:="org.eclipse.emf.ecore,  org.eclipse.xtext.parser.antlr,  org.xtext.example.ipl.services,  org.antlr.runtime",
  org.xtext.example.ipl.scoping,
- org.xtext.example.ipl.serializer;
-  uses:="org.eclipse.emf.ecore,
-   org.eclipse.xtext.nodemodel,
-   org.xtext.example.ipl.iPL,
-   org.eclipse.xtext.serializer.analysis,
-   org.xtext.example.ipl.services,
-   org.eclipse.xtext.serializer.sequencer,
-   org.eclipse.xtext,
-   org.eclipse.xtext.serializer",
+ org.xtext.example.ipl.serializer; uses:="org.eclipse.emf.ecore,  org.eclipse.xtext.nodemodel,  org.xtext.example.ipl.iPL,  org.eclipse.xtext.serializer.analysis,  org.xtext.example.ipl.services,  org.eclipse.xtext.serializer.sequencer,  org.eclipse.xtext,  org.eclipse.xtext.serializer",
  org.xtext.example.ipl.services;uses:="org.eclipse.xtext.common.services,org.eclipse.xtext.service,org.eclipse.xtext",
- org.xtext.example.ipl.validation;
-  uses:="org.osate.aadl2,
-   org.eclipse.emf.ecore,
-   org.xtext.example.ipl.iPL,
-   org.osate.aadl2.instance"
+ org.xtext.example.ipl.validation; uses:="org.osate.aadl2,  org.eclipse.emf.ecore,  org.xtext.example.ipl.iPL,  org.osate.aadl2.instance"
 Bundle-ClassPath: .
+Import-Package: org.apache.log4j

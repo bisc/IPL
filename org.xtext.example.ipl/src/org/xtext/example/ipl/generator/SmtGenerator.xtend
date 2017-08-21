@@ -44,7 +44,7 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.ViewDec
+import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -92,7 +92,7 @@ class SmtGenerator {
 '''
 
 		// gather view declarations
-		val viewDecs = spec.eAllOfType(ViewDec)
+		val viewDecs = spec.eAllOfType(ViewDecl)
 
 		if (viewDecs.size == 0)
 			return preamble

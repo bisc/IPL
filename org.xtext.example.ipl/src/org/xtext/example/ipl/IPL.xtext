@@ -16,14 +16,14 @@ Import:
 ;
 
 Declaration:
-	TypedDec | FunDec
+	TypedDecl | FunDecl
 ;
 
-ViewDec:
+ViewDecl:
 	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID
 ;
 
-ModelDec:
+ModelDecl:
 	'use' 'model' name=ID
 ;
 
@@ -35,15 +35,15 @@ Type:
 	BaseType | {TypeSet} '{' elem=BaseType '}' | {TypeLst} '<<' elem=BaseType '>>'
 ;
 
-TypedDec:
-	VarDec | STVarDec | SortDec | ViewDec
+TypedDecl:
+	VarDecl | STVarDecl | SortDecl | ViewDecl | ModelDecl
 ;
 
-VarDec:
+VarDecl:
 	'var' name=ID ':' type = Type
 ;
 
-STVarDec:
+STVarDecl:
 	'stvar' name=ID ':' type = Type
 ;
 
@@ -58,27 +58,27 @@ CIREF: // for subcomponents?
 	ID ('.' ID)?
 ;
 
-ElemDec:
+ElemDecl:
 	'elem' ref=[aadl2::ComponentImplementation | CIREF]
 ;
 
-SortDec:
+SortDecl:
 	'set' name=ID ':' ref=[aadl2::ComponentClassifier | CIREF] // used to be ComponentImplementation
 ;
 
-FunDec:
-	(RFunDec | MFunDec | BFunDec)
+FunDecl:
+	(RFunDecl | MFunDecl | BFunDecl)
 ;
 
-RFunDec:
+RFunDecl:
 	'vrfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
 ;
 
-MFunDec:
+MFunDecl:
 	'mfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
 ;
 
-BFunDec:
+BFunDecl:
 	'bfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
 ;
 
@@ -104,7 +104,7 @@ Const:
 ;
 
 Fun:
-	name=[FunDec] '(' (args += Term)? (',' args += Term)* ')'
+	name=[FunDecl] '(' (args += Term)? (',' args += Term)* ')'
 ;
 
 Prop returns Prop:
@@ -176,7 +176,7 @@ ModelExpr returns ModelExpr:
 // PCTL-specific syntax
 
 PrismExpr:
-	'$' (ProbQuery | RewardQuery) '$'
+	 (ProbQuery | RewardQuery) 
 ;
 
 PrismComp:

@@ -93,11 +93,11 @@ class IPLPrettyPrinter {
 	}
 	
 	dispatch def String print(ProbQuery f){ 
-		'''$P«f.comp»«print(f.value)»[«print(f.expr)»]$'''
+		'''P«f.comp»«print(f.value)»[«print(f.expr)»]'''
 	}
 	
 	dispatch def String print(RewardQuery f){ 
-		'''$R{'«f.rewardName»'} «print(f.value)» [«f.expr»]$'''
+		'''R{'«f.rewardName»'} «print(f.value)» [«f.expr»]'''
 	}
 	
 	/*dispatch def print(PrismValue f){

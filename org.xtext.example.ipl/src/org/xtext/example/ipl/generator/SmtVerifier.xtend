@@ -16,80 +16,85 @@ import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
-import org.xtext.example.ipl.iPL.ModelDec
+import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
+import org.eclipse.emf.ecore.util.EcoreUtil
 
 public class SmtVerifier {
 
 	private val smtGenerator = new SmtGenerator
-	
+
 	private var Map<String, IPLType> scopeDecls // declarations of scoped variables
 	// each map in the list is an evaluation of scope
 	private var List<Map<String, Object>> scopeVals = new ArrayList<Map<String, Object>>
-	
-	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
-	private var Boolean modelFound = false 
 
-	public def boolean verifyNonRigidFormula(Formula f, ModelDec md, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
+	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
+	private var Boolean modelFound = false
+
+	public def boolean verifyNonRigidFormula(Formula f, ModelDecl md, IPLSpec spec, String filename,
+		IFileSystemAccess2 fsa) {
 		scopeVals.clear
-		
+
 		// check if it's valid anyway, regardless of flexible terms
 		println('Checking if rigid verification discharges the formula')
 		if (verifyRigidFormula(f, spec, filename, fsa))
 			return true
-		
+
 		// find models: candidate valuations for sat of negformula
-		if (!findNegModels(f, spec, filename, fsa)) 
+		if (!findNegModels(f, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
-			
+
 		// if scope vals are empty, add one just to continue 
-		if(scopeVals.size == 0)
+		if (scopeVals.size == 0)
 			scopeVals.add(new HashMap)
-		 
+
 		val IPLPrettyPrinter pp = new IPLPrettyPrinter
 		// basically go through candidate valuations one by one, obtaining MC results for each
-		return scopeVals.map[ nameValueMap | 
-				println("Considering valuation " + nameValueMap)
-				
-				flexDecls.forEach[flexName, flexType|
-					println("Considering flex variable: " + flexName)
-					
-					// find a flexible subformula
-					val ModelExpr flexMdlExpr = smtGenerator.lastFormulaFlexClauses.get(flexName)
-					println('Flexible formula: ' + pp.print(flexMdlExpr))
-					
-					// put rigid values into it (including model parameters)
-					(new IPLTransformerValueReplacer).replaceVarsWithValues(flexMdlExpr, nameValueMap, scopeDecls)
-					
-					// set up prism data
-					val prop = pp.print(flexMdlExpr)
-					val params = flexMdlExpr.params.vals.map[pp.print(it)]
-					// TODO get parameters and pass them to model checker		
-					println('''Invoking PRISM: model «md.name», params «params», prop «prop»''')
-					
-					// call model checker
-					val PrismPlugin prism = new PrismPlugin(md.name/*'prismtmp'*/,  fsa)//new PrismPlugin('', fsa) 
-					prism.verifyProbQuery(prop, params)
-					
-					// record result in flexEvals 
-				]
-				
-				// put scope & flex evals into formulaNeg (can replace QAtom or put a restriction on it)
-				
-				// run the resulting formula through smt 
-				
-				// if we rejected it (unsat), move on 
-				// otherwise:
-				return false
+		return scopeVals.map [ nameValueMap |
+			println("Considering valuation " + nameValueMap)
 
-		].reduce[resSoFar, thisRes| resSoFar && thisRes]
+			flexDecls.forEach [ flexName, flexType |
+				println("Considering flex variable: " + flexName)
+
+				// find a flexible subformula
+				var ModelExpr flexMdlExpr = smtGenerator.lastFormulaFlexClauses.get(flexName)
+
+				// copy a formula to not spoil it for further iterations
+				flexMdlExpr = EcoreUtil::copy(flexMdlExpr)
+
+				println('Flexible formula before replacement: ' + pp.print(flexMdlExpr) + ", params: " +
+					flexMdlExpr.params.vals.map[pp.print(it)])
+
+				// put rigid values into it (including model parameters)
+				(new IPLTransformerValueReplacer).replaceVarsWithValues(flexMdlExpr, nameValueMap, scopeDecls)
+
+				// set up prism data
+				var prop = pp.print(flexMdlExpr)
+				//prop = prop.substring(1, prop.length-1) // remove $
+				val params = flexMdlExpr.params.vals.map[pp.print(it)]
+				// TODO get parameters and pass them to model checker		
+				println('''Invoking PRISM: model «md.name», params «params», prop «prop»''')
+
+				// call model checker
+				val PrismPlugin prism = new PrismPlugin(md.name /*'prismtmp'*/ , fsa) // new PrismPlugin('', fsa) 
+				prism.verifyProbQuery(prop, params)
+
+			// record result in flexEvals 
+			]
+
+			// put scope & flex evals into formulaNeg (can replace QAtom or put a restriction on it)
+			// run the resulting formula through smt 
+			// if we rejected it (unsat), move on 
+			// otherwise:
+			return false
+
+		].reduce[resSoFar, thisRes|resSoFar && thisRes]
 	}
-
 
 	// finds all variable assignments that satisfy a negated formula
 	// thus, these are candidates for the formula to NOT be valid
@@ -97,32 +102,32 @@ public class SmtVerifier {
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
-		
+
 		// initial run of formula to initialize scope declarations 
 		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
 		println("Done generating IPL SMT")
-		
+
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
 		// no variables -> no need to look for models
 		if (scopeDecls.size == 0) {
-			println('No quantified variables; aborting model search')			
+			println('No quantified variables; aborting model search')
 			return true
 		}
-		
+
 		flexDecls = smtGenerator.lastFormulaFlexDecls
 		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
-		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl	
-						
+		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
+
 		// model search loop 
 		println("Starting SMT model search...")
-		while(true) { 
+		while (true) {
 			fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
 				
 				(check-sat) 
 				(get-model)
 				
 			''')
-			
+
 			System::out.println("Done generating SMT, see file " + filename)
 
 			// call smt 
@@ -141,15 +146,15 @@ public class SmtVerifier {
 				return true
 			} else if (z3ResFirstLine == "sat") {
 				println('''sat; looking for models with scope: «scopeDecls»''')
-				if (!populateEvals(z3Res)) { 
+				if (!populateEvals(z3Res)) {
 					println("Finding models error; stopping model search")
 					return false
-				} 
+				}
 			} else {
 				println("SMT error; stopping model search: " + z3ResLines.join('\n'))
 				return false
 			}
-			
+
 			smtGenerator.blockingValues = scopeVals
 			// a new iteration
 			formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
@@ -164,11 +169,11 @@ public class SmtVerifier {
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
 		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
 		println("Done generating IPL SMT")
-		
+
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
 		flexDecls = smtGenerator.lastFormulaFlexDecls
 		println('''Flex: «flexDecls»''')
-		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl	
+		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
 
 		fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
 			
@@ -200,7 +205,6 @@ public class SmtVerifier {
 		}
 	}
 
-
 	// get (additional) variable evaluations from the model (z3 output)
 	private def Boolean populateEvals(String z3Res) {
 		// note: z3 doesn't return values of quantified vars on (eval <varname) or (get value (<varlist>))
@@ -212,7 +216,7 @@ public class SmtVerifier {
 		modelFound = true // assume so until proven otherwise
 		val newEval = new HashMap
 		scopeVals.add(newEval)
-		
+
 		scopeDecls.forEach [ varName, varType |
 
 			var Pattern p = Pattern.compile(modelParsingPattern(varName))
@@ -220,8 +224,8 @@ public class SmtVerifier {
 
 			// some sequential logic here to simplify code
 			var matchFound = false
-			
-			if (m.find) 
+
+			if (m.find)
 				matchFound = true
 			else if (!IPLConfig.ENABLE_PROBING_VARS)
 				println('''Error parsing z3 output: match for «varName» (type «varType») not found in:
@@ -237,19 +241,17 @@ public class SmtVerifier {
 					 «z3Res»''')
 					modelFound = false
 				}
-			} 
-			
+			}
+
 			if (matchFound) {
 				val typeSmt = m.group(2)
-				val valueSmt = m.group(3)   
+				val valueSmt = m.group(3)
 				addValueToEval(newEval, varName, valueSmt, varType, typeSmt)
-			} else 
+			} else
 				modelFound = false
 
-			
-			
 			// has to be only one match per variable
-			if(m.find) {
+			if (m.find) {
 				println('''Error parsing z3 output: several matches for «varName»; unexpected second: «m.group» ''')
 				modelFound = false
 			}
@@ -257,22 +259,22 @@ public class SmtVerifier {
 		println('Values found:' + scopeVals)
 		modelFound
 	}
-	
+
 	// returns a model parsing pattern (complex enough that deserves its own function) 
-	private def String modelParsingPattern(String varName) { 
-			// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
-			// then parentheses with something, then a type (word, 1st group) in parentheses
-			// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
-			// zero group - everything that matched
-			// first group - exclamation signs (may be not there for probes)
-			// second ground - the type
-			// third group - the value 
+	private def String modelParsingPattern(String varName) {
+		// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
+		// then parentheses with something, then a type (word, 1st group) in parentheses
+		// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
+		// zero group - everything that matched
+		// first group - exclamation signs (may be not there for probes)
+		// second ground - the type
+		// third group - the value 
 		'''\(define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
-	
+
 	// helper function: adds a value to a valuation, doing all the checks as well 
 	private def addValueToEval(Map<String, Object> eval, String varName, String valueSmt, IPLType varType,
-			String smtType) {
+		String smtType) {
 		// if evals don't have a var, add a list
 		if (!eval.containsKey(varName))
 			eval.put(varName, new LinkedList)

@@ -31,9 +31,9 @@ import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
-import org.xtext.example.ipl.iPL.STVarDec
+import org.xtext.example.ipl.iPL.STVarDecl
 import org.xtext.example.ipl.iPL.Set
-import org.xtext.example.ipl.iPL.SortDec
+import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.Type
@@ -42,9 +42,9 @@ import org.xtext.example.ipl.iPL.TypeInt
 import org.xtext.example.ipl.iPL.TypeLst
 import org.xtext.example.ipl.iPL.TypeReal
 import org.xtext.example.ipl.iPL.TypeSet
-import org.xtext.example.ipl.iPL.TypedDec
-import org.xtext.example.ipl.iPL.VarDec
-import org.xtext.example.ipl.iPL.ViewDec
+import org.xtext.example.ipl.iPL.TypedDecl
+import org.xtext.example.ipl.iPL.VarDecl
+import org.xtext.example.ipl.iPL.ViewDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
@@ -72,14 +72,14 @@ class IPLTypeProvider {
 		
 		val decls = e.getContainerOfType(IPLSpec).decls
 		
-		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
+		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
 		if (decl !== null) {
 			return switch (decl) {
-				VarDec: fromType(decl.type)
-				STVarDec: fromType(decl.type)
-				SortDec: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
-				ViewDec: fromComponentImpl(decl.ref)
+				VarDecl: fromType(decl.type)
+				STVarDecl: fromType(decl.type)
+				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
+				ViewDecl: fromComponentImpl(decl.ref)
 			}
 		} else {
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
@@ -285,7 +285,7 @@ class IPLTypeProvider {
 		
 		val decls = e.getContainerOfType(IPLSpec).decls
 		
-		val decl = decls.findLast[it instanceof TypedDec && (it as TypedDec).name == name] as TypedDec
+		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
 		if (decl !== null) {
 			true
