@@ -10,13 +10,13 @@ import java.util.Map
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
-import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.IPLConfig
+import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
-import org.xtext.example.ipl.prism.plugin.PrismConnectorAPI
+import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType
@@ -50,6 +50,7 @@ public class SmtVerifier {
 		if(scopeVals.size == 0)
 			scopeVals.add(new HashMap)
 		 
+		val IPLPrettyPrinter pp = new IPLPrettyPrinter
 		// basically go through candidate valuations one by one, obtaining MC results for each
 		return scopeVals.map[ nameValueMap | 
 				println("Considering valuation " + nameValueMap)
@@ -58,17 +59,20 @@ public class SmtVerifier {
 					println("Considering flex variable: " + flexName)
 					
 					// find a flexible subformula
-					val EObject flexFormula = smtGenerator.lastFormulaFlexClauses.get(flexName)
-					println('Flexible formula: ' + flexFormula)
-					
+					val ModelExpr flexMdlExpr = smtGenerator.lastFormulaFlexClauses.get(flexName)
+					println('Flexible formula: ' + pp.print(flexMdlExpr))
+					 
 					// find its flexible subtree
-					// TODO assuming now it's the same thing
+					// FIXME assuming now it's the same thing
 					
 					// put rigid values into it (including model parameters)
-					(new IPLTransformerValueReplacer).replaceQvarsWithValues(flexFormula, nameValueMap)
+					(new IPLTransformerValueReplacer).replaceVarsWithValues(flexMdlExpr, nameValueMap, scopeDecls)
 					
-					println('Transformed formula:' + flexFormula)
+					println('Transformed formula:' + pp.print(flexMdlExpr))
 										
+					// TODO get parameters and pass them to model checker		
+					println('Prism parameters ' + pp.print(flexMdlExpr.params))			
+					
 					// call model checker
 					(new PrismPlugin).verify('', fsa)
 					
@@ -101,7 +105,7 @@ public class SmtVerifier {
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
 		// no variables -> no need to look for models
 		if (scopeDecls.size == 0) {
-			print('No quantified variables; aborting model search')			
+			println('No quantified variables; aborting model search')			
 			return true
 		}
 		

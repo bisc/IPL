@@ -3,12 +3,11 @@
  */
 package org.xtext.example.ipl.generator
 
-import java.net.URL
-import org.eclipse.core.runtime.FileLocator
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
+import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
@@ -35,11 +34,11 @@ class IPLGenerator extends AbstractGenerator {
 		
 		specs.forEach[ s |
 			s.formulas.forEach[ f, i |
-				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.z3' 
-				println('\n\nVerifying ' + f.toString)
+				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.smt' 
+				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 				if(IPLRigidityProvider::isRigid(f))
 					smtVerifier.verifyRigidFormula(f, s, filename, fsa)
-				else // TODO preprocessing needed
+				else 
 					smtVerifier.verifyNonRigidFormula(f, s, filename, fsa)
 			]
 		]

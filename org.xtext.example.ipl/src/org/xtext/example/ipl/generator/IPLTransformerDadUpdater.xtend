@@ -18,6 +18,8 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
 
+
+// TODO: not being used, using EcoreUtils instead
 class IPLTransformerDadUpdater {
 	
 	dispatch def updateDad(FormulaOperation f, EObject son){

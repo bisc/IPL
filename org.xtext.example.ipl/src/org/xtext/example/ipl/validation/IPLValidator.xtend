@@ -220,7 +220,7 @@ class IPLValidator extends AbstractIPLValidator {
 	}
 	
 	@Check
-	def checkModelExpr(PrismExpr t) {
+	def checkModelExpr(ModelExpr t) {
 		val inModelExpr = t.allContainers.findFirst[it instanceof ModelExpr] !== null
 		
 		if (inModelExpr) {

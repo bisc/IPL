@@ -47,14 +47,14 @@ STVarDec:
 	'stvar' name=ID ':' type = Type
 ;
 
-WQCREF:
+WQCREF: // for imports
 	ID ('.' ID)* '.*'?
 ;
 
-QCREF:
+QCREF: // not used
 	ID ('::' ID)*;
 
-CIREF:
+CIREF: // for subcomponents?
 	ID ('.' ID)?
 ;
 
@@ -169,7 +169,7 @@ ModelParamExpr:
 ;
 
 ModelExpr returns ModelExpr:
-	PrismExpr params=ModelParamExpr 
+	expr=PrismExpr params=ModelParamExpr 
 ;
 
 //-----------------------------------------------------------------------------

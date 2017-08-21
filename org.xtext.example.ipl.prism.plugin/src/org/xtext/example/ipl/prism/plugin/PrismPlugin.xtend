@@ -6,10 +6,8 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 
 class PrismPlugin {
 	def boolean verify(String prop, IFileSystemAccess2 fsa) {
-		println("PRISM!")
 
 		// call prism   
-		System.out.println(System.getProperty("java.library.path"));
 
 		val PrismConnectorAPI pc = new PrismConnectorAPI()
 
@@ -29,7 +27,7 @@ class PrismPlugin {
 
 		println("path: " + prismModelPath)
 
-		var res = PrismConnectorAPI.modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
+		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelPath, prismPropsPath, prismPolPath);
 		println(res)
 		
 		true
