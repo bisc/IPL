@@ -10,6 +10,7 @@ import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
+import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
@@ -33,6 +34,10 @@ class IPLPrettyPrinter {
 		'''«print(f.left)» «f.op» «print(f.right)»'''
 	}
 	
+	dispatch def String print(Negation f){
+		'''!«print(f.child)»'''
+	}
+	
 	dispatch def String print(QAtom f){ 
 		'''«f.op» «f.^var»: «print(f.set)» | «print(f.exp)»'''
 	}
@@ -45,11 +50,11 @@ class IPLPrettyPrinter {
 		'''«f.»''' 
 	}*/
 	dispatch def String print(Set f){
-		'''{«f.members.map[print(it)].join(' ')»}'''
+		'''{«f.members.map[print(it)].join(', ')»}'''
 	}
 	
 	dispatch def String print(Lst f){
-		'''<<«f.members.map[print(it)].join(' ')»>>'''
+		'''<<«f.members.map[print(it)].join(', ')»>>'''
 	}
 	
 	dispatch def String print(Int f){

@@ -63,18 +63,20 @@ class SmtGenerator {
 	// all quantified variables: name, type
 	private var Map<String, IPLType> scopeDecls = new HashMap
 
-	// flexible "variables"
+	// for flexible "variables"
 	private var Map<String, IPLType> flexDecls = new HashMap // type details of flex "variables"; flexName -> flexVarType
-	private var Map<String, List<String>> flexArgs = new HashMap // argument names of flex clauses; flexName -> <varName>
 	private var Map<String, ModelExpr> flexClauses = new HashMap // mapping between clauses and var names; flexName -> <IPL lang elem>
+	private var Map<String, List<String>> flexArgs = new HashMap // argument names (from scope) of flex clauses; flexName -> <varName>. Does not face externally
 	private var flexNum = 0
 
 	// probes for finding model values	
 	private var Map<String, String> probingClauses = new HashMap
 
-	// blocking clauses for finding model values; set externally
-	private var List<Map<String, Object>> blockingValues = new ArrayList
-
+	// SET EXTERNALLY blocking clauses for finding model values; 
+	private var List<Map<String, Object>> blockingValues = new ArrayList // has to be not null
+	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
+	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap // has to be not null
+	
 	// anonymous sets encoded as functions
 	private var setDecls = ""
 	private var anonSetNum = 0
@@ -130,7 +132,7 @@ class SmtGenerator {
 
 		println("Done generating AADL SMT")
 
-		// final output
+		// background output
 		'''	«preamble»
 			
 			; Arch elements
@@ -182,20 +184,45 @@ class SmtGenerator {
 		(assert (not «formulaStr»))'''
 	}
 
+	// needs to be populated with proper abstractions already, after generating for formula
 	public def String generateSmtFlexDecl() {
-		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) // with args
-			flexDecls.keySet.map [
+		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
+			val funDecls = flexDecls.keySet.map [
 				'''(declare-fun «it» («flexArgs.get(it).map[typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
 					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
-		else // no args
+			
+			var asserts = ''
+			for ( scopeVal : flexsVals.keySet ) {
+				val flexsVal = flexsVals.get(scopeVal) // set of flexible variables
+				asserts += flexsVal.keySet.map[ flexName | {
+					val args = flexArgs.get(flexName) // (scope vars) arguments
+					if (args.size > 0) // function
+						'''(assert (= («flexName» «args.map[scopeVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
+					else // constant, no parentheses
+						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
+					}	
+				].join('\n')
+			} 
+			
+			funDecls + asserts
+			
+		} else {// no args
 			flexDecls.keySet.map [
 				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
+			throw new UnsupportedOperationException("Not updated for flexs interp as above")
+		}
 	}
 
+	// set repeatedly only during model finding
 	public def setBlockingValues(List<Map<String, Object>> blocks) {
 		blockingValues = blocks
+	}
+	
+	// set only for the final call
+	public def setFlexsVals(Map vals) {
+		flexsVals = vals
 	}
 
 	// returns the scope declaration
@@ -391,7 +418,7 @@ class SmtGenerator {
 			name
 		}
 	}
-
+	
 	// reset the formula parsing state
 	private def reset() {
 		// creating new ones to be independent from its clients

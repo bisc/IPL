@@ -1,5 +1,6 @@
 package org.xtext.example.ipl.generator
 
+import java.rmi.UnexpectedException
 import java.util.Map
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
@@ -25,7 +26,6 @@ import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
-import java.rmi.UnexpectedException
 
 // replaces values of rigid variables/constants in IPL formulas
 class IPLTransformerValueReplacer {
@@ -34,46 +34,54 @@ class IPLTransformerValueReplacer {
 	var Map<String, IPLType> decls
 
 	// replaces all occurences of variables with their valuations
-	public def replaceVarsWithValues(EObject f, Map<String, Object> valuation, Map<String, IPLType> declarations) {
+	// returns the next object (potentially changed if on top
+	public def EObject replaceVarsWithValues(EObject f, Map<String, Object> valuation, Map<String, IPLType> declarations) {
 		if (valuation.size == 0 )
-			return;
+			return f;
 		
 		vals = valuation
 		decls = declarations
-		replaceVars(f)
+		return replaceVars(f)
 	}
 
-	private dispatch def replaceVars(FormulaOperation f) {
+	private dispatch def EObject replaceVars(FormulaOperation f) {
 		replaceVars(f.left)
 		replaceVars(f.right)
+		return f
 	}
 
-	private dispatch def replaceVars(QAtom f) {
+	private dispatch def EObject replaceVars(QAtom f) {
 		replaceVars(f.exp)
 
 		// eliminate quantification
 		if (vals.containsKey(f.^var))
 			EcoreUtil::replace(f, f.exp)
+		
+		return f.exp
 	}
 
-	private dispatch def replaceVars(TAtom f) {
+	private dispatch def EObject replaceVars(TAtom f) {
 		replaceVars(f.exp)
+		return f
 	}
 
-	private dispatch def replaceVars(Const f) {
+	private dispatch def EObject replaceVars(Const f) {
 		// do nothing?
+		return f
 	}
 
-	private dispatch def replaceVars(ExprOperation f) {
+	private dispatch def EObject replaceVars(ExprOperation f) {
 		replaceVars(f.left)
 		replaceVars(f.right)
+		return f
 	}
 
-	private dispatch def replaceVars(Fun f) {
+	private dispatch def EObject replaceVars(Fun f) {
 		f.args.forEach[replaceVars(it)]
+		return f
 	}
 
-	private dispatch def replaceVars(ID f) {
+	private dispatch def EObject replaceVars(ID f) {
 		// the actual replacement 
 		if (vals.containsKey(f.id)) {
 			// replace with a value from switch, depending on the type
@@ -101,33 +109,40 @@ class IPLTransformerValueReplacer {
 			
 			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, v)
+			return v
 		}
 	}
 
-	private dispatch def replaceVars(PropertyExpression f) {
+	private dispatch def EObject replaceVars(PropertyExpression f) {
 		replaceVars(f.left)
+		return f
 	}
 
-	private dispatch def replaceVars(TermOperation f) {
+	private dispatch def EObject replaceVars(TermOperation f) {
 		replaceVars(f.left)
 		replaceVars(f.right)
+		return f
 	}
 
-	private dispatch def replaceVars(ModelExpr f) {
+	private dispatch def EObject replaceVars(ModelExpr f) {
 		replaceVars(f.expr)
 		replaceVars(f.params)
+		return f
 	}
 
-	private dispatch def replaceVars(ModelParamExpr f) {
+	private dispatch def EObject replaceVars(ModelParamExpr f) {
 		f.vals.forEach[replaceVars(it)]
+		return f
 	}
 
-	private dispatch def replaceVars(ProbQuery f) {
+	private dispatch def EObject replaceVars(ProbQuery f) {
 		replaceVars(f.expr)
+		return f
 	}
 
-	private dispatch def replaceVars(RewardQuery f) {
+	private dispatch def EObject replaceVars(RewardQuery f) {
 		replaceVars(f.expr)
+		return f
 	}
 
 }

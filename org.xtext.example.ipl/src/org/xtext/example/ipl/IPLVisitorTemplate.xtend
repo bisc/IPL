@@ -8,6 +8,7 @@ import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
+import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
@@ -21,6 +22,10 @@ class IPLVisitorTemplate {
 	}
 		
 	dispatch def visit(FormulaOperation f){ 
+	}
+	
+	dispatch def String visit(Negation f){
+		
 	}
 	
 	dispatch def visit(QAtom f){ 

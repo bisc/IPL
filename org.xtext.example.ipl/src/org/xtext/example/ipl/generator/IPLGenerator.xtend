@@ -21,7 +21,7 @@ import org.xtext.example.ipl.validation.IPLRigidityProvider
  */
 class IPLGenerator extends AbstractGenerator {
 
-	private val smtVerifier = new SmtVerifier
+	//private val smtVerifier = new SmtVerifier
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
@@ -33,12 +33,13 @@ class IPLGenerator extends AbstractGenerator {
 			].join('\n')
 		].join('\n')*/
 		
+		// have to renew smt verifier every formula to not carry state in SMTGenerator over
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.smt' 
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 				if(IPLRigidityProvider::isRigid(f)) { //rigid
-					val res = smtVerifier.verifyRigidFormula(f, spec, filename, fsa)
+					val res = (new SmtVerifier).verifyRigidFormula(f, spec, filename, fsa)
 					println("Rigid IPL formula verified, result: " + res)
 				} else { // non-rigid 
 					// find a model declaration
@@ -46,7 +47,7 @@ class IPLGenerator extends AbstractGenerator {
 					if (mdls.size == 0) {
 						println('Error: cannot verify non-rigid formulas without a model')
 					} else {					
-						val res = smtVerifier.verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+						val res = (new SmtVerifier).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
 						println("Non-rigid IPL formula verified, result: " + res)
 					}
 				}

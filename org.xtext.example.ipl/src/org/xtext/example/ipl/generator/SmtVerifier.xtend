@@ -40,12 +40,15 @@ public class SmtVerifier {
 
 	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
 	private var Map<String, ModelExpr> flexClauses // pointers to flexible clauses, by name 
-	private var Boolean modelFound = false
+	private var Boolean modelFound = false 
+	
+	private var int valuationCount // for output
 
 	public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		scopeVals.clear
-
+		smtGenerator.flexsVals = new HashMap // reset it here because it could've been called before
+		
 		// check if it's valid anyway, regardless of flexible terms
 		println('Checking if rigid verification discharges the formula')
 		if (verifyRigidFormula(origFormula, spec, filename, fsa))
@@ -56,23 +59,34 @@ public class SmtVerifier {
 			throw new UnexpectedException("Failed to find models, check the formula")
 
 		// now the current formula state is populated: 
-		// scope decls are set
-		// scope vals populated
+		// scope decls are set, but can get spoiled by rigid verification
+		val oldScopeDecls = scopeDecls.immutableCopy
+		// scope vals populated, if in existence
 		// flex decls are also set
 		// what remains is to save flex clauses
 		flexClauses = smtGenerator.lastFormulaFlexClauses
+		// reset blocking state of the smt generator because find models was just called
+		smtGenerator.blockingValues = new ArrayList
 		
 		// if scope vals are empty, add one just to continue 
 		if (scopeVals.size == 0)
 			scopeVals.add(new HashMap)
 
 		val IPLPrettyPrinter pp = new IPLPrettyPrinter
+		valuationCount = 0
+		
+		// collect all values of flex variable
+		// set of scope vals (name, value) -> <flex name -> value(s)>
+		val Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap
+		
 		// basically go through candidate valuations one by one, obtaining MC results for each
-		// need an immutable copy because verifyRigidFormula clears evals for itself
-		return scopeVals.immutableCopy.map [ nameValueMap |
-			println("Considering valuation " + nameValueMap)
-			
-			var boolean flexVerRes = true
+		// need an immutable copy because verifyRigidFormula clears evals for itself (actually now it doesnt)
+		for (scopeVal : scopeVals.immutableCopy){
+			// above but for a given scope eval
+			val Map<String, Object> flexVals = new HashMap
+		
+			println("Considering valuation " + scopeVal)
+			//var boolean flexVerRes = true
 			
 			// iterate through flexible parts (although not expecting > 1)
 			for (e : flexDecls.entrySet) {
@@ -88,14 +102,14 @@ public class SmtVerifier {
 				// find a flexible subformula; original in the formula
 				val ModelExpr origflexMdlExpr = flexClauses.get(flexName)
 
-				// make a copy to feed to prism, to not spoil it for further iterations
-				val newflexMdlExpr = EcoreUtil::copy(origflexMdlExpr)
+				// make a copy to feed to prism, to not spoil the original formula it for further iterations
+				var newflexMdlExpr = EcoreUtil::copy(origflexMdlExpr)
 
 				println('Flexible formula before replacement: ' + pp.print(newflexMdlExpr) + ", params: " +
 					newflexMdlExpr.params.vals.map[pp.print(it)])
 
 				// put rigid values into it (including model parameters)
-				(new IPLTransformerValueReplacer).replaceVarsWithValues(newflexMdlExpr, nameValueMap, scopeDecls)
+				newflexMdlExpr = (new IPLTransformerValueReplacer).replaceVarsWithValues(newflexMdlExpr, scopeVal, oldScopeDecls) as ModelExpr
 
 				// set up prism data
 				var prop = pp.print(newflexMdlExpr)
@@ -109,7 +123,20 @@ public class SmtVerifier {
 
 				// call model checker and replace part of formula with the result
 				val PrismPlugin prism = new PrismPlugin(md.name /*'prismtmp'*/ , fsa) // new PrismPlugin('', fsa)
-				val EObject flexVal = switch (flexType) { 
+				
+				val Object flexVal = switch (flexType) {
+					RealType: {
+						prism.runPrismQuery(prop, md.params, paramVals)
+					}
+					BoolType: {
+						prism.verifyPrismBooleanProp(prop, md.params, paramVals)
+					}
+					default:
+						throw new UnexpectedException("Expected type of flexible expression: " + flexType)
+				}
+				flexVals.put(flexName, flexVal)
+				// NO, IT DOESN"T WORK
+				/*val EObject flexVal = switch (flexType) { 
 					RealType: {
 						val res = prism.runPrismQuery(prop, md.params, paramVals)
 						
@@ -133,11 +160,13 @@ public class SmtVerifier {
 				EcoreUtil::replace(origflexMdlExpr, flexVal)
 				println('Original formula after MC: ' + pp.print(origFormula))
 				
+				
+				// DOESN"T REALLY WORK as we have to recreate the original formula with the new flex interpretation
 				// copy, put rigid vals, and run final smt
-				val formulaCopySmt = EcoreUtil::copy(origFormula)
-				(new IPLTransformerValueReplacer).replaceVarsWithValues(formulaCopySmt, nameValueMap, scopeDecls)
+				var formulaCopySmt = EcoreUtil::copy(origFormula)
+				formulaCopySmt = (new IPLTransformerValueReplacer).replaceVarsWithValues(formulaCopySmt, nameValueMap, oldScopeDecls) as Formula
 				println('Verifying formula after MC: ' + pp.print(formulaCopySmt))
-				val verRes = verifyRigidFormula(formulaCopySmt, spec, filename, fsa)
+				val newVerRes = verifyRigidFormula(formulaCopySmt, spec, filename+"-val" + valuationCount++ +".smt", fsa)
 				
 				// don't need the formula copy anymore
 				EcoreUtil::delete(formulaCopySmt)
@@ -148,19 +177,29 @@ public class SmtVerifier {
 				
 				EcoreUtil::delete(flexVal)
 				
-				flexVerRes = flexVerRes && verRes
-			}//.reduce[resSoFar, thisRes | resSoFar && thisRes]
+				verRes = verRes && newVerRes*/
+				
+			} // done for all flex vars (not expecting > 1
+			flexsVals.put(scopeVal, flexVals) 
 
-			// pushing the verification results up
-			flexVerRes
-
-		].reduce[resSoFar, thisRes | resSoFar && thisRes]
+			//shortcutting verification
+			/*if(!verRes) {
+				println('Counterexample found, shortcutting verification')	
+				return false
+			}*/
+		}
+		
+		// run the ultimate smt here
+		println('Final verification after MCs: ' + pp.print(origFormula))
+		smtGenerator.flexsVals = flexsVals
+		return verifyRigidFormula(origFormula, spec, filename+"-final.smt", fsa)
+		
 	}
 
 	// finds all variable assignments that satisfy a negated formula
 	// thus, these are candidates for the formula to NOT be valid
 	// @returns true if managed to find all models, false otherwise 
-	// implicit result: populates flexDecls
+	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
@@ -170,14 +209,14 @@ public class SmtVerifier {
 		println("Done generating IPL SMT")
 
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
+		flexDecls = smtGenerator.lastFormulaFlexDecls
+		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
+		
 		// no variables -> no need to look for models
 		if (scopeDecls.size == 0) {
 			println('No quantified variables; aborting model search')
 			return true
 		}
-
-		flexDecls = smtGenerator.lastFormulaFlexDecls
-		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
 		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
 
 		// model search loop 
@@ -226,7 +265,7 @@ public class SmtVerifier {
 	}
 
 	// simple verification of negated formula
-	// populates scope decls but not flexDecls
+	// touches: scopeDecls  (but not flexDecls)
 	public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		// scopeVals.clear -- not needed?
 		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
@@ -269,6 +308,7 @@ public class SmtVerifier {
 	}
 
 	// get (additional) variable evaluations from the model (z3 output)
+	// touches: modelFound, scopeVals; reads: scopeDecls
 	private def Boolean populateEvals(String z3Res) {
 		// note: z3 doesn't return values of quantified vars on (eval <varname) or (get value (<varlist>))
 		// the only way to get the values is to:
