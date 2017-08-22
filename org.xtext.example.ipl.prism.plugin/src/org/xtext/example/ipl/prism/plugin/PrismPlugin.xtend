@@ -33,7 +33,7 @@ class PrismPlugin {
 	
 	public def double runPrismQuery(String property, List<String> paramsDecl, List<String> paramVals, String attemptName) {
 		val res = modelCheck(property, paramsDecl, paramVals, attemptName)
-		if (res == 'infinity')
+		if (res == 'Infinity')
 			throw new UnexpectedException("Received infinity from prism: check that the path formula holds with P=1")
 		
 		Double.parseDouble(res)

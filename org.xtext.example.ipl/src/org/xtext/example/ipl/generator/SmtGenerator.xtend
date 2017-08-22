@@ -56,6 +56,7 @@ import org.xtext.example.ipl.validation.SetType
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
+// use only one generator per each formula, do not reuse
 class SmtGenerator {
 
 	private val tp = new IPLTypeProvider
@@ -87,6 +88,9 @@ class SmtGenerator {
 	private var setDecls = ""
 	private var anonSetNum = 0
 	
+	// to not run background generation every time when looking for models
+	private var backgroundGenerated = false
+	
 	// probes for finding model values; does not face externally 	
 	private var Map<String, String> probingClauses = new HashMap
 
@@ -96,10 +100,16 @@ class SmtGenerator {
 		setDecls = ""
 		anonSetNum = 0
 
-		val preamble = '''; Preabmle
+		val preamble = '''
 (set-logic ALL)
 (set-option :produce-models true)
 (set-option :model_evaluator.completion true)
+
+'''
+
+		val pluginTerms = '''
+(define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
+(define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
 
 '''
 
@@ -119,6 +129,7 @@ class SmtGenerator {
 			populateAadlSmtStructures(viewDecl.ref, compMap, subCompMap)
 		]
 
+		backgroundGenerated = true
 		println("Done populating AADL SMT")
 
 		// generate aadl->smt 
@@ -143,7 +154,10 @@ class SmtGenerator {
 		println("Done generating AADL SMT")
 
 		// background output
-		'''«preamble»
+		'''; Preabmle
+«preamble»
+; Plugin terms
+«pluginTerms»
 
 ; Arch elements
 «decls»
@@ -263,6 +277,10 @@ class SmtGenerator {
 		flexClauses
 	}
 	
+	public def isBackgroundGenerated() {
+		backgroundGenerated
+	}
+	
 
 
 	/*public def String getLastFormulaScopeEvals(){
@@ -318,6 +336,7 @@ class SmtGenerator {
 			// blocking for components
 			var blockingClauses = blockingValues.map[ nameValueMap |
 				if(nameValueMap.containsKey(q.^var)) {
+					// blocking clauses applied to probes
 					if (IPLConfig.ENABLE_PROBING_VARS) {
 						probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
 						
@@ -582,12 +601,6 @@ class SmtGenerator {
 								null
 							}
 
-						/*val value = switch propExp {
-							BooleanLiteral: String::valueOf(propExp.getValue())
-							IntegerLiteral: String::valueOf(propExp.getValue())
-							RealLiteral: String::valueOf(propExp.getValue())
-							default: null
-						}*/
 						// have to go through this dance because otherwise does not get cast
 						val value = switch propExp {
 							BooleanLiteral: propExp.getValue()
@@ -602,7 +615,6 @@ class SmtGenerator {
 								propValueMap.put(prop.name, new HashMap)
 							
 							propValueMap.get(prop.name).put(index, value)
-							//propMap.add(new Pair(prop.name, type), index, value)
 						}
 					}
 				}
@@ -663,13 +675,13 @@ class SmtGenerator {
 		map.get(key).add(item)
 	}
 
-	// used for properties, prop map
-	def <K, L, V> add(Map<K, Map<L, V>> map, K key, L key2, V value) {
+	// used for properties, prop map (not anymore)
+	/*def <K, L, V> add(Map<K, Map<L, V>> map, K key, L key2, V value) {
 		if (map.get(key) === null) {
 			map.put(key, new HashMap<L, V>)
 		}
 
 		map.get(key).put(key2, value)
-	}
+	}*/
 
 }

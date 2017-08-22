@@ -35,9 +35,11 @@ public class SmtVerifier {
 	private var List<Map<String, Object>> scopeVals = new ArrayList<Map<String, Object>>
 
 	private var Map<String, IPLType> flexDecls // declarations of flexible abstractions
-	private var Map<String, ModelExpr> flexClauses // pointers to flexible clauses, by name 
-	private var Boolean modelFound = false 
+	private var Map<String, ModelExpr> flexClauses // pointers to flexible clauses, by name
 	
+	private var String backgroundSmt = ''	
+	 
+	private var Boolean modelFound = false 
 	private var int valuationCount // for output
 
 	public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
@@ -54,6 +56,9 @@ public class SmtVerifier {
 		if (!findNegModels(origFormula, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
 
+		// remove blocking values
+		smtGenerator.blockingValues = new ArrayList
+		
 		// now the current formula state is populated: 
 		// scope decls are set, but can get spoiled by rigid verification
 		val oldScopeDecls = scopeDecls.immutableCopy
@@ -200,7 +205,10 @@ public class SmtVerifier {
 	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
-		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
+		
+		// optimization: not rerun AADL generation for every model find
+		if(!smtGenerator.backgroundGenerated)
+			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
 
 		// initial run of formula to initialize scope declarations 
 		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
@@ -221,7 +229,7 @@ public class SmtVerifier {
 		println("Starting SMT model search...")
 		val filenameWithExt = filename + '.smt'
 		while (true) {
-			fsa.generateFile(filenameWithExt, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
+			fsa.generateFile(filenameWithExt, backgroundSmt + flexDeclsSmt + formulaSmt + ''' 
 				
 				(check-sat) 
 				(get-model)
@@ -266,8 +274,10 @@ public class SmtVerifier {
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
 	public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
-		// scopeVals.clear -- not needed?
-		val String backgrSmt = smtGenerator.generateBackgroundSmt(s)
+		// optimization: not rerun AADL generation for every model find
+		if(!smtGenerator.backgroundGenerated)
+			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
+
 		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
 		println("Done generating IPL SMT")
 
@@ -277,7 +287,7 @@ public class SmtVerifier {
 		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
 
 		val filenameWithExt = filename + '.smt'
-		fsa.generateFile(filenameWithExt, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
+		fsa.generateFile(filenameWithExt, backgroundSmt + flexDeclsSmt + formulaSmt + ''' 
 			
 			(check-sat) 
 			(get-model)
