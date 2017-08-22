@@ -7,6 +7,10 @@ import java.rmi.UnexpectedException
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
+import org.osate.aadl2.Property
+import org.osate.aadl2.AadlBoolean
+import org.osate.aadl2.AadlInteger
+import org.osate.aadl2.AadlReal
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.Int
@@ -73,6 +77,27 @@ class Utils {
 			}
 			default:
 				throw new UnexpectedException("Unknown type")
+		}
+	}
+	
+	// type conversion AADL -> IPL
+	public def static IPLType typeFromPropType(Property property) {
+		switch (property.propertyType) {
+			AadlBoolean: new BoolType
+			AadlInteger: new IntType 
+			AadlReal: new RealType
+			default: null
+		}
+	}
+	
+	// type conversion IPL -> SMT
+	public def static String typesIPL2Smt(IPLType t) {
+		switch (t) {
+			BoolType: 'Bool'
+			IntType: 'Int'
+			RealType: 'Real'
+			ComponentType: 'ArchElem' // conversion by ID to integer
+			default: 'UNKNOWN TYPE'
 		}
 	}
 }

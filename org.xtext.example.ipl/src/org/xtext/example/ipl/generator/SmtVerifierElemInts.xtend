@@ -19,6 +19,8 @@ import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
+import org.xtext.example.ipl.interfaces.SmtGenerator
+import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
@@ -26,9 +28,9 @@ import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
-public class SmtVerifier {
+public class SmtVerifierElemInts implements SmtVerifier {
 
-	private val smtGenerator = new SmtGenerator
+	private val smtGenerator = new SmtGeneratorElemInts
 
 	private var Map<String, IPLType> scopeDecls // declarations of scoped variables
 	// each map in the list is an evaluation of scope
@@ -42,7 +44,7 @@ public class SmtVerifier {
 	private var Boolean modelFound = false 
 	private var int valuationCount // for output
 
-	public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
+	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		smtGenerator.flexsVals = new HashMap // reset it here because it could've been called before
@@ -203,7 +205,7 @@ public class SmtVerifier {
 	// thus, these are candidates for the formula to NOT be valid
 	// @returns true if managed to find all models, false otherwise 
 	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
-	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+	override public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		scopeVals.clear
 		
 		// optimization: not rerun AADL generation for every model find
@@ -273,7 +275,7 @@ public class SmtVerifier {
 
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
-	public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+	override  public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		// optimization: not rerun AADL generation for every model find
 		if(!smtGenerator.backgroundGenerated)
 			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
@@ -394,7 +396,7 @@ public class SmtVerifier {
 		if (!eval.containsKey(varName))
 			eval.put(varName, new LinkedList)
 		
-		if (smtType != smtGenerator.typesIPL2Smt(varType))
+		if (smtType != Utils::typesIPL2Smt(varType))
 			if (!(smtType == 'Int' && varType instanceof ComponentType)) // special case
 				println('''Type error: variable «varName»:«varType» gets value «valueSmt» of type «smtType»''');
 

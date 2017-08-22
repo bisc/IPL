@@ -5,15 +5,10 @@ import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import java.util.Map
-import static java.lang.Math.toIntExact;
 import org.eclipse.xtext.resource.IEObjectDescription
-import org.osate.aadl2.AadlBoolean
-import org.osate.aadl2.AadlInteger
-import org.osate.aadl2.AadlReal
 import org.osate.aadl2.BooleanLiteral
 import org.osate.aadl2.ComponentImplementation
 import org.osate.aadl2.IntegerLiteral
-import org.osate.aadl2.Property
 import org.osate.aadl2.PropertySet
 import org.osate.aadl2.RealLiteral
 import org.osate.aadl2.SubprogramGroupImplementation
@@ -26,6 +21,7 @@ import org.osate.aadl2.properties.PropertyNotPresentException
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
 import org.xtext.example.ipl.IPLConfig
+import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Expression
@@ -46,6 +42,7 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.ViewDecl
+import org.xtext.example.ipl.interfaces.SmtGenerator
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -54,10 +51,12 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
+import static java.lang.Math.toIntExact
+
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
 // use only one generator per each formula, do not reuse
-class SmtGenerator {
+class SmtGeneratorElemInts implements SmtGenerator {
 
 	private val tp = new IPLTypeProvider
 
@@ -95,7 +94,7 @@ class SmtGenerator {
 	private var Map<String, String> probingClauses = new HashMap
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
-	public def String generateBackgroundSmt(IPLSpec spec) {
+	override public def String generateBackgroundSmt(IPLSpec spec) {
 
 		setDecls = ""
 		anonSetNum = 0
@@ -106,7 +105,8 @@ class SmtGenerator {
 (set-option :model_evaluator.completion true)
 
 '''
-
+//(assert (= (abs_int (- 1)) 1)) - how to write it for cvc4
+//(assert (= (abs_int -1) 1)) - how to write it for z3
 		val pluginTerms = '''
 (define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
 (define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
@@ -141,7 +141,7 @@ class SmtGenerator {
 				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
-		val props = propTypeMap.keySet.map['(declare-fun ' + it + ' (ArchElem) ' + typesIPL2Smt(propTypeMap.get(it)) + ')\n'].join + '\n' +
+		val props = propTypeMap.keySet.map['(declare-fun ' + it + ' (ArchElem) ' + Utils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'].join + '\n' +
 			propValueMap.keySet.map [ name |
 				propValueMap.get(name).entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
 			].join
@@ -154,7 +154,7 @@ class SmtGenerator {
 		println("Done generating AADL SMT")
 
 		// background output
-		'''; Preabmle
+		'''; Preamble
 «preamble»
 ; Plugin terms
 «pluginTerms»
@@ -173,7 +173,7 @@ class SmtGenerator {
 		'''
 	}
 
-	public def String generateSmtFormula(Formula f) {
+	override public def String generateSmtFormula(Formula f) {
 		reset
 
 		// this populates anonymous sets
@@ -187,7 +187,7 @@ class SmtGenerator {
 		(assert «formulaStr»)'''
 	}
 
-	public def String generateSmtFormulaNeg(Formula f) {
+	override public def String generateSmtFormulaNeg(Formula f) {
 		reset
 
 		// this populates anonymous sets
@@ -201,7 +201,7 @@ class SmtGenerator {
 		; Probing
 		«if (IPLConfig.ENABLE_PROBING_VARS) 
 			'''«scopeDecls.keySet.map['(declare-const ' + probe(it) +' '
-					+ typesIPL2Smt(scopeDecls.get(it))+')'
+					+ Utils::typesIPL2Smt(scopeDecls.get(it))+')'
 			].join('\n')»'''»
 		
 		«probingClauses.values.join('\n')»
@@ -211,10 +211,10 @@ class SmtGenerator {
 	}
 
 	// needs to be populated with proper abstractions already, after generating for formula
-	public def String generateSmtFlexDecl() {
+	override public def String generateSmtFlexDecl() {
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
 			val funDecls = flexDecls.keySet.map [
-				'''(declare-fun «it» («flexArgs.get(it).map[typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
+				'''(declare-fun «it» («flexArgs.get(it).map[Utils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
 					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
 			
@@ -242,42 +242,42 @@ class SmtGenerator {
 	}
 
 	// set repeatedly only during model finding
-	public def setBlockingValues(List<Map<String, Object>> blocks) {
+	override public def setBlockingValues(List<Map<String, Object>> blocks) {
 		blockingValues = blocks
 	}
 	
 	// set only for the final call
-	public def setFlexsVals(Map vals) {
+	override public def setFlexsVals(Map vals) {
 		flexsVals = vals
 	}
 	
 	// product of background generation; resets it itself
-	public def getPropTypeMap() {
+	override public def getPropTypeMap() {
 		propTypeMap
 	}
 	
 	// same
-	public def getPropValueMap() {
+	override public def getPropValueMap() {
 		propValueMap
 	}
 
 	// returns the scope declaration
 	// won't clear it later
-	public def getLastFormulaScopeDecls() {
+	override public def getLastFormulaScopeDecls() {
 		scopeDecls
 	}
 
 	// won't clear it later
-	public def getLastFormulaFlexDecls() {
+	override public def getLastFormulaFlexDecls() {
 		flexDecls
 	}
 
 	// won't clear it later
-	public def getLastFormulaFlexClauses() {
+	override public def getLastFormulaFlexClauses() {
 		flexClauses
 	}
 	
-	public def isBackgroundGenerated() {
+	override public def isBackgroundGenerated() {
 		backgroundGenerated
 	}
 	
@@ -471,25 +471,7 @@ class SmtGenerator {
 		varName + '_probe'
 	}
 	
-		private def IPLType fromPropType(Property property) {
-		switch (property.propertyType) {
-			AadlBoolean: new BoolType
-			AadlInteger: new IntType 
-			AadlReal: new RealType
-			default: null
-		}
-	}
-	
-	// type conversion IPL -> SMT
-	public def String typesIPL2Smt(IPLType t) {
-		switch (t) {
-			BoolType: 'Bool'
-			IntType: 'Int'
-			RealType: 'Real'
-			ComponentType: 'ArchElem' // conversion by ID to integer
-			default: 'UNKNOWN TYPE'
-		}
-	}
+
 
 	private def String createFlexAbstraction(IPLType type) {
 
@@ -593,7 +575,7 @@ class SmtGenerator {
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 			for (prop : ps.ownedProperties) { // each property
 				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
-					val type = fromPropType(prop)
+					val type = Utils::typeFromPropType(prop)
 					if (type !== null) {
 						val propExp = try {
 								PropertyUtils::getSimplePropertyValue(comp, prop)
