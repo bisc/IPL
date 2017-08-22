@@ -5,9 +5,9 @@ import java.util.HashMap
 
 class ComponentType extends IPLType {
 	
-	String name;
-	ComponentType superType = null;
-	HashMap<String, IPLType> members = new HashMap;
+	private String name;
+	private ComponentType superType = null;
+	private HashMap<String, IPLType> members = new HashMap;
 	
 	new (String name) {
 		this.name = name
@@ -44,7 +44,8 @@ class ComponentType extends IPLType {
 	}
 	
 	override toString() {
-		"ComponentType(" + this.name + ": " + members + ")" 
+		"ComponentType("+ this.name + ")"
+		//"ComponentType(" + this.name + ": " + members + ")" 
 	}
 
 }

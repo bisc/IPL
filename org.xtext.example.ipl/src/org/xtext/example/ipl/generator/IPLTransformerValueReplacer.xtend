@@ -5,6 +5,7 @@ import java.util.Map
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
+import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -23,6 +24,7 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.validation.BoolType
+import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
@@ -32,15 +34,22 @@ class IPLTransformerValueReplacer {
 
 	var Map<String, Object> vals
 	var Map<String, IPLType> decls
+	//var Map<Pair<String, IPLType>, Map<Integer, String>> propMap
+	var Map<String, IPLType> propTypeMap
+	var Map<String, Map<Integer, Object>> propValueMap
 
 	// replaces all occurences of variables with their valuations
 	// returns the next object (potentially changed if on top
-	public def EObject replaceVarsWithValues(EObject f, Map<String, Object> valuation, Map<String, IPLType> declarations) {
+	public def EObject replaceVarsWithValues(EObject f, Map<String, Object> valuation, 
+		Map<String, IPLType> declarations, Map propertyTypeMap, Map propertyValueMap
+	) {
 		if (valuation.size == 0 )
 			return f;
 		
 		vals = valuation
 		decls = declarations
+		propTypeMap = propertyTypeMap
+		propValueMap = propertyValueMap
 		return replaceVars(f)
 	}
 
@@ -85,7 +94,7 @@ class IPLTransformerValueReplacer {
 		// the actual replacement 
 		if (vals.containsKey(f.id)) {
 			// replace with a value from switch, depending on the type
-			val v = switch (decls.get(f.id)) {
+			val v = Utils::createEcoreValueFromIPL(decls.get(f.id), vals.get(f.id)) /*  switch () {
 				BoolType: {
 					val EClass eb = IPLPackage.eINSTANCE.bool
 					val Bool i = EcoreUtil::create(eb) as Bool
@@ -104,8 +113,14 @@ class IPLTransformerValueReplacer {
 					i.value = vals.get(f.id) as Float
 					i
 				}
+				ComponentType:{ // replacing component references with integers
+					val EClass ei = IPLPackage.eINSTANCE.int
+					val Int i = EcoreUtil::create(ei) as Int
+					i.value = vals.get(f.id) as Integer
+					i
+				}
 				default: throw new UnexpectedException("Unknown type")
-			}
+			}*/
 			
 			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, v)
@@ -114,8 +129,36 @@ class IPLTransformerValueReplacer {
 	}
 
 	private dispatch def EObject replaceVars(PropertyExpression f) {
+		// replace the name into a value
 		replaceVars(f.left)
-		return f
+		
+		val propName = f.right.id
+		val propType = propTypeMap.get(propName)
+		// need replace with a property value, if in place
+		// dig through the property map defensively
+		/*val Pair<String, IPLType> prop = propMap.keySet.findFirst[ 
+			Pair<String, IPLType> p | p.key == propName
+		]*/
+		
+		if(propType === null)
+			throw new UnexpectedException('Cannot find property ' + propName + ' in property map ' + propTypeMap)
+		
+		// map: elemId -> val
+		val elemValueMap = propValueMap.get(propName)
+		
+		if(!(f.left instanceof Int))
+			throw new UnsupportedOperationException('Property ' + propName + ' has a non-integer left side: ' + f.left)
+		
+		val elemId = (f.left as Int).value
+		
+		if(!elemValueMap.containsKey(elemId)) 
+			throw new UnexpectedException('Cannot find element ' + elemId + ' in property map ' + propValueMap)
+		
+		// make a value 
+		val v = Utils::createEcoreValueFromIPL(propType, elemValueMap.get(elemId))
+		EcoreUtil::replace(f, v)
+		
+		return v
 	}
 
 	private dispatch def EObject replaceVars(TermOperation f) {
@@ -144,5 +187,6 @@ class IPLTransformerValueReplacer {
 		replaceVars(f.expr)
 		return f
 	}
+
 
 }

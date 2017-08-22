@@ -10,6 +10,7 @@ import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
+import org.xtext.example.ipl.iPL.Prop
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
@@ -49,7 +50,8 @@ class IPLVisitorTemplate {
 	
 	dispatch def visit(PropertyExpression f){ 
 	}
-	
+	dispatch def String print(Prop f){
+	}
 	dispatch def visit(TermOperation f){ 
 	}
 	

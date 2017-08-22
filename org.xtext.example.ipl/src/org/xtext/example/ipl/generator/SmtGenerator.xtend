@@ -5,6 +5,7 @@ import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import java.util.Map
+import static java.lang.Math.toIntExact;
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
@@ -64,22 +65,30 @@ class SmtGenerator {
 	private var Map<String, IPLType> scopeDecls = new HashMap
 
 	// for flexible "variables"
-	private var Map<String, IPLType> flexDecls = new HashMap // type details of flex "variables"; flexName -> flexVarType
-	private var Map<String, ModelExpr> flexClauses = new HashMap // mapping between clauses and var names; flexName -> <IPL lang elem>
-	private var Map<String, List<String>> flexArgs = new HashMap // argument names (from scope) of flex clauses; flexName -> <varName>. Does not face externally
-	private var flexNum = 0
-
-	// probes for finding model values	
-	private var Map<String, String> probingClauses = new HashMap
+	// type details of flex "variables"; flexName -> flexVarType
+	private var Map<String, IPLType> flexDecls = new HashMap 
+	 // mapping between clauses and var names; flexName -> <IPL lang elem>
+	private var Map<String, ModelExpr> flexClauses = new HashMap
+	 // argument names (from scope) of flex clauses; flexName -> <varName>. Does not face externally
+	private var Map<String, List<String>> flexArgs = new HashMap
+	private var flexNum = 0 // for naming flexible abstractions
+	
+	// storage for component properties and their types; <prop name , prop type> -> (archelem index -> prop value)
+	// e.g. <start_head -> Int> -> (0 -> 1, 1-> 0, 2 -> 3, ...)  
+	private var Map<String, Map<Integer, Object>> propValueMap = new HashMap
+	private var Map<String, IPLType> propTypeMap = new HashMap
 
 	// SET EXTERNALLY blocking clauses for finding model values; 
 	private var List<Map<String, Object>> blockingValues = new ArrayList // has to be not null
 	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
 	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap // has to be not null
 	
-	// anonymous sets encoded as functions
+	// anonymous sets encoded as functions; does not face externally 
 	private var setDecls = ""
 	private var anonSetNum = 0
+	
+	// probes for finding model values; does not face externally 	
+	private var Map<String, String> probingClauses = new HashMap
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
 	public def String generateBackgroundSmt(IPLSpec spec) {
@@ -87,7 +96,8 @@ class SmtGenerator {
 		setDecls = ""
 		anonSetNum = 0
 
-		val preamble = '''(set-logic ALL)
+		val preamble = '''; Preabmle
+(set-logic ALL)
 (set-option :produce-models true)
 (set-option :model_evaluator.completion true)
 
@@ -100,12 +110,13 @@ class SmtGenerator {
 			return preamble
 
 		val compMap = new HashMap<String, List<Integer>>
-		val propMap = new HashMap<Pair<String, String>, HashMap<Integer, String>>
+		propTypeMap = new HashMap<String, IPLType>
+		propValueMap = new HashMap<String, Map<Integer, Object>>
 		val subCompMap = new HashMap<Integer, List<Integer>>
 
 		// parse aadl structures to prep for smt generation
 		viewDecs.forEach [ viewDecl |
-			populateAadlSmtStructures(viewDecl.ref, compMap, propMap, subCompMap)
+			populateAadlSmtStructures(viewDecl.ref, compMap, subCompMap)
 		]
 
 		println("Done populating AADL SMT")
@@ -119,10 +130,9 @@ class SmtGenerator {
 				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
-		val props = propMap.keySet.map['(declare-fun ' + it.key + ' (ArchElem) ' + it.value + ')\n'].join + '\n' +
-			propMap.entrySet.map [
-				val name = key.key
-				value.entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
+		val props = propTypeMap.keySet.map['(declare-fun ' + it + ' (ArchElem) ' + typesIPL2Smt(propTypeMap.get(it)) + ')\n'].join + '\n' +
+			propValueMap.keySet.map [ name |
+				propValueMap.get(name).entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
 			].join
 
 		var subComps = '(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)\n'
@@ -133,19 +143,19 @@ class SmtGenerator {
 		println("Done generating AADL SMT")
 
 		// background output
-		'''	«preamble»
-			
-			; Arch elements
-			«decls»
-			
-			«defns»
-					
-			; Properties and subcomponents
-			«props»
-			
-			; Subcomponents
-			«subComps»
-			
+		'''«preamble»
+
+; Arch elements
+«decls»
+
+«defns»
+		
+; Properties and subcomponents
+«props»
+
+; Subcomponents
+«subComps»
+
 		'''
 	}
 
@@ -174,6 +184,7 @@ class SmtGenerator {
 			'''; Anonymous sets
 «setDecls» '''»
 		
+		; Probing
 		«if (IPLConfig.ENABLE_PROBING_VARS) 
 			'''«scopeDecls.keySet.map['(declare-const ' + probe(it) +' '
 					+ typesIPL2Smt(scopeDecls.get(it))+')'
@@ -181,6 +192,7 @@ class SmtGenerator {
 		
 		«probingClauses.values.join('\n')»
 		
+		; Formula 
 		(assert (not «formulaStr»))'''
 	}
 
@@ -224,6 +236,16 @@ class SmtGenerator {
 	public def setFlexsVals(Map vals) {
 		flexsVals = vals
 	}
+	
+	// product of background generation; resets it itself
+	public def getPropTypeMap() {
+		propTypeMap
+	}
+	
+	// same
+	public def getPropValueMap() {
+		propValueMap
+	}
 
 	// returns the scope declaration
 	// won't clear it later
@@ -240,6 +262,8 @@ class SmtGenerator {
 	public def getLastFormulaFlexClauses() {
 		flexClauses
 	}
+	
+
 
 	/*public def String getLastFormulaScopeEvals(){
 	 * 	scope.map[ v | '''(eval «v.key»)'''].join('\n')
@@ -283,9 +307,31 @@ class SmtGenerator {
 
 		// switching on the set member type
 		switch (varType) {
-			ComponentType: // TODO implement blocking for components
-			'''(«quant» ((«q.^var» ArchElem)) («quantOp» («'is' + (varType as ComponentType)
-				.name.replace('.', '_')» «q.^var») «generateFormula(q.exp)»))'''
+			ComponentType: {
+			val archElemMbFun = getArchElemMbFun(varType as ComponentType)
+			
+			// TODO the bottom part can be factored out as a helper function for all types (argument: membership set)
+			// probing constraint - archelem
+			if (IPLConfig.ENABLE_PROBING_VARS) 
+				probingClauses.put(probe(q.^var), '''(assert («archElemMbFun» «probe(q.^var)»))''')
+
+			// blocking for components
+			var blockingClauses = blockingValues.map[ nameValueMap |
+				if(nameValueMap.containsKey(q.^var)) {
+					if (IPLConfig.ENABLE_PROBING_VARS) {
+						probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
+						
+						(assert (distinct «probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
+					}
+					'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
+				} else 
+					''
+			].join(' ')			
+			
+			// actual quantified expression
+			'''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var») «blockingClauses»)
+					«generateFormula(q.exp)»))'''
+			}	
 			IntType,
 			RealType,
 			BoolType: {
@@ -293,13 +339,12 @@ class SmtGenerator {
 				val z3TypeName = switch (varType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
 
 				// probing constraint - set
-				if (IPLConfig.ENABLE_PROBING_VARS) {
+				if (IPLConfig.ENABLE_PROBING_VARS) 
 					probingClauses.put(probe(q.^var), '''(assert («setMbFunName» «probe(q.^var)»))''')
-				}
+				
 
 				// do blocking for this variable if needed
-				var blockingClauses = ''
-				blockingClauses = blockingValues.map [ nameValueMap |
+				var blockingClauses = blockingValues.map [ nameValueMap |
 					if (nameValueMap.containsKey(q.^var)) {
 						if (IPLConfig.ENABLE_PROBING_VARS) {
 							probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
@@ -314,10 +359,11 @@ class SmtGenerator {
 
 				// the old way of doing blocking: 
 				// if (blockingValues.get(q.^var) !== null)
-//					 blockingClauses = blockingValues.get(q.^var).map['''(distinct «q.^var» «it» )'''].join(' ') // forEach[blockingClauses += it]	
+//					 blockingClauses = blockingValues.get(q.^var).map['''(distinct «q.^var» «it» )'''].join(' ') // forEach[blockingClauses += it]
+	
 				// actual quantified expression
 				'''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» (and («setMbFunName» «q.^var») «blockingClauses») 
-						«generateFormula(q.exp)»))'''
+	«generateFormula(q.exp)»))'''
 			}
 			default:
 				'; Unimplemented set member type'
@@ -397,8 +443,33 @@ class SmtGenerator {
 
 	// === HELPER FUNCTIONS === 
 	
+	
+	private def String getArchElemMbFun(ComponentType ct) {
+		'is' + ct.name.replace('.', '_')
+	}
+	
 	private def String probe(String varName) {
 		varName + '_probe'
+	}
+	
+		private def IPLType fromPropType(Property property) {
+		switch (property.propertyType) {
+			AadlBoolean: new BoolType
+			AadlInteger: new IntType 
+			AadlReal: new RealType
+			default: null
+		}
+	}
+	
+	// type conversion IPL -> SMT
+	public def String typesIPL2Smt(IPLType t) {
+		switch (t) {
+			BoolType: 'Bool'
+			IntType: 'Int'
+			RealType: 'Real'
+			ComponentType: 'ArchElem' // conversion by ID to integer
+			default: 'UNKNOWN TYPE'
+		}
 	}
 
 	private def String createFlexAbstraction(IPLType type) {
@@ -449,8 +520,7 @@ class SmtGenerator {
 		funName
 	}
 
-	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
-		HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
+	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap, Map<Integer, List<Integer>> subCompMap) {
 
 		if (comp instanceof SubprogramImplementation || comp instanceof SubprogramGroupImplementation) {
 			// Fail...
@@ -460,11 +530,11 @@ class SmtGenerator {
 		val inst = InstantiateModel::buildInstanceModelFile(comp)
 		val cic = new ComponentIndexCache
 
-		inst.allComponentInstances.forEach[generateComponentInst(it, typeMap, cic, propMap, subCompMap)]
+		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, cic, subCompMap)]
 	}
 
-	private def generateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map, ComponentIndexCache cic,
-		HashMap<Pair<String, String>, HashMap<Integer, String>> propMap, HashMap<Integer, List<Integer>> subCompMap) {
+	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map, ComponentIndexCache cic,
+		 Map<Integer, List<Integer>> subCompMap) {
 
 		val index = cic.indexForComp(comp)
 
@@ -478,40 +548,61 @@ class SmtGenerator {
 			map.add('is' + ci.name.replace('.', '_'), index)
 		}
 
+		// handling subcomponents
 		comp.children.forEach [
 			switch (it) {
 				ComponentInstance: {
 					val scIndex = cic.indexForComp(it)
-					propMap.add(new Pair(name, 'ArchElem'), index, scIndex.toString)
+					propTypeMap.put(name, new ComponentType('EMPTY'))
+					
+					if(propValueMap.get(name) === null)
+						propValueMap.put(name, new HashMap)
+					
+					propValueMap.get(name).put(index, scIndex)
+					
+					//propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
+						//index, scIndex.toString
 					subCompMap.add(index, scIndex)
 				}
 			}
 		]
 
+		// handling properties
 		for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(
 			comp.getComponentClassifier())) {
 
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
-			for (prop : ps.ownedProperties) {
-				if (comp.acceptsProperty(prop)) {
+			for (prop : ps.ownedProperties) { // each property
+				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
 					val type = fromPropType(prop)
 					if (type !== null) {
-
 						val propExp = try {
 								PropertyUtils::getSimplePropertyValue(comp, prop)
 							} catch (PropertyNotPresentException e) {
 								null
 							}
 
-						val value = switch propExp {
+						/*val value = switch propExp {
 							BooleanLiteral: String::valueOf(propExp.getValue())
 							IntegerLiteral: String::valueOf(propExp.getValue())
 							RealLiteral: String::valueOf(propExp.getValue())
 							default: null
+						}*/
+						// have to go through this dance because otherwise does not get cast
+						val value = switch propExp {
+							BooleanLiteral: propExp.getValue()
+							IntegerLiteral: toIntExact(propExp.getValue())//it returns long
+							RealLiteral: propExp.getValue()
+							default: null
 						}
 
 						if (value !== null) {
-							propMap.add(new Pair(prop.name, type), index, value)
+							propTypeMap.put(prop.name, type)
+							if(propValueMap.get(prop.name)=== null)
+								propValueMap.put(prop.name, new HashMap)
+							
+							propValueMap.get(prop.name).put(index, value)
+							//propMap.add(new Pair(prop.name, type), index, value)
 						}
 					}
 				}
@@ -519,23 +610,7 @@ class SmtGenerator {
 		}
 	}
 
-	private def String fromPropType(Property property) {
-		switch (property.propertyType) {
-			AadlBoolean: 'Bool'
-			AadlInteger: 'Int'
-			AadlReal: 'Real'
-			default: null
-		}
-	}
 
-	private def String typesIPL2Smt(IPLType t) {
-		switch (t) {
-			BoolType: 'Bool'
-			IntType: 'Int'
-			RealType: 'Real'
-			default: 'UNKNOWN TYPE'
-		}
-	}
 
 	static class ComponentIndexCache {
 		var next = 0
@@ -578,7 +653,9 @@ class SmtGenerator {
 	 * 		'<' + first.toString + ', ' + second.toString + '>'
 	 * 	}
 	 }*/
-	def <K, V> add(Map<K, List<V>> map, K key, V item) {
+	 
+	// used for subcomponents, subcomp map
+	private def <K, V> add(Map<K, List<V>> map, K key, V item) {
 		if (map.get(key) === null) {
 			map.put(key, new ArrayList<V>)
 		}
@@ -586,7 +663,8 @@ class SmtGenerator {
 		map.get(key).add(item)
 	}
 
-	def <K, L, V> add(Map<K, HashMap<L, V>> map, K key, L key2, V value) {
+	// used for properties, prop map
+	def <K, L, V> add(Map<K, Map<L, V>> map, K key, L key2, V value) {
 		if (map.get(key) === null) {
 			map.put(key, new HashMap<L, V>)
 		}

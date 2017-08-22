@@ -12,6 +12,7 @@ import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
+import org.xtext.example.ipl.iPL.Prop
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.QM
@@ -83,6 +84,10 @@ class IPLPrettyPrinter {
 	
 	dispatch def String print(PropertyExpression f){
 		'''«print(f.left)»::«print(f.right)»''' 
+	}
+	
+	dispatch def String print(Prop f){
+		'''«f.id»''' 
 	}
 	
 	dispatch def String print(TermOperation f){ 

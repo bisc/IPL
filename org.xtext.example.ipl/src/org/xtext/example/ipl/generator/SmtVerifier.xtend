@@ -10,25 +10,21 @@ import java.util.Map
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
-import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.IPLPrettyPrinter
 import org.xtext.example.ipl.Utils
-import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.Formula
-import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
-import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
+import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
-import org.eclipse.emf.ecore.EObject
 
 public class SmtVerifier {
 
@@ -108,8 +104,10 @@ public class SmtVerifier {
 				println('Flexible formula before replacement: ' + pp.print(newflexMdlExpr) + ", params: " +
 					newflexMdlExpr.params.vals.map[pp.print(it)])
 
-				// put rigid values into it (including model parameters)
-				newflexMdlExpr = (new IPLTransformerValueReplacer).replaceVarsWithValues(newflexMdlExpr, scopeVal, oldScopeDecls) as ModelExpr
+				// put rigid values into it (including model parameters and property values)
+				newflexMdlExpr = (new IPLTransformerValueReplacer).replaceVarsWithValues(
+					newflexMdlExpr, scopeVal, oldScopeDecls, smtGenerator.propTypeMap, smtGenerator.propValueMap
+				) as ModelExpr
 
 				// set up prism data
 				var prop = pp.print(newflexMdlExpr)
@@ -126,10 +124,10 @@ public class SmtVerifier {
 				
 				val Object flexVal = switch (flexType) {
 					RealType: {
-						prism.runPrismQuery(prop, md.params, paramVals)
+						prism.runPrismQuery(prop, md.params, paramVals, filename)
 					}
 					BoolType: {
-						prism.verifyPrismBooleanProp(prop, md.params, paramVals)
+						prism.verifyPrismBooleanProp(prop, md.params, paramVals, filename)
 					}
 					default:
 						throw new UnexpectedException("Expected type of flexible expression: " + flexType)
@@ -192,7 +190,7 @@ public class SmtVerifier {
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + pp.print(origFormula))
 		smtGenerator.flexsVals = flexsVals
-		return verifyRigidFormula(origFormula, spec, filename+"-final.smt", fsa)
+		return verifyRigidFormula(origFormula, spec, filename+"-final", fsa)
 		
 	}
 
@@ -221,18 +219,19 @@ public class SmtVerifier {
 
 		// model search loop 
 		println("Starting SMT model search...")
+		val filenameWithExt = filename + '.smt'
 		while (true) {
-			fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
+			fsa.generateFile(filenameWithExt, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
 				
 				(check-sat) 
 				(get-model)
 				
 			''')
 
-			System::out.println("Done generating SMT, see file " + filename)
+			System::out.println("Done generating SMT, see file " + filenameWithExt)
 
 			// call smt 
-			var z3Filename = fsa.getURI(filename)
+			var z3Filename = fsa.getURI(filenameWithExt)
 			var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
 			var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
@@ -277,17 +276,18 @@ public class SmtVerifier {
 		//println('''Flex: «flexDecls»''')
 		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
 
-		fsa.generateFile(filename, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
+		val filenameWithExt = filename + '.smt'
+		fsa.generateFile(filenameWithExt, backgrSmt + flexDeclsSmt + formulaSmt + ''' 
 			
 			(check-sat) 
 			(get-model)
 			
 		''')
 
-		System::out.println("Done generating SMT, see file " + filename)
+		System::out.println("Done generating SMT, see file " + filenameWithExt)
 
 		// call smt 
-		var z3Filename = fsa.getURI(filename)
+		var z3Filename = fsa.getURI(filenameWithExt)
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
 		var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
@@ -383,25 +383,17 @@ public class SmtVerifier {
 		// if evals don't have a var, add a list
 		if (!eval.containsKey(varName))
 			eval.put(varName, new LinkedList)
+		
+		if (smtType != smtGenerator.typesIPL2Smt(varType))
+			if (!(smtType == 'Int' && varType instanceof ComponentType)) // special case
+				println('''Type error: variable «varName»:«varType» gets value «valueSmt» of type «smtType»''');
 
 		switch (varType) { // variable type from scope
-			IntType: {
-				if (smtType != 'Int')
-					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
-
-				eval.put(varName, Integer.parseInt(valueSmt))
-			}
-			RealType: {
-				if (smtType != 'Real')
-					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
-
-				eval.put(varName, Float.parseFloat(valueSmt))
-			}
-			BoolType: {
-				if (smtType != 'Bool')
-					print('''Type error: variable «varName»:«varType» gets a value «valueSmt»''');
-
-				eval.put(varName, Boolean.parseBoolean(valueSmt))
+			IntType: eval.put(varName, Integer.parseInt(valueSmt))
+			RealType: eval.put(varName, Float.parseFloat(valueSmt))
+			BoolType: eval.put(varName, Boolean.parseBoolean(valueSmt))
+			ComponentType: {
+				eval.put(varName, Integer.parseInt(valueSmt)) // because ArchElem is a renaming of Int
 			}
 			default:
 				println('''Type error: undefined type «varType» of variable «varName»''')

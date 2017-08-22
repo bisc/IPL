@@ -36,7 +36,7 @@ class IPLGenerator extends AbstractGenerator {
 		// have to renew smt verifier every formula to not carry state in SMTGenerator over
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
-				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i + '.smt' 
+				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 				if(IPLRigidityProvider::isRigid(f)) { //rigid
 					val res = (new SmtVerifier).verifyRigidFormula(f, spec, filename, fsa)

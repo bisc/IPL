@@ -27,25 +27,25 @@ class PrismPlugin {
 		}
 	
 	
-	public def boolean verifyPrismBooleanProp(String property, List<String> paramsDecl, List<String> paramVals) {
-		Boolean.parseBoolean(modelCheck(property, paramsDecl, paramVals))
+	public def boolean verifyPrismBooleanProp(String property, List<String> paramsDecl, List<String> paramVals, String attemptName) {
+		Boolean.parseBoolean(modelCheck(property, paramsDecl, paramVals, attemptName))
 	}
 	
-	public def double runPrismQuery(String property, List<String> paramsDecl, List<String> paramVals) {
-		val res = modelCheck(property, paramsDecl, paramVals)
+	public def double runPrismQuery(String property, List<String> paramsDecl, List<String> paramVals, String attemptName) {
+		val res = modelCheck(property, paramsDecl, paramVals, attemptName)
 		if (res == 'infinity')
 			throw new UnexpectedException("Received infinity from prism: check that the path formula holds with P=1")
 		
 		Double.parseDouble(res)
 	}
 	
-	private def String modelCheck(String property, List<String> paramsDecl, List<String> paramVals) {
+	private def String modelCheck(String property, List<String> paramsDecl, List<String> paramVals, String attemptName) {
 		
 		if (paramsDecl.size != paramVals.size)
 			throw new IllegalArgumentException("Need the same quantity of parameter declarations and values")
 
 		// put property into a file
-		val String propsRelativePath = relativePrismLoc + "myprops.props"
+		val String propsRelativePath = relativePrismLoc + attemptName + ".props"
 		fsa.generateFile(propsRelativePath, property+'\n')
 
 		var propsAbsolutePath = FileLocator.toFileURL(new URL(fsa.getURI(propsRelativePath/*"mapbot.props"*/).toString)).path
