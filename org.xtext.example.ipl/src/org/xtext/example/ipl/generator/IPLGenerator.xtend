@@ -3,14 +3,17 @@
  */
 package org.xtext.example.ipl.generator
 
+import java.lang.management.ManagementFactory
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.xtext.example.ipl.IPLPrettyPrinter
+import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.validation.IPLRigidityProvider
+import org.xtext.example.ipl.TimeRec
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -20,10 +23,22 @@ import org.xtext.example.ipl.validation.IPLRigidityProvider
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#code-generation
  */
 class IPLGenerator extends AbstractGenerator {
+	
+	// setting up for timing 
+	override public void beforeGenerate(Resource input, IFileSystemAccess2 fsa, IGeneratorContext context) {
+		// set up timing
+		var mxb = ManagementFactory.getThreadMXBean()
+		mxb.threadContentionMonitoringEnabled = true
+		println('CPU time support available:' + mxb.isThreadCpuTimeSupported)
+		println('CPU time support enabled:' + mxb.isThreadCpuTimeEnabled)
+		println('Contention monitoring:' + mxb.isThreadContentionMonitoringEnabled)
+		
+		TimeRec::reset 
+	}
 
 	//private val smtVerifier = new SmtVerifier
 
-	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
+	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
 		// generation of SMT for IPL formulas
@@ -38,23 +53,28 @@ class IPLGenerator extends AbstractGenerator {
 			spec.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
-				if(IPLRigidityProvider::isRigid(f)) { //rigid
-					val res = (new SmtVerifierElemInts).verifyRigidFormula(f, spec, filename, fsa)
-					println("Rigid IPL formula verified, result: " + res)
-				} else { // non-rigid 
+					
+				if(!IPLRigidityProvider::isRigid(f)) { // non-rigid, full-scale IPL
 					// find a model declaration
 					val mdls = spec.decls.filter[it instanceof ModelDecl]
 					if (mdls.size == 0) {
 						println('Error: cannot verify non-rigid formulas without a model')
-					} else {					
+					} else {  
+						TimeRec::startTimer("verifyNonRigidFormula")
 						val res = (new SmtVerifierElemInts).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+						TimeRec::stopTimer("verifyNonRigidFormula")
 						println("Non-rigid IPL formula verified, result: " + res)
-					}
+					} 
+				} else { //rigid, shortcut
+						val res = (new SmtVerifierElemInts).verifyRigidFormula(f, spec, filename, fsa)
+						println("Rigid IPL formula verified, result: " + res)
+						
 				}
 			]
 		]
 		
-
+		// output timing results
+		TimeRec::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
 	}
 	
 }

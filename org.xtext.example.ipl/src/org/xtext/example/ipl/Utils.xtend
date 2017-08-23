@@ -7,10 +7,10 @@ import java.rmi.UnexpectedException
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
-import org.osate.aadl2.Property
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
 import org.osate.aadl2.AadlReal
+import org.osate.aadl2.Property
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.Int
@@ -21,7 +21,7 @@ import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
-class Utils {
+class Utils { 
 	/** 
 	 * Run a shell command in the specified directory.  
 	 * @param command command to be run
@@ -100,4 +100,11 @@ class Utils {
 			default: 'UNKNOWN TYPE'
 		}
 	}
+	
+	// var name to probe name
+	public def static String probe(String varName) {
+		varName + '_probe'
+	}
+	
+	
 }

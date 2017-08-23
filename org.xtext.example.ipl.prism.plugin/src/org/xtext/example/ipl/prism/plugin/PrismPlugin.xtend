@@ -68,10 +68,14 @@ class PrismPlugin {
 			paramInst += '''«paramsDecl.get(i)»=«paramVals.get(i)»'''
 		}
 		
-		// call prism   
-		var res = PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, 
-			propsAbsolutePath, prismPolPath, -1/*prop to check - all*/, paramInst) 
-		
+		// call prism -- leaving default params in place as needed    
+		var res = if (paramInst.length > 0)
+			PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, 
+				propsAbsolutePath, prismPolPath, -1/*prop to check - all*/, paramInst)
+		else  
+			PrismConnectorAPI::modelCheckFromFileS(prismModelAbsolutePath, 
+				propsAbsolutePath, prismPolPath)
+			
 		println('Prism result: ' + res)
 		res
 	// val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)

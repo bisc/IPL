@@ -14,12 +14,12 @@ import org.eclipse.emf.ecore.util.EcoreUtil
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.IPLPrettyPrinter
+import org.xtext.example.ipl.TimeRec
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
-import org.xtext.example.ipl.interfaces.SmtGenerator
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.validation.BoolType
@@ -28,6 +28,7 @@ import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
+// implementation of generation by mapping ArchElem -> Int
 public class SmtVerifierElemInts implements SmtVerifier {
 
 	private val smtGenerator = new SmtGeneratorElemInts
@@ -55,8 +56,10 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			return true
 
 		// find models: candidate valuations for sat of negformula
+		TimeRec::startTimer("findNegModels")
 		if (!findNegModels(origFormula, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
+		TimeRec::stopTimer("findNegModels")
 
 		// remove blocking values
 		smtGenerator.blockingValues = new ArrayList
@@ -127,8 +130,11 @@ public class SmtVerifierElemInts implements SmtVerifier {
 				println('''Invoking PRISM: model «md.name», params «md.params», param vals «paramVals», prop «prop»''')
 
 				// call model checker and replace part of formula with the result
-				val PrismPlugin prism = new PrismPlugin(md.name /*'prismtmp'*/ , fsa) // new PrismPlugin('', fsa)
+				TimeRec::startTimer("new PrismPlugin")
+				val PrismPlugin prism = new PrismPlugin(md.name, fsa)
+				TimeRec::stopTimer("new PrismPlugin")
 				
+				TimeRec::startTimer("prismCheck")
 				val Object flexVal = switch (flexType) {
 					RealType: {
 						prism.runPrismQuery(prop, md.params, paramVals, filename)
@@ -139,6 +145,8 @@ public class SmtVerifierElemInts implements SmtVerifier {
 					default:
 						throw new UnexpectedException("Expected type of flexible expression: " + flexType)
 				}
+				TimeRec::stopTimer("prismCheck")
+				
 				flexVals.put(flexName, flexVal)
 				// NO, IT DOESN"T WORK
 				/*val EObject flexVal = switch (flexType) { 
@@ -213,7 +221,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
 
 		// initial run of formula to initialize scope declarations 
-		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
+		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
 		println("Done generating IPL SMT")
 
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
@@ -243,8 +251,9 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			// call smt 
 			var z3Filename = fsa.getURI(filenameWithExt)
 			var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
-
+			TimeRec::startTimer("z3")
 			var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+			TimeRec::stopTimer("z3")
 			var z3ResLines = z3Res.split('\n')
 			val z3ResFirstLine = z3ResLines.get(0)
 
@@ -267,7 +276,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 
 			smtGenerator.blockingValues = scopeVals
 			// a new iteration
-			formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
+			formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
 			println("Done generating IPL SMT")
 		}
 
@@ -276,11 +285,12 @@ public class SmtVerifierElemInts implements SmtVerifier {
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
 	override  public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+		TimeRec::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if(!smtGenerator.backgroundGenerated)
 			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
 
-		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f)
+		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f, false)
 		println("Done generating IPL SMT")
 
 		scopeDecls = smtGenerator.lastFormulaScopeDecls
@@ -302,11 +312,14 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		var z3Filename = fsa.getURI(filenameWithExt)
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
+		TimeRec::startTimer("z3")
 		var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+		TimeRec::stopTimer("z3")
 		// z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		var z3ResLines = z3Res.split('\n')
 		val z3ResFirstLine = z3ResLines.get(0)
 
+		TimeRec::stopTimer("verifyRigidFormula")
 		if (z3ResFirstLine == "unsat") {
 			println("unsat, formula is valid")
 			true

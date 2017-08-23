@@ -6,6 +6,7 @@ import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.IPLSpec
 
+// use only one generator per each formula, do not reuse
 interface SmtGenerator {
 	// generate AADL SMT
 	public def String generateBackgroundSmt(IPLSpec spec)
@@ -14,7 +15,7 @@ interface SmtGenerator {
 	public def String generateSmtFormula(Formula f)
 	
 	// generate SMT for negated formula
-	public def String generateSmtFormulaNeg(Formula f)
+	public def String generateSmtFormulaNeg(Formula f, boolean probing)
 	
 	// needs to be populated with proper abstractions already, after generating for formula
 	public def String generateSmtFlexDecl()
@@ -38,7 +39,7 @@ interface SmtGenerator {
 	public def Map getLastFormulaFlexDecls() 
 
 	// won't clear it later
-	public def Map getLastFormulaFlexClauses() 
+	public def Map getLastFormulaFlexClauses()
 	
 	public def boolean isBackgroundGenerated() 
 

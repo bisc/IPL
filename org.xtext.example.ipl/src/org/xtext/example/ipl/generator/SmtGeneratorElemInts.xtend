@@ -5,6 +5,7 @@ import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import java.util.Map
+import org.eclipse.emf.ecore.util.EcoreUtil
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.BooleanLiteral
 import org.osate.aadl2.ComponentImplementation
@@ -21,6 +22,7 @@ import org.osate.aadl2.properties.PropertyNotPresentException
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
 import org.xtext.example.ipl.IPLConfig
+import org.xtext.example.ipl.TimeRec
 import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -40,6 +42,8 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
+import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtGenerator
@@ -53,9 +57,10 @@ import org.xtext.example.ipl.validation.SetType
 
 import static java.lang.Math.toIntExact
 
+import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-// use only one generator per each formula, do not reuse
+// implementation of generation by mapping ArchElem -> Int
 class SmtGeneratorElemInts implements SmtGenerator {
 
 	private val tp = new IPLTypeProvider
@@ -92,9 +97,15 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	
 	// probes for finding model values; does not face externally 	
 	private var Map<String, String> probingClauses = new HashMap
+	
+	// an alternative formula for probes 	
+	private String probingFormula = ''
+	private boolean probingFormulaSwitch = false // switch on when generating probes, for modelexpr 
+	
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
 	override public def String generateBackgroundSmt(IPLSpec spec) {
+		TimeRec::startTimer("generateBackgroundSmt")
 
 		setDecls = ""
 		anonSetNum = 0
@@ -153,7 +164,8 @@ class SmtGeneratorElemInts implements SmtGenerator {
 
 		println("Done generating AADL SMT")
 
-		// background output
+		TimeRec::stopTimer("generateBackgroundSmt")
+		// background generation output
 		'''; Preamble
 «preamble»
 ; Plugin terms
@@ -173,8 +185,9 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		'''
 	}
 
+	// NOT USED
 	override public def String generateSmtFormula(Formula f) {
-		reset
+		/*reset
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
@@ -183,11 +196,21 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		«if (setDecls.length > 0)
 			'''; Anonymous sets
 				«setDecls» '''»
+		; Probing
+		«if (IPLConfig.ENABLE_PROBING_VARS) 
+			'''«scopeDecls.keySet.map['(declare-const ' + Utils::probe(it) +' '
+					+ Utils::typesIPL2Smt(scopeDecls.get(it))+')'
+			].join('\n')»'''»
 		
-		(assert «formulaStr»)'''
+		«probingClauses.values.join('\n')»
+		
+		«probingFormula»
+		
+		;Formula 
+		(assert «formulaStr»)'''*/
 	}
 
-	override public def String generateSmtFormulaNeg(Formula f) {
+	override public def String generateSmtFormulaNeg(Formula f, boolean probing) {
 		reset
 
 		// this populates anonymous sets
@@ -200,14 +223,16 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		
 		; Probing
 		«if (IPLConfig.ENABLE_PROBING_VARS) 
-			'''«scopeDecls.keySet.map['(declare-const ' + probe(it) +' '
+			'''«scopeDecls.keySet.map['(declare-const ' + Utils::probe(it) +' '
 					+ Utils::typesIPL2Smt(scopeDecls.get(it))+')'
 			].join('\n')»'''»
 		
-		«probingClauses.values.join('\n')»
+		«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
+			probingClauses.values.join('\n') + generateProbingBlockingClauses + '\n' + probingFormula »
 		
 		; Formula 
-		(assert (not «formulaStr»))'''
+		«if (!probing) 
+			'(assert (not ' + formulaStr  +'))'»'''
 	}
 
 	// needs to be populated with proper abstractions already, after generating for formula
@@ -281,7 +306,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		backgroundGenerated
 	}
 	
-
+	
 
 	/*public def String getLastFormulaScopeEvals(){
 	 * 	scope.map[ v | '''(eval «v.key»)'''].join('\n')
@@ -324,28 +349,33 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		val quantOp = if(quant == 'forall') '=>' else 'and'
 
 		// switching on the set member type
-		switch (varType) {
+		val formula = switch (varType) { 
 			ComponentType: {
 			val archElemMbFun = getArchElemMbFun(varType as ComponentType)
 			
 			// TODO the bottom part can be factored out as a helper function for all types (argument: membership set)
 			// probing constraint - archelem
 			if (IPLConfig.ENABLE_PROBING_VARS) 
-				probingClauses.put(probe(q.^var), '''(assert («archElemMbFun» «probe(q.^var)»))''')
+				probingClauses.put(Utils::probe(q.^var), '''(assert («archElemMbFun» «Utils::probe(q.^var)»))''')
 
+			// FIXME inserting the blocking at the innermost quantification, not sure if right
+			var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
+				generateScopeBlockingClauses
+			else 
+				''				
 			// blocking for components
-			var blockingClauses = blockingValues.map[ nameValueMap |
+			/*var blockingClauses = blockingValues.map[ nameValueMap |
 				if(nameValueMap.containsKey(q.^var)) {
 					// blocking clauses applied to probes
 					if (IPLConfig.ENABLE_PROBING_VARS) {
-						probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
+						probingClauses.put(Utils::probe(q.^var), probingClauses.get(Utils::probe(q.^var)) + '''
 						
-						(assert (distinct «probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
+						(assert (distinct «Utils::probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
 					}
 					'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
 				} else 
 					''
-			].join(' ')			
+			].join(' ')*/			
 			
 			// actual quantified expression
 			'''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var») «blockingClauses»)
@@ -359,22 +389,26 @@ class SmtGeneratorElemInts implements SmtGenerator {
 
 				// probing constraint - set
 				if (IPLConfig.ENABLE_PROBING_VARS) 
-					probingClauses.put(probe(q.^var), '''(assert («setMbFunName» «probe(q.^var)»))''')
+					probingClauses.put(Utils::probe(q.^var), '''(assert («setMbFunName» «Utils::probe(q.^var)»))''')
 				
-
+				// FIXME inserting the blocking at the innermost quantification, not sure if right
+				var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
+					generateScopeBlockingClauses
+				else 
+					''	
 				// do blocking for this variable if needed
-				var blockingClauses = blockingValues.map [ nameValueMap |
+				/*var blockingClauses = blockingValues.map [ nameValueMap |
 					if (nameValueMap.containsKey(q.^var)) {
 						if (IPLConfig.ENABLE_PROBING_VARS) {
-							probingClauses.put(probe(q.^var), probingClauses.get(probe(q.^var)) + '''
+							probingClauses.put(Utils::probe(q.^var), probingClauses.get(Utils::probe(q.^var)) + '''
 							
-							(assert (distinct «probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
+							(assert (distinct «Utils::probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
 						}
 
 						'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
 					} else
 						''
-				].join(' ')
+				].join(' ')*/
 
 				// the old way of doing blocking: 
 				// if (blockingValues.get(q.^var) !== null)
@@ -387,6 +421,24 @@ class SmtGeneratorElemInts implements SmtGenerator {
 			default:
 				'; Unimplemented set member type'
 		}
+		
+		// check and see if want to construct a probing analogue of the formula (w/o qatoms)
+		if(IPLConfig::ENABLE_PROBING_VARS && q.getAllContents(false).forall[! (it instanceof QAtom)]){
+			val copyExp = EcoreUtil::copy(q.exp)
+			val replExp = (new IPLTransformerProbeReplacer).replaceVarsWithProbes(copyExp, scopeDecls) 
+			val a = copyExp.class 
+			probingFormulaSwitch = true // no need for negation: looking for the same _constraints_ as vars
+			probingFormula += '(assert ' + switch(replExp) { // have to do this because not clear what replExp casts to 
+				FormulaOperation: generateFormula(replExp)
+				Negation: generateFormula(replExp)
+				TermFormula:  generateFormula(replExp)
+				TAtom: generateFormula(replExp)
+				QAtom: throw new UnexpectedException("Not supposed to work on QAtoms") 
+			} + ')\n'
+			probingFormulaSwitch = false
+		}
+		
+		formula
 	}
 
 	private def dispatch String generateFormula(TermOperation top) {
@@ -412,7 +464,6 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	}
 
 	private def dispatch String generateFormula(ID id) {
-		// TODO: ArchElem support
 		id.id
 	}
 
@@ -434,6 +485,14 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	// === FLEXIBLE GENERATION FUNCTIONS ===
 	private def dispatch String generateFormula(ModelExpr mdex) {
 
+		if (probingFormulaSwitch) {// when probing, need to apply an existing abstraction to probes
+				// TODO fix this hack that assumes only one flexible abstraction
+				val abst = flexClauses.keySet.get(0)
+				return '''(«abst» «flexArgs.get(abst).map[Utils::probe(it)].join(' ')»)'''
+		}
+
+		// normal flow: 
+		
 		// poll downstream for type & generate an abstraction
 		val String abst = switch(mdex.expr){
 			ProbQuery:	createFlexAbstraction(new BoolType)
@@ -446,9 +505,9 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		
 		// generate smt for the abstraction
 		// non-nullary functions need extra ( ) around them
-		if (args !== null && args.length > 0)
+		if (args !== null && args.length > 0){
 			'''(«abst» «args.map[it].join(' ')»)'''
-		else
+		} else
 			abst
 	}
 
@@ -466,11 +525,24 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	private def String getArchElemMbFun(ComponentType ct) {
 		'is' + ct.name.replace('.', '_')
 	}
-	
-	private def String probe(String varName) {
-		varName + '_probe'
+
+	// blocking for actual vars
+	private def String generateScopeBlockingClauses() {
+		blockingValues.map [ nameValueMap |
+			'(or ' + nameValueMap.keySet.map[ varName |
+				'(distinct ' + varName + ' ' + nameValueMap.get(varName) + ')'
+			].join(' ') + ')'
+		].join('\n')
 	}
-	
+
+	// blocking for probes
+	private def String generateProbingBlockingClauses() {
+		blockingValues.map [ nameValueMap |
+			'(assert (or ' + nameValueMap.keySet.map[ varName |
+				'(distinct ' + Utils::probe(varName) + ' ' + nameValueMap.get(varName) + ')'
+			].join(' ') + '))'
+		].join('\n') + '\n'
+	}
 
 
 	private def String createFlexAbstraction(IPLType type) {
@@ -501,6 +573,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		flexArgs.clear
 		flexNum = 0
 		probingClauses.clear
+		probingFormula = ''
 
 		setDecls = ""
 		anonSetNum = 0
