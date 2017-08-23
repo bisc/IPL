@@ -45,6 +45,7 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.TypeReal
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtGenerator
 import org.xtext.example.ipl.validation.BoolType
@@ -440,6 +441,15 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		
 		formula
 	}
+	
+	/*private def dispatch String generateFormula(Fun f) {
+		val decl = f.name   
+		if (decl.name != "abs" || decl.paramTypes.size != 1 || 
+			!(decl.paramTypes.get(0) instanceof TypeReal) || !(decl.retType instanceof TypeReal))
+			throw new UnsupportedOperationException("Function " + decl.name + " is not supported yet")
+		
+		'''(«decl.name» «f.args.map[generateFormula(it)].join(' ')»)'''
+	}*/ 
 
 	private def dispatch String generateFormula(TermOperation top) {
 		if (top.op == '!=')
@@ -454,9 +464,9 @@ class SmtGeneratorElemInts implements SmtGenerator {
 
 	private def dispatch String generateFormula(Fun f) {
 		if (f.args.length > 0)
-			'''(«f.name.name»«FOR arg : f.args» «generateFormula(arg)»«ENDFOR»)'''
+			'''(«f.name.name» «f.args.map[generateFormula(it)].join(' ')»)''' //FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
 		else
-			'''(«f.name.name» ())'''
+			'''«f.name.name»'''
 	}
 
 	private def dispatch String generateFormula(PropertyExpression pe) {

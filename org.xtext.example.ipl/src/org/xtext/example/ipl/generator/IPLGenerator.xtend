@@ -14,6 +14,7 @@ import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 import org.xtext.example.ipl.TimeRec
+import org.xtext.example.ipl.standalone.DirectPrismChecker
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -72,6 +73,9 @@ class IPLGenerator extends AbstractGenerator {
 				}
 			]
 		]
+		
+		//direct check in comparison
+		(new DirectPrismChecker).directCheck(fsa)
 		
 		// output timing results
 		TimeRec::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
