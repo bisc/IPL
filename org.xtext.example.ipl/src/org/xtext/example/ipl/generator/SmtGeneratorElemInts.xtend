@@ -80,10 +80,12 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	private var flexNum = 0 // for naming flexible abstractions
 	
 	// storage for component properties and their types; <prop name , prop type> -> (archelem index -> prop value)
-	// e.g. <start_head -> Int> -> (0 -> 1, 1-> 0, 2 -> 3, ...)  
+	// e.g. <start_head -> Int> -> (0 -> 1, 1-> 0, 2 -> 3, ...) 
+	// faces externally  
 	private var Map<String, Map<Integer, Object>> propValueMap = new HashMap
 	private var Map<String, IPLType> propTypeMap = new HashMap
 
+	// INPUTS
 	// SET EXTERNALLY blocking clauses for finding model values; 
 	private var List<Map<String, Object>> blockingValues = new ArrayList // has to be not null
 	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
@@ -105,11 +107,8 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
-	override public def String generateBackgroundSmt(IPLSpec spec) {
+	override public def String generateViewSmt(IPLSpec spec) {
 		TimeRec::startTimer("generateBackgroundSmt")
-
-		setDecls = ""
-		anonSetNum = 0
 
 		val preamble = '''
 (set-logic ALL)
@@ -222,6 +221,9 @@ class SmtGeneratorElemInts implements SmtGenerator {
 			'''; Anonymous sets
 «setDecls» '''»
 		
+		; Flex decls
+		«generateSmtFlexDecl»
+		
 		; Probing
 		«if (IPLConfig.ENABLE_PROBING_VARS) 
 			'''«scopeDecls.keySet.map['(declare-const ' + Utils::probe(it) +' '
@@ -236,36 +238,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 			'(assert (not ' + formulaStr  +'))'»'''
 	}
 
-	// needs to be populated with proper abstractions already, after generating for formula
-	override public def String generateSmtFlexDecl() {
-		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
-			val funDecls = flexDecls.keySet.map [
-				'''(declare-fun «it» («flexArgs.get(it).map[Utils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
-					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
-			].join('\n') + '\n'
-			
-			var asserts = ''
-			for ( scopeVal : flexsVals.keySet ) {
-				val flexsVal = flexsVals.get(scopeVal) // set of flexible variables
-				asserts += flexsVal.keySet.map[ flexName | {
-					val args = flexArgs.get(flexName) // (scope vars) arguments
-					if (args.size > 0) // function
-						'''(assert (= («flexName» «args.map[scopeVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
-					else // constant, no parentheses
-						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
-					}	
-				].join('\n')
-			} 
-			
-			funDecls + asserts
-			
-		} else {// no args
-			flexDecls.keySet.map [
-				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
-			].join('\n') + '\n'
-			throw new UnsupportedOperationException("Not updated for flexs interp as above")
-		}
-	}
+
 
 	// set repeatedly only during model finding
 	override public def setBlockingValues(List<Map<String, Object>> blocks) {
@@ -289,17 +262,17 @@ class SmtGeneratorElemInts implements SmtGenerator {
 
 	// returns the scope declaration
 	// won't clear it later
-	override public def getLastFormulaScopeDecls() {
+	override public def getFormulaScopeDecls() {
 		scopeDecls
 	}
 
 	// won't clear it later
-	override public def getLastFormulaFlexDecls() {
+	override public def getFormulaFlexDecls() {
 		flexDecls
 	}
 
 	// won't clear it later
-	override public def getLastFormulaFlexClauses() {
+	override public def getFormulaFlexClauses() {
 		flexClauses
 	}
 	
@@ -531,6 +504,36 @@ class SmtGeneratorElemInts implements SmtGenerator {
 
 	// === HELPER FUNCTIONS === 
 	
+	// needs to be populated with proper abstractions already, after generating for formula
+	private def String generateSmtFlexDecl() {
+		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
+			val funDecls = flexDecls.keySet.map [
+				'''(declare-fun «it» («flexArgs.get(it).map[Utils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
+					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
+			].join('\n') + '\n'
+			
+			var asserts = ''
+			for ( scopeVal : flexsVals.keySet ) {
+				val flexsVal = flexsVals.get(scopeVal) // set of flexible variables
+				asserts += flexsVal.keySet.map[ flexName | {
+					val args = flexArgs.get(flexName) // (scope vars) arguments
+					if (args.size > 0) // function
+						'''(assert (= («flexName» «args.map[scopeVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
+					else // constant, no parentheses
+						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
+					}	
+				].join('\n')
+			} 
+			
+			funDecls + asserts
+			
+		} else {// no args
+			flexDecls.keySet.map [
+				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
+			].join('\n') + '\n'
+			throw new UnsupportedOperationException("Not updated for flexs interp as above")
+		}
+	}
 	
 	private def String getArchElemMbFun(ComponentType ct) {
 		'is' + ct.name.replace('.', '_')

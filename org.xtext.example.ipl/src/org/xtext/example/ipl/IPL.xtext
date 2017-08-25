@@ -149,10 +149,6 @@ TermFormula returns TermFormula:
 
 // ATOMS
 
-TAtom: //TODO: make until binary
-	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')' //used to have parentheses 
-;
-
 QAtom:
 	op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression '|' exp=Formula 
 ;
@@ -212,10 +208,10 @@ RewardQuery:
 
 //-----------------------------------------------------------------------------
 // LTL-specific syntax
-// TODO add
 
-
-
+TAtom: //TODO: make until binary
+	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')' //used to have parentheses 
+;
 
 //-----------------------------------------------------------------------------
 terminal AND:

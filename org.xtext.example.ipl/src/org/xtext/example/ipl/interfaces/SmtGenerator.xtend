@@ -8,39 +8,46 @@ import org.xtext.example.ipl.iPL.IPLSpec
 
 // use only one generator per each formula, do not reuse
 interface SmtGenerator {
-	// generate AADL SMT
-	public def String generateBackgroundSmt(IPLSpec spec)
+	
+	// VIEW GENERATION 
+	
+	// generate SMT for AADL views 
+	public def String generateViewSmt(IPLSpec spec)
 
+	public def boolean isBackgroundGenerated() 
+	
+	// product of background generation; resets it itself
+	public def Map getPropTypeMap() 
+
+	// same
+	public def Map getPropValueMap()
+	
+	// FORMULA GENERATION 
+	 
 	// generate SMT for formula 	
 	public def String generateSmtFormula(Formula f)
 	
 	// generate SMT for negated formula
 	public def String generateSmtFormulaNeg(Formula f, boolean probing)
 	
-	// needs to be populated with proper abstractions already, after generating for formula
-	public def String generateSmtFlexDecl()
-	
-	public def void setBlockingValues(List<Map<String, Object>> blocks) 
+	// FORMULA VALUES 
+
+	// returns the scope declaration
+	// won't clear it later
+	public def Map getFormulaScopeDecls() 
+
+	// won't clear it later
+	public def Map getFormulaFlexDecls() 
+
+	// won't clear it later
+	public def Map getFormulaFlexClauses()
+
+	// EXTERNAL MODIFICATIONS 
+
+	public def void setBlockingValues(List<Map<String, Object>> blocks)
 	
 	// set only for the final call
 	public def void setFlexsVals(Map vals) 
 	
-	// product of background generation; resets it itself
-	public def Map getPropTypeMap() 
-	
-	// same
-	public def Map getPropValueMap() 
-
-	// returns the scope declaration
-	// won't clear it later
-	public def Map getLastFormulaScopeDecls() 
-
-	// won't clear it later
-	public def Map getLastFormulaFlexDecls() 
-
-	// won't clear it later
-	public def Map getLastFormulaFlexClauses()
-	
-	public def boolean isBackgroundGenerated() 
 
 }

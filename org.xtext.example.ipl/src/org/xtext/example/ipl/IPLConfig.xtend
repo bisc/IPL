@@ -7,4 +7,5 @@ class IPLConfig {
 	 
 	// use the probing heuristic to coerce z3 into giving models of quantified variables
 	static public val Boolean ENABLE_PROBING_VARS = true
+
 }

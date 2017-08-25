@@ -70,7 +70,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		// scope vals populated, if in existence
 		// flex decls are also set
 		// what remains is to save flex clauses
-		flexClauses = smtGenerator.lastFormulaFlexClauses
+		flexClauses = smtGenerator.formulaFlexClauses
 		// reset blocking state of the smt generator because find models was just called
 		smtGenerator.blockingValues = new ArrayList
 		
@@ -218,14 +218,14 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		
 		// optimization: not rerun AADL generation for every model find
 		if(!smtGenerator.backgroundGenerated)
-			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
+			backgroundSmt = smtGenerator.generateViewSmt(s)
 
 		// initial run of formula to initialize scope declarations 
 		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.lastFormulaScopeDecls
-		flexDecls = smtGenerator.lastFormulaFlexDecls
+		scopeDecls = smtGenerator.formulaScopeDecls
+		flexDecls = smtGenerator.formulaFlexDecls
 		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
 		
 		// no variables -> no need to look for models
@@ -233,13 +233,11 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			println('No quantified variables; aborting model search')
 			return true
 		}
-		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
-
 		// model search loop 
 		println("Starting SMT model search...")
 		val filenameWithExt = filename + '.smt'
 		while (true) {
-			fsa.generateFile(filenameWithExt, backgroundSmt + flexDeclsSmt + formulaSmt + ''' 
+			fsa.generateFile(filenameWithExt, backgroundSmt + formulaSmt + ''' 
 				
 				(check-sat) 
 				(get-model)
@@ -288,18 +286,15 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		TimeRec::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if(!smtGenerator.backgroundGenerated)
-			backgroundSmt = smtGenerator.generateBackgroundSmt(s)
+			backgroundSmt = smtGenerator.generateViewSmt(s)
 
 		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f, false)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.lastFormulaScopeDecls
-		//val flexDecls = smtGenerator.lastFormulaFlexDecls
-		//println('''Flex: «flexDecls»''')
-		val flexDeclsSmt = smtGenerator.generateSmtFlexDecl
+		scopeDecls = smtGenerator.formulaScopeDecls
 
 		val filenameWithExt = filename + '.smt'
-		fsa.generateFile(filenameWithExt, backgroundSmt + flexDeclsSmt + formulaSmt + ''' 
+		fsa.generateFile(filenameWithExt, backgroundSmt + formulaSmt + ''' 
 			
 			(check-sat) 
 			(get-model)

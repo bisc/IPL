@@ -15,9 +15,11 @@ class DirectPrismChecker {
 		var checkRes = true
 		for (locStart: 0..<7)
 			for (locEnd: 0..<7) {
-				val pp = new PrismPlugin('prism_probs', fsa)
+				val pp = new PrismPlugin('prism_probs', fsa) 
 				val res = pp.runPrismQuery('R{"time"}min=? [F l = ' + locEnd + ']', newArrayList('INITIAL_LOCATION', 'TARGET_LOCATION', 'INITIAL_BATTERY'),
-					newArrayList(String.valueOf(locStart), String.valueOf(locEnd), String.valueOf(20000)), "directCheck")
+					newArrayList(String.valueOf(locStart), String.valueOf(locEnd), String.valueOf(30000)), "directCheck")
+				 
+				// TODO query AADL here to check times from the prediction model?  
 				 
 				if (res == 'infinity' || res > 55)
 					checkRes = checkRes && true
