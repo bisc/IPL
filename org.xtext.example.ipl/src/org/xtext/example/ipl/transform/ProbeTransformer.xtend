@@ -1,4 +1,4 @@
-package org.xtext.example.ipl.generator
+package org.xtext.example.ipl.transform
 
 import java.rmi.UnexpectedException
 import java.util.Map
@@ -12,7 +12,6 @@ import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLPackage
-import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.ProbQuery
@@ -24,7 +23,7 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.validation.IPLType
 
 // replaces values of rigid variables/constants in IPL formulas
-class IPLTransformerProbeReplacer {
+class ProbeTransformer {
 
 	var Map<String, IPLType> scopeDecls
 
@@ -79,7 +78,7 @@ class IPLTransformerProbeReplacer {
 		// the actual replacement 
 		if (scopeDecls.containsKey(f.id)) {
 			// create an ID element with probe name 
-			val EClass eb = IPLPackage.eINSTANCE.ID
+			val EClass eb = IPLPackage.eINSTANCE.getID
 			val ID probeId = EcoreUtil::create(eb) as ID
 			probeId.id = Utils::probe(f.id)
 				

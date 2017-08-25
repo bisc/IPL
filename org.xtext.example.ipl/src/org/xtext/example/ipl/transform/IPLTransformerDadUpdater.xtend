@@ -1,4 +1,4 @@
-package org.xtext.example.ipl.generator
+package org.xtext.example.ipl.transform
 
 import java.rmi.UnexpectedException
 import org.eclipse.emf.ecore.EObject

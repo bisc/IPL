@@ -1,36 +1,28 @@
-package org.xtext.example.ipl.generator
+package org.xtext.example.ipl.transform
 
 import java.rmi.UnexpectedException
 import java.util.Map
-import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.Utils
-import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
-import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
-import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.validation.BoolType
-import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.validation.IntType
-import org.xtext.example.ipl.validation.RealType
 
 // replaces values of rigid variables/constants in IPL formulas
-class IPLTransformerValueReplacer {
+class VarValueTransformer {
 
 	var Map<String, Object> vals
 	var Map<String, IPLType> decls

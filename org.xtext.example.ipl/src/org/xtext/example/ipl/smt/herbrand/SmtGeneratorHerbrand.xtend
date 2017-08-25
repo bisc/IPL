@@ -1,4 +1,4 @@
-package org.xtext.example.ipl.generator
+package org.xtext.example.ipl.smt.herbrand
 
 import java.rmi.UnexpectedException
 import java.util.ArrayList
@@ -45,9 +45,9 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.TypeReal
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtGenerator
+import org.xtext.example.ipl.transform.ProbeTransformer
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -62,7 +62,7 @@ import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
 // implementation of generation by mapping ArchElem -> Int
-class SmtGeneratorElemInts implements SmtGenerator {
+class SmtGeneratorHerbrand implements SmtGenerator {
 
 	private val tp = new IPLTypeProvider
 
@@ -217,24 +217,24 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		val formulaStr = generateFormula(f)
 
 		'''
-		«if (setDecls.length > 0)
+					«if (setDecls.length > 0)
 			'''; Anonymous sets
 «setDecls» '''»
-		
-		; Flex decls
-		«generateSmtFlexDecl»
-		
-		; Probing
-		«if (IPLConfig.ENABLE_PROBING_VARS) 
+					
+					; Flex decls
+					«generateSmtFlexDecl»
+					
+					; Probing
+					«if (IPLConfig.ENABLE_PROBING_VARS) 
 			'''«scopeDecls.keySet.map['(declare-const ' + Utils::probe(it) +' '
 					+ Utils::typesIPL2Smt(scopeDecls.get(it))+')'
 			].join('\n')»'''»
-		
-		«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
+					
+					«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
 			probingClauses.values.join('\n') + generateProbingBlockingClauses + '\n' + probingFormula »
-		
-		; Formula 
-		«if (!probing) 
+					
+					; Formula 
+					«if (!probing) 
 			'(assert (not ' + formulaStr  +'))'»'''
 	}
 
@@ -399,7 +399,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		// check and see if want to construct a probing analogue of the formula (w/o qatoms)
 		if(IPLConfig::ENABLE_PROBING_VARS && q.getAllContents(false).forall[! (it instanceof QAtom)]){
 			val copyExp = EcoreUtil::copy(q.exp)
-			val replExp = (new IPLTransformerProbeReplacer).replaceVarsWithProbes(copyExp, scopeDecls) 
+			val replExp = (new ProbeTransformer).replaceVarsWithProbes(copyExp, scopeDecls) 
 			val a = copyExp.class 
 			probingFormulaSwitch = true // no need for negation: looking for the same _constraints_ as vars
 			probingFormula += '(assert ' + switch(replExp) { // have to do this because not clear what replExp casts to 
@@ -468,7 +468,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	// === FLEXIBLE GENERATION FUNCTIONS ===
 	private def dispatch String generateFormula(ModelExpr mdex) {
 
-		if (probingFormulaSwitch) {// when probing, need to apply an existing abstraction to probes
+		if (probingFormulaSwitch) { // when probing, need to apply an existing abstraction to probes
 				// TODO fix this hack that assumes only one flexible abstraction
 				val abst = flexClauses.keySet.get(0)
 				return '''(«abst» «flexArgs.get(abst).map[Utils::probe(it)].join(' ')»)'''
@@ -527,7 +527,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 			
 			funDecls + asserts
 			
-		} else {// no args
+		} else { // no args
 			flexDecls.keySet.map [
 				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
@@ -579,9 +579,9 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	// reset the formula parsing state
 	private def reset() {
 		// creating new ones to be independent from its clients
-		scopeDecls = new HashMap//scopeDecls.clear
-		flexDecls = new HashMap//flexDecls.clear
-		flexClauses = new HashMap//flexClauses.clear
+		scopeDecls = new HashMap //scopeDecls.clear
+		flexDecls = new HashMap //flexDecls.clear
+		flexClauses = new HashMap //flexClauses.clear
 		
 		flexArgs.clear
 		flexNum = 0
@@ -672,7 +672,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 						// have to go through this dance because otherwise does not get cast
 						val value = switch propExp {
 							BooleanLiteral: propExp.getValue()
-							IntegerLiteral: toIntExact(propExp.getValue())//it returns long
+							IntegerLiteral: toIntExact(propExp.getValue()) //it returns long
 							RealLiteral: propExp.getValue()
 							default: null
 						}

@@ -9,12 +9,12 @@ import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.xtext.example.ipl.IPLPrettyPrinter
-import org.xtext.example.ipl.Utils
+import org.xtext.example.ipl.TimeRec
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
-import org.xtext.example.ipl.validation.IPLRigidityProvider
-import org.xtext.example.ipl.TimeRec
+import org.xtext.example.ipl.smt.probing.SmtVerifierElemInts
 import org.xtext.example.ipl.standalone.DirectPrismChecker
+import org.xtext.example.ipl.validation.IPLRigidityProvider
 
 //import org.xtext.example.ipl.iPL.EDouble
 

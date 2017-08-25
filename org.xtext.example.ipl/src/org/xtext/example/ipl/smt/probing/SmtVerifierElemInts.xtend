@@ -1,4 +1,4 @@
-package org.xtext.example.ipl.generator;
+package org.xtext.example.ipl.smt.probing;
 
 import java.net.URL
 import java.rmi.UnexpectedException
@@ -22,6 +22,7 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
+import org.xtext.example.ipl.transform.VarValueTransformer
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -115,7 +116,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 					newflexMdlExpr.params.vals.map[pp.print(it)])
 
 				// put rigid values into it (including model parameters and property values)
-				newflexMdlExpr = (new IPLTransformerValueReplacer).replaceVarsWithValues(
+				newflexMdlExpr = (new VarValueTransformer).replaceVarsWithValues(
 					newflexMdlExpr, scopeVal, oldScopeDecls, smtGenerator.propTypeMap, smtGenerator.propValueMap
 				) as ModelExpr
 
