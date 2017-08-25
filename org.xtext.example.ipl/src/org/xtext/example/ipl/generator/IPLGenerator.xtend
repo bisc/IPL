@@ -8,12 +8,12 @@ import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
-import org.xtext.example.ipl.IPLPrettyPrinter
-import org.xtext.example.ipl.TimeRec
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
-import org.xtext.example.ipl.smt.probing.SmtVerifierElemInts
+import org.xtext.example.ipl.smt.herbrand.SmtVerifierHerbrand
 import org.xtext.example.ipl.standalone.DirectPrismChecker
+import org.xtext.example.ipl.util.IPLPrettyPrinter
+import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
 //import org.xtext.example.ipl.iPL.EDouble
@@ -42,13 +42,6 @@ class IPLGenerator extends AbstractGenerator {
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
-		// generation of SMT for IPL formulas
-		/*val formulasSMT = specs.map [ IPLSpec s |
-			s.formulas.map [ Formula f |
-				smtVerifier.verifyRigidFormula(f, s, resource, fsa)
-			].join('\n')
-		].join('\n')*/
-		
 		// have to renew smt verifier every formula to not carry state in SMTGenerator over
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
@@ -62,12 +55,12 @@ class IPLGenerator extends AbstractGenerator {
 						println('Error: cannot verify non-rigid formulas without a model')
 					} else {  
 						TimeRec::startTimer("verifyNonRigidFormula")
-						val res = (new SmtVerifierElemInts).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+						val res = (new SmtVerifierHerbrand).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
 						TimeRec::stopTimer("verifyNonRigidFormula")
 						println("Non-rigid IPL formula verified, result: " + res)
 					} 
 				} else { //rigid, shortcut
-						val res = (new SmtVerifierElemInts).verifyRigidFormula(f, spec, filename, fsa)
+						val res = (new SmtVerifierHerbrand).verifyRigidFormula(f, spec, filename, fsa)
 						println("Rigid IPL formula verified, result: " + res)
 						
 				}

@@ -1,4 +1,4 @@
-package org.xtext.example.ipl
+package org.xtext.example.ipl.util
 
 import java.io.BufferedReader
 import java.io.File
@@ -21,7 +21,7 @@ import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
-class Utils { 
+class IPLUtils { 
 	/** 
 	 * Run a shell command in the specified directory.  
 	 * @param command command to be run

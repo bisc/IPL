@@ -1,4 +1,4 @@
-package org.xtext.example.ipl
+package org.xtext.example.ipl.util
 
 import org.eclipse.emf.ecore.EObject
 import org.xtext.example.ipl.iPL.Bool

@@ -4,7 +4,6 @@ import java.rmi.UnexpectedException
 import java.util.Map
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
-import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.FormulaOperation
@@ -19,6 +18,7 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
 // replaces values of rigid variables/constants in IPL formulas
@@ -86,7 +86,7 @@ class VarValueTransformer {
 		// the actual replacement 
 		if (vals.containsKey(f.id)) {
 			// replace with a value from switch, depending on the type
-			val v = Utils::createEcoreValueFromIPL(decls.get(f.id), vals.get(f.id)) /*  switch () {
+			val v = IPLUtils::createEcoreValueFromIPL(decls.get(f.id), vals.get(f.id)) /*  switch () {
 				BoolType: {
 					val EClass eb = IPLPackage.eINSTANCE.bool
 					val Bool i = EcoreUtil::create(eb) as Bool
@@ -147,7 +147,7 @@ class VarValueTransformer {
 			throw new UnexpectedException('Cannot find element ' + elemId + ' in property map ' + propValueMap)
 		
 		// make a value 
-		val v = Utils::createEcoreValueFromIPL(propType, elemValueMap.get(elemId))
+		val v = IPLUtils::createEcoreValueFromIPL(propType, elemValueMap.get(elemId))
 		EcoreUtil::replace(f, v)
 		
 		return v

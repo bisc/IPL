@@ -13,17 +13,16 @@ import org.eclipse.core.runtime.FileLocator
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.IPLConfig
-import org.xtext.example.ipl.IPLPrettyPrinter
-import org.xtext.example.ipl.TimeRec
-import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
-import org.xtext.example.ipl.smt.probing.SmtGeneratorElemInts
 import org.xtext.example.ipl.transform.VarValueTransformer
+import org.xtext.example.ipl.util.IPLPrettyPrinter
+import org.xtext.example.ipl.util.IPLUtils
+import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -199,7 +198,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 			var z3Filename = fsa.getURI(filenameWithExt)
 			var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 			TimeRec::startTimer("z3")
-			var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+			var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
 			TimeRec::stopTimer("z3")
 			var z3ResLines = z3Res.split('\n')
 			val z3ResFirstLine = z3ResLines.get(0)
@@ -257,7 +256,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
 		TimeRec::startTimer("z3")
-		var z3Res = Utils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+		var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
 		TimeRec::stopTimer("z3")
 		// z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		var z3ResLines = z3Res.split('\n')
@@ -353,7 +352,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 		if (!eval.containsKey(varName))
 			eval.put(varName, new LinkedList)
 		
-		if (smtType != Utils::typesIPL2Smt(varType))
+		if (smtType != IPLUtils::typesIPL2Smt(varType))
 			if (!(smtType == 'Int' && varType instanceof ComponentType)) // special case
 				println('''Type error: variable «varName»:«varType» gets value «valueSmt» of type «smtType»''');
 

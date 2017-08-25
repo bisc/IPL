@@ -1,4 +1,4 @@
-package org.xtext.example.ipl
+package org.xtext.example.ipl.util
 
 import java.lang.management.ManagementFactory
 import java.net.URL
@@ -19,7 +19,7 @@ class TimeRec {
 
 
 	public def static startTimer(String timerName) {
-		if(timers.containsKey(timerName)){// save an old timer 
+		if(timers.containsKey(timerName)){ // save an old timer 
 			dumpTimerToLog(timerName)
 		}
 		

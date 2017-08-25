@@ -5,7 +5,6 @@ import java.util.Map
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
-import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.FormulaOperation
@@ -20,6 +19,7 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
 // replaces values of rigid variables/constants in IPL formulas
@@ -80,7 +80,7 @@ class ProbeTransformer {
 			// create an ID element with probe name 
 			val EClass eb = IPLPackage.eINSTANCE.getID
 			val ID probeId = EcoreUtil::create(eb) as ID
-			probeId.id = Utils::probe(f.id)
+			probeId.id = IPLUtils::probe(f.id)
 				
 			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, probeId)

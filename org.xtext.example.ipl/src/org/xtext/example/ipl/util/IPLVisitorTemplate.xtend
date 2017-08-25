@@ -1,4 +1,4 @@
-package org.xtext.example.ipl
+package org.xtext.example.ipl.util
 
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation

@@ -22,8 +22,6 @@ import org.osate.aadl2.properties.PropertyNotPresentException
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
 import org.xtext.example.ipl.IPLConfig
-import org.xtext.example.ipl.TimeRec
-import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Expression
@@ -46,6 +44,11 @@ import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.ViewDecl
+import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
+import org.xtext.example.ipl.interfaces.SmtViewGenerator
+import org.xtext.example.ipl.transform.ProbeTransformer
+import org.xtext.example.ipl.util.IPLUtils
+import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -58,9 +61,6 @@ import static java.lang.Math.toIntExact
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.transform.ProbeTransformer
-import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
-import org.xtext.example.ipl.interfaces.SmtViewGenerator
 
 // implementation of generation by mapping ArchElem -> Int
 class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
@@ -153,7 +153,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
-		val props = propTypeMap.keySet.map['(declare-fun ' + it + ' (ArchElem) ' + Utils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'].join + '\n' +
+		val props = propTypeMap.keySet.map['(declare-fun ' + it + ' (ArchElem) ' + IPLUtils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'].join + '\n' +
 			propValueMap.keySet.map [ name |
 				propValueMap.get(name).entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
 			].join
@@ -227,8 +227,8 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 					
 					; Probing
 					«if (IPLConfig.ENABLE_PROBING_VARS) 
-			'''«scopeDecls.keySet.map['(declare-const ' + Utils::probe(it) +' '
-					+ Utils::typesIPL2Smt(scopeDecls.get(it))+')'
+			'''«scopeDecls.keySet.map['(declare-const ' + IPLUtils::probe(it) +' '
+					+ IPLUtils::typesIPL2Smt(scopeDecls.get(it))+')'
 			].join('\n')»'''»
 					
 					«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
@@ -331,7 +331,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 			// TODO the bottom part can be factored out as a helper function for all types (argument: membership set)
 			// probing constraint - archelem
 			if (IPLConfig.ENABLE_PROBING_VARS) 
-				probingClauses.put(Utils::probe(q.^var), '''(assert («archElemMbFun» «Utils::probe(q.^var)»))''')
+				probingClauses.put(IPLUtils::probe(q.^var), '''(assert («archElemMbFun» «IPLUtils::probe(q.^var)»))''')
 
 			// FIXME inserting the blocking at the innermost quantification, not sure if right
 			var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
@@ -364,7 +364,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
 				// probing constraint - set
 				if (IPLConfig.ENABLE_PROBING_VARS) 
-					probingClauses.put(Utils::probe(q.^var), '''(assert («setMbFunName» «Utils::probe(q.^var)»))''')
+					probingClauses.put(IPLUtils::probe(q.^var), '''(assert («setMbFunName» «IPLUtils::probe(q.^var)»))''')
 				
 				// FIXME inserting the blocking at the innermost quantification, not sure if right
 				var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
@@ -472,7 +472,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 		if (probingFormulaSwitch) { // when probing, need to apply an existing abstraction to probes
 				// TODO fix this hack that assumes only one flexible abstraction
 				val abst = flexClauses.keySet.get(0)
-				return '''(«abst» «flexArgs.get(abst).map[Utils::probe(it)].join(' ')»)'''
+				return '''(«abst» «flexArgs.get(abst).map[IPLUtils::probe(it)].join(' ')»)'''
 		}
 
 		// normal flow: 
@@ -509,7 +509,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 	private def String generateSmtFlexDecl() {
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
 			val funDecls = flexDecls.keySet.map [
-				'''(declare-fun «it» («flexArgs.get(it).map[Utils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
+				'''(declare-fun «it» («flexArgs.get(it).map[IPLUtils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
 					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
 			
@@ -553,7 +553,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 	private def String generateProbingBlockingClauses() {
 		blockingValues.map [ nameValueMap |
 			'(assert (or ' + nameValueMap.keySet.map[ varName |
-				'(distinct ' + Utils::probe(varName) + ' ' + nameValueMap.get(varName) + ')'
+				'(distinct ' + IPLUtils::probe(varName) + ' ' + nameValueMap.get(varName) + ')'
 			].join(' ') + '))'
 		].join('\n') + '\n'
 	}
@@ -662,7 +662,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 			for (prop : ps.ownedProperties) { // each property
 				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
-					val type = Utils::typeFromPropType(prop)
+					val type = IPLUtils::typeFromPropType(prop)
 					if (type !== null) {
 						val propExp = try {
 								PropertyUtils::getSimplePropertyValue(comp, prop)

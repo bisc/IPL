@@ -19,11 +19,11 @@ import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
 import org.osate.aadl2.properties.PropertyNotPresentException
 import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
-import org.xtext.example.ipl.TimeRec
-import org.xtext.example.ipl.Utils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtViewGenerator
+import org.xtext.example.ipl.util.IPLUtils
+import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 
@@ -88,7 +88,7 @@ class SmtViewGeneratorHerbrand implements SmtViewGenerator {
 		].join('\n')
 
 		val props = propTypeMap.keySet.map [
-			'(declare-fun ' + it + ' (ArchElem) ' + Utils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'
+			'(declare-fun ' + it + ' (ArchElem) ' + IPLUtils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'
 		].join + '\n' + propValueMap.keySet.map [ name |
 			propValueMap.get(name).entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
 		].join
@@ -191,7 +191,7 @@ class SmtViewGeneratorHerbrand implements SmtViewGenerator {
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 			for (prop : ps.ownedProperties) { // each property
 				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
-					val type = Utils::typeFromPropType(prop)
+					val type = IPLUtils::typeFromPropType(prop)
 					if (type !== null) {
 						val propExp = try {
 								PropertyUtils::getSimplePropertyValue(comp, prop)

@@ -2,7 +2,7 @@ package org.xtext.example.ipl.standalone
 
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
-import org.xtext.example.ipl.TimeRec
+import org.xtext.example.ipl.util.TimeRec
 
 // uses prism directly to check properties
 class DirectPrismChecker {
