@@ -218,7 +218,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		scopeVals.clear
 		
 		// optimization: not rerun AADL generation for every model find
-		if(!smtGenerator.backgroundGenerated)
+		if(!smtGenerator.isViewGenerated)
 			backgroundSmt = smtGenerator.generateViewSmt(s)
 
 		// initial run of formula to initialize scope declarations 
@@ -286,7 +286,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 	override  public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		TimeRec::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
-		if(!smtGenerator.backgroundGenerated)
+		if(!smtGenerator.isViewGenerated)
 			backgroundSmt = smtGenerator.generateViewSmt(s)
 
 		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f, false)

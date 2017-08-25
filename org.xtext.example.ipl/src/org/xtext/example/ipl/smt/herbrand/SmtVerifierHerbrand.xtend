@@ -33,7 +33,8 @@ import org.xtext.example.ipl.validation.RealType
 // implementation of generation by mapping ArchElem -> Int
 public class SmtVerifierHerbrand implements SmtVerifier {
 
-	private val smtGenerator = new SmtGeneratorElemInts
+	private val smtViewGenerator = new SmtViewGeneratorHerbrand
+	private val smtFormulaGenerator = new SmtFormulaGeneratorHerbrand
 
 	private var Map<String, IPLType> scopeDecls // declarations of scoped variables
 	// each map in the list is an evaluation of scope
@@ -50,7 +51,6 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		scopeVals.clear
-		smtGenerator.flexsVals = new HashMap // reset it here because it could've been called before
 		
 		// check if it's valid anyway, regardless of flexible terms
 		println('Checking if rigid verification discharges the formula')
@@ -63,8 +63,8 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 			throw new UnexpectedException("Failed to find models, check the formula")
 		TimeRec::stopTimer("findNegModels")
 
-		// remove blocking values
-		smtGenerator.blockingValues = new ArrayList
+		// reset blocking state of the smt generator because find models was just called
+		smtFormulaGenerator.blockingValues = new ArrayList
 		
 		// now the current formula state is populated: 
 		// scope decls are set, but can get spoiled by rigid verification
@@ -72,9 +72,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 		// scope vals populated, if in existence
 		// flex decls are also set
 		// what remains is to save flex clauses
-		flexClauses = smtGenerator.formulaFlexClauses
-		// reset blocking state of the smt generator because find models was just called
-		smtGenerator.blockingValues = new ArrayList
+		flexClauses = smtFormulaGenerator.formulaFlexClauses
 		
 		// if scope vals are empty, add one just to continue 
 		if (scopeVals.size == 0)
@@ -101,9 +99,6 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 				val flexName = e.key
 				val flexType = e.value
 			
-				//val flexVerRes = flexDecls.[String flexName | //keySet.map[String flexName |
-				//val flexType = flexDecls.get(flexName)
-				
 				//String flexName, IPLType flexType |
 				println("Considering flex variable: " + flexName)
 
@@ -118,7 +113,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 
 				// put rigid values into it (including model parameters and property values)
 				newflexMdlExpr = (new VarValueTransformer).replaceVarsWithValues(
-					newflexMdlExpr, scopeVal, oldScopeDecls, smtGenerator.propTypeMap, smtGenerator.propValueMap
+					newflexMdlExpr, scopeVal, oldScopeDecls, smtViewGenerator.propTypeMap, smtViewGenerator.propValueMap
 				) as ModelExpr
 
 				// set up prism data
@@ -150,63 +145,15 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 				TimeRec::stopTimer("prismCheck")
 				
 				flexVals.put(flexName, flexVal)
-				// NO, IT DOESN"T WORK
-				/*val EObject flexVal = switch (flexType) { 
-					RealType: {
-						val res = prism.runPrismQuery(prop, md.params, paramVals)
-						
-						val EClass er = IPLPackage.eINSTANCE.real
-						val Real i = EcoreUtil::create(er) as Real
-						i.value = res
-						i
-						
-					} 
-					BoolType:{
-						val res = prism.verifyPrismBooleanProp(prop, md.params, paramVals)
-						 
-						val EClass eb = IPLPackage.eINSTANCE.bool
-						val Bool i = EcoreUtil::create(eb) as Bool
-						i.value = Boolean.toString(res) 
-						i
-					} default: throw new UnexpectedException("Expected type of flexible expression: " + flexType)
-				}
 				
-				// replace the original flex formula
-				EcoreUtil::replace(origflexMdlExpr, flexVal)
-				println('Original formula after MC: ' + pp.print(origFormula))
-				
-				
-				// DOESN"T REALLY WORK as we have to recreate the original formula with the new flex interpretation
-				// copy, put rigid vals, and run final smt
-				var formulaCopySmt = EcoreUtil::copy(origFormula)
-				formulaCopySmt = (new IPLTransformerValueReplacer).replaceVarsWithValues(formulaCopySmt, nameValueMap, oldScopeDecls) as Formula
-				println('Verifying formula after MC: ' + pp.print(formulaCopySmt))
-				val newVerRes = verifyRigidFormula(formulaCopySmt, spec, filename+"-val" + valuationCount++ +".smt", fsa)
-				
-				// don't need the formula copy anymore
-				EcoreUtil::delete(formulaCopySmt)
-				
-				// restore the original formula for the next iteration
-				EcoreUtil::replace(flexVal, origflexMdlExpr)
-				println('Restored formula: ' + pp.print(origFormula))
-				
-				EcoreUtil::delete(flexVal)
-				
-				verRes = verRes && newVerRes*/
-				
-			} // done for all flex vars (not expecting > 1
+			} // done for all flex vars 
 			flexsVals.put(scopeVal, flexVals) 
 
-			//shortcutting verification
-			/*if(!verRes) {
-				println('Counterexample found, shortcutting verification')	
-				return false
-			}*/
 		}
 		
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + pp.print(origFormula))
-		smtGenerator.flexsVals = flexsVals
+		smtFormulaGenerator.flexsVals = flexsVals
 		return verifyRigidFormula(origFormula, spec, filename+"-final", fsa)
 		
 	}
@@ -219,15 +166,15 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 		scopeVals.clear
 		
 		// optimization: not rerun AADL generation for every model find
-		if(!smtGenerator.backgroundGenerated)
-			backgroundSmt = smtGenerator.generateViewSmt(s)
+		if(!smtViewGenerator.isViewGenerated)
+			backgroundSmt = smtViewGenerator.generateViewSmt(s)
 
 		// initial run of formula to initialize scope declarations 
-		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
+		var formulaSmt = smtFormulaGenerator.generateSmtFormulaNeg(f, true)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.formulaScopeDecls
-		flexDecls = smtGenerator.formulaFlexDecls
+		scopeDecls = smtFormulaGenerator.formulaScopeDecls
+		flexDecls = smtFormulaGenerator.formulaFlexDecls
 		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
 		
 		// no variables -> no need to look for models
@@ -274,9 +221,9 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 				return false
 			}
 
-			smtGenerator.blockingValues = scopeVals
+			smtFormulaGenerator.blockingValues = scopeVals
 			// a new iteration
-			formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
+			formulaSmt = smtFormulaGenerator.generateSmtFormulaNeg(f, true)
 			println("Done generating IPL SMT")
 		}
 
@@ -287,13 +234,13 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 	override  public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		TimeRec::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
-		if(!smtGenerator.backgroundGenerated)
-			backgroundSmt = smtGenerator.generateViewSmt(s)
+		if(!smtViewGenerator.isViewGenerated)
+			backgroundSmt = smtViewGenerator.generateViewSmt(s)
 
-		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f, false)
+		val String formulaSmt = smtFormulaGenerator.generateSmtFormulaNeg(f, false)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.formulaScopeDecls
+		scopeDecls = smtFormulaGenerator.formulaScopeDecls
 
 		val filenameWithExt = filename + '.smt'
 		fsa.generateFile(filenameWithExt, backgroundSmt + formulaSmt + ''' 

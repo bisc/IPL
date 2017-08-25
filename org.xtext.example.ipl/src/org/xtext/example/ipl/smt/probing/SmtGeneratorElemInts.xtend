@@ -46,7 +46,6 @@ import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.ViewDecl
-import org.xtext.example.ipl.interfaces.SmtGenerator
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -60,9 +59,11 @@ import static java.lang.Math.toIntExact
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import org.xtext.example.ipl.transform.ProbeTransformer
+import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
+import org.xtext.example.ipl.interfaces.SmtViewGenerator
 
 // implementation of generation by mapping ArchElem -> Int
-class SmtGeneratorElemInts implements SmtGenerator {
+class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
 	private val tp = new IPLTypeProvider
 
@@ -96,7 +97,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 	private var anonSetNum = 0
 	
 	// to not run background generation every time when looking for models
-	private var backgroundGenerated = false
+	private var viewGenerated = false
 	
 	// probes for finding model values; does not face externally 	
 	private var Map<String, String> probingClauses = new HashMap
@@ -140,7 +141,7 @@ class SmtGeneratorElemInts implements SmtGenerator {
 			populateAadlSmtStructures(viewDecl.ref, compMap, subCompMap)
 		]
 
-		backgroundGenerated = true
+		viewGenerated = true
 		println("Done populating AADL SMT")
 
 		// generate aadl->smt 
@@ -276,8 +277,8 @@ class SmtGeneratorElemInts implements SmtGenerator {
 		flexClauses
 	}
 	
-	override public def isBackgroundGenerated() {
-		backgroundGenerated
+	override public def isViewGenerated() {
+		viewGenerated
 	}
 	
 	

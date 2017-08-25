@@ -7,20 +7,7 @@ import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.IPLSpec
 
 // use only one generator per each formula, do not reuse
-interface SmtGenerator {
-	
-	// VIEW GENERATION 
-	
-	// generate SMT for AADL views 
-	public def String generateViewSmt(IPLSpec spec)
-
-	public def boolean isBackgroundGenerated() 
-	
-	// product of background generation; resets it itself
-	public def Map getPropTypeMap() 
-
-	// same
-	public def Map getPropValueMap()
+interface SmtFormulaGenerator {
 	
 	// FORMULA GENERATION 
 	 
