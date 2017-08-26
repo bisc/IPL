@@ -38,18 +38,25 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
+import static extension org.xtext.example.ipl.util.IPLUtils.*
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
+import static extension org.eclipse.xtext.EcoreUtil2.*
+import org.xtext.example.ipl.transform.VarTermTransformer
+import org.xtext.example.ipl.util.IPLPrettyPrinter
 
-// implementation of generation by mapping ArchElem -> Int
-class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
+// implementation of formula generation with herbrandization and uninterpreted sorts 
+class SmtFormulaGeneratorHerbrand {
 
 	private val tp = new IPLTypeProvider
 
-	// state for formula part
-	// all quantified variables: name, type
-	private var Map<String, IPLType> scopeDecls = new HashMap
+	// all terms replacing quantified variables (herbs or skolems): name, type
+	private var Map<String, IPLType> termDecls = new HashMap
+	// list of parameters for each variable term. Empty list if no parameters
+	private var Map<String, List<Pair<String, IPLType>>> termParams = new HashMap
+	
+	private var String termTypeRestrictions
 
-	// for flexible "variables"
+	// for flexible abstractions 
 	// type details of flex "variables"; flexName -> flexVarType
 	private var Map<String, IPLType> flexDecls = new HashMap 
 	 // mapping between clauses and var names; flexName -> <IPL lang elem>
@@ -60,13 +67,13 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 	
 	// INPUTS
 	// SET EXTERNALLY blocking clauses for finding model values; 
-	private var List<Map<String, Object>> blockingValues = new ArrayList // has to be not null
+	private var List<Map<String, Object>> varBlockingValues = new ArrayList // has to be not null
 	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
 	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap // has to be not null
 	
 	// anonymous sets encoded as functions; does not face externally 
 	private var setDecls = ""
-	private var anonSetNum = 0
+	private var anonSetCount = 0
 
 	
 	// probes for finding model values; does not face externally 	
@@ -75,12 +82,35 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 	// an alternative formula for probes 	
 	private String probingFormula = ''
 	private boolean probingFormulaSwitch = false // switch on when generating probes, for modelexpr 
-	
-
-
-
+ 
 	// NOT USED
-	override public def String generateSmtFormula(Formula f) {
+	public def String generateFormulaSmtFind(Formula f) {
+		reset
+		
+		val herb = herbrandizeAndSkolemize(f)
+		println(IPLPrettyPrinter::print_formula(herb))
+		
+		// this populates anonymous sets
+		val formulaStr = generateFormula(herb)
+
+		'''
+			«if (setDecls.length > 0)
+	'''; Anonymous sets
+«setDecls» '''»
+			
+			; Term defs & type restrictions
+			«generateTermDecl»
+			«termTypeRestrictions»
+			
+			; Flex decls
+			«generateSmtFlexDecl»
+			
+			; Probing
+			«generateBlockingClauses»
+			
+			; Formula 
+			«'(assert (not ' + formulaStr  +'))'»'''
+
 		/*reset
 
 		// this populates anonymous sets
@@ -104,7 +134,7 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 		(assert «formulaStr»)'''*/
 	}
 
-	override public def String generateSmtFormulaNeg(Formula f, boolean probing) {
+	public def String generateFormulaSmtCheck(Formula f, boolean probing) {
 		reset
 
 		// this populates anonymous sets
@@ -115,17 +145,16 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 			'''; Anonymous sets
 «setDecls» '''»
 					
+					; Term defs & type restrictions
+					«generateTermDecl»
+					«termTypeRestrictions»
+					
 					; Flex decls
 					«generateSmtFlexDecl»
 					
 					; Probing
-					«if (IPLConfig.ENABLE_PROBING_VARS) 
-			'''«scopeDecls.keySet.map['(declare-const ' + IPLUtils::probe(it) +' '
-					+ IPLUtils::typesIPL2Smt(scopeDecls.get(it))+')'
-			].join('\n')»'''»
-					
 					«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
-			probingClauses.values.join('\n') + generateProbingBlockingClauses + '\n' + probingFormula »
+			probingClauses.values.join('\n') + generateBlockingClauses + '\n' + probingFormula »
 					
 					; Formula 
 					«if (!probing) 
@@ -135,29 +164,33 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 
 
 	// set repeatedly only during model finding
-	override public def setBlockingValues(List<Map<String, Object>> blocks) {
-		blockingValues = blocks
+	public def setBlockingValues(List<Map<String, Object>> blocks) {
+		varBlockingValues = blocks
 	}
 	
 	// set only for the final call
-	override public def setFlexsVals(Map vals) {
+	public def setFlexsVals(Map vals) {
 		flexsVals = vals
 	}
 
 
 	// returns the scope declaration
 	// won't clear it later
-	override public def getFormulaScopeDecls() {
-		scopeDecls
+	public def Map getFormulaTermDecls() {
+		termDecls
 	}
-
+	
+	public def Map getFormulaTermParams() {
+		termParams
+	}
+	
 	// won't clear it later
-	override public def getFormulaFlexDecls() {
+	public def Map getFormulaFlexDecls() {
 		flexDecls
 	}
 
 	// won't clear it later
-	override public def getFormulaFlexClauses() {
+	public def Map getFormulaFlexClauses() {
 		flexClauses
 	}
 
@@ -195,7 +228,7 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 	private def dispatch String generateFormula(QAtom q) {
 
 		val varType = (tp.typeOf(q.set) as SetType).elemType;
-		scopeDecls.put(q.^var, varType)
+		termDecls.put(q.^var, varType)
 
 		val quant = if(q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		// forall comes with implication, exists with conjunction
@@ -212,24 +245,11 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 				probingClauses.put(IPLUtils::probe(q.^var), '''(assert («archElemMbFun» «IPLUtils::probe(q.^var)»))''')
 
 			// FIXME inserting the blocking at the innermost quantification, not sure if right
-			var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
+			var blockingClauses = '' /*if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
 				generateScopeBlockingClauses
 			else 
-				''				
-			// blocking for components
-			/*var blockingClauses = blockingValues.map[ nameValueMap |
-				if(nameValueMap.containsKey(q.^var)) {
-					// blocking clauses applied to probes
-					if (IPLConfig.ENABLE_PROBING_VARS) {
-						probingClauses.put(Utils::probe(q.^var), probingClauses.get(Utils::probe(q.^var)) + '''
-						
-						(assert (distinct «Utils::probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
-					}
-					'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
-				} else 
-					''
-			].join(' ')*/			
-			
+				''				*/
+
 			// actual quantified expression
 			'''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var») «blockingClauses»)
 					«generateFormula(q.exp)»))'''
@@ -245,28 +265,11 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 					probingClauses.put(IPLUtils::probe(q.^var), '''(assert («setMbFunName» «IPLUtils::probe(q.^var)»))''')
 				
 				// FIXME inserting the blocking at the innermost quantification, not sure if right
-				var blockingClauses = if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
+				var blockingClauses = ''/*if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
 					generateScopeBlockingClauses
 				else 
-					''	
-				// do blocking for this variable if needed
-				/*var blockingClauses = blockingValues.map [ nameValueMap |
-					if (nameValueMap.containsKey(q.^var)) {
-						if (IPLConfig.ENABLE_PROBING_VARS) {
-							probingClauses.put(Utils::probe(q.^var), probingClauses.get(Utils::probe(q.^var)) + '''
-							
-							(assert (distinct «Utils::probe(q.^var)» «nameValueMap.get(q.^var)» ))''')
-						}
+					''	*/
 
-						'''(distinct «q.^var» «nameValueMap.get(q.^var)» )'''
-					} else
-						''
-				].join(' ')*/
-
-				// the old way of doing blocking: 
-				// if (blockingValues.get(q.^var) !== null)
-//					 blockingClauses = blockingValues.get(q.^var).map['''(distinct «q.^var» «it» )'''].join(' ') // forEach[blockingClauses += it]
-	
 				// actual quantified expression
 				'''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» (and («setMbFunName» «q.^var») «blockingClauses») 
 	«generateFormula(q.exp)»))'''
@@ -276,9 +279,9 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 		}
 		
 		// check and see if want to construct a probing analogue of the formula (w/o qatoms)
-		if(IPLConfig::ENABLE_PROBING_VARS && q.getAllContents(false).forall[! (it instanceof QAtom)]){
+		/*if(IPLConfig::ENABLE_PROBING_VARS && q.getAllContents(false).forall[! (it instanceof QAtom)]){
 			val copyExp = EcoreUtil::copy(q.exp)
-			val replExp = (new ProbeTransformer).replaceVarsWithProbes(copyExp, scopeDecls) 
+			val replExp = (new ProbeTransformer).replaceVarsWithProbes(copyExp, varDecls) 
 			val a = copyExp.class 
 			probingFormulaSwitch = true // no need for negation: looking for the same _constraints_ as vars
 			probingFormula += '(assert ' + switch(replExp) { // have to do this because not clear what replExp casts to 
@@ -289,19 +292,10 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 				QAtom: throw new UnexpectedException("Not supposed to work on QAtoms") 
 			} + ')\n'
 			probingFormulaSwitch = false
-		}
+		}*/
 		
 		formula
 	}
-	
-	/*private def dispatch String generateFormula(Fun f) {
-		val decl = f.name   
-		if (decl.name != "abs" || decl.paramTypes.size != 1 || 
-			!(decl.paramTypes.get(0) instanceof TypeReal) || !(decl.retType instanceof TypeReal))
-			throw new UnsupportedOperationException("Function " + decl.name + " is not supported yet")
-		
-		'''(«decl.name» «f.args.map[generateFormula(it)].join(' ')»)'''
-	}*/ 
 
 	private def dispatch String generateFormula(TermOperation top) {
 		if (top.op == '!=')
@@ -326,7 +320,11 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 	}
 
 	private def dispatch String generateFormula(ID id) {
-		id.id
+		// check if it's one of the terms
+		if (termDecls.containsKey(id.id)) 
+			resolveTerm(id.id)
+		else // not a term
+			id.id
 	}
 
 	private def dispatch String generateFormula(Int i) {
@@ -373,21 +371,102 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 			abst
 	}
 
-	/*private def dispatch String generateFormula(ProbQuery pq) {
-		throw new UnexpectedException('Was not supposed to reach here')
-	}
-
-	private def dispatch String generateFormula(RewardQuery pq) {
-		throw new UnexpectedException('Was not supposed to reach here')
-	}*/
-
 	// === HELPER FUNCTIONS === 
+	
+	private def toPrenexForm(Formula f) { 
+		// TODO have to be careful to not touch QRATOMS
+	}
+	
+	// replaces quantified variables with herbrand or skolem terms
+	// does not resolve terms -- they are all IDs
+	private def Formula herbrandizeAndSkolemize(Formula f) { 
+		// assumes that all QATOMS are in the front 
+		
+		val List<Pair<String, IPLType>> existentialVars = new ArrayList
+		
+		termTypeRestrictions = '' 
+		val Map<String, String> oldVar2New = new HashMap
+
+		// TODO have to be careful to not touch QRATOMS
+		// first unwrap qatoms and populate sets as needed
+		val i = f.eAll.filter(QAtom)
+		while (i.hasNext) {
+			val QAtom q = i.next
+	
+			val varName = IPLUtils::skolem(q.^var)
+			oldVar2New.put(q.^var, varName)
+			val varType = (tp.typeOf(q.set) as SetType).elemType;
+			termDecls.put(varName, varType)
+			
+			val paramNames = new ArrayList
+			termParams.put(varName, paramNames)
+			
+			val quant = if(q.op == 'forall' || q.op == 'A') {
+				// this gets herbrandized, so all existential vars so far become params
+				existentialVars.forEach[paramNames.add(it)]
+				
+				'forall'				
+			} else {
+				// this gets skolemized, but since all universal quants are gone, it can be just a constant
+				existentialVars.add(varName -> varType)
+				
+				'exists'
+			}
+			// forall comes with implication, exists with conjunction
+			//val quantOp = if(quant == 'forall') '=>' else 'and'
+			
+			// generate type restrictions
+			// switching on the set member type
+			switch (varType) {
+				ComponentType: {
+					val archElemMbFun = getArchElemMbFun(varType as ComponentType)
+
+					termTypeRestrictions += '''(assert («archElemMbFun» «resolveTerm(varName)»))
+					'''
+
+					// actual quantified expression
+					//'''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var») «blockingClauses»)
+					//«generateFormula(q.exp)»))'''
+				}
+				IntType,
+				RealType,
+				BoolType: {
+					val setMbFunName = generateAnonSet(q.set);
+
+					termTypeRestrictions += '''(assert («setMbFunName» «resolveTerm(varName)»))
+					'''
+
+					//val z3TypeName = switch (varType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
+					// actual quantified expression
+					//'''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» (and («setMbFunName» «q.^var») «blockingClauses») 
+					//«generateFormula(q.exp)»))'''
+				}
+				default:
+					throw new IllegalArgumentException('Unimplemented set member type')
+			}
+		}
+
+		// replace variables in the rest of the formula		
+		// FIXME is this cast safe? 
+		(new VarTermTransformer).replaceVarsWithTerms(f, oldVar2New, termDecls, termParams) as Formula
+
+	}
+	
+	// needs to be populated with terms already, after generating for formula
+	private def String generateTermDecl() {
+		termDecls.keySet.map[ termName |
+		'''(declare-fun «termName» «{
+			val params = termParams.get(termName)
+			'(' + params.map[it.value.typesIPL2Smt].join(' ')+ ')'
+			}» «termDecls.get(termName).typesIPL2Smt»)'''
+		].join('\n')
+	}
 	
 	// needs to be populated with proper abstractions already, after generating for formula
 	private def String generateSmtFlexDecl() {
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
 			val funDecls = flexDecls.keySet.map [
-				'''(declare-fun «it» («flexArgs.get(it).map[IPLUtils::typesIPL2Smt(scopeDecls.get(it))].join(' ')») ''' +
+				'''(declare-fun «it» («flexArgs.get(it).map[IPLUtils::typesIPL2Smt(termDecls.get(it))].join(' ')») ''' +
 					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
 			].join('\n') + '\n'
 			
@@ -418,20 +497,11 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 		'is' + ct.name.replace('.', '_')
 	}
 
-	// blocking for actual vars
-	private def String generateScopeBlockingClauses() {
-		blockingValues.map [ nameValueMap |
-			'(or ' + nameValueMap.keySet.map[ varName |
-				'(distinct ' + varName + ' ' + nameValueMap.get(varName) + ')'
-			].join(' ') + ')'
-		].join('\n')
-	}
-
-	// blocking for probes
-	private def String generateProbingBlockingClauses() {
-		blockingValues.map [ nameValueMap |
-			'(assert (or ' + nameValueMap.keySet.map[ varName |
-				'(distinct ' + IPLUtils::probe(varName) + ' ' + nameValueMap.get(varName) + ')'
+	// blocking for terms
+	private def String generateBlockingClauses() {
+		varBlockingValues.map [ nameValueMap |
+			'(assert (or ' + nameValueMap.keySet.map[ termName |
+				'(distinct ' + resolveTerm(termName) + ' ' + nameValueMap.get(termName) + ')'
 			].join(' ') + '))'
 		].join('\n') + '\n'
 	}
@@ -444,7 +514,7 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 			flexDecls.put(name, type)
 
 			flexArgs.put(name, new ArrayList)
-			scopeDecls.forEach [ varName, varType |
+			termDecls.forEach [ varName, varType |
 				flexArgs.get(name).add(varName)
 			]
 			name
@@ -458,7 +528,7 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 	// reset the formula parsing state
 	private def reset() {
 		// creating new ones to be independent from its clients
-		scopeDecls = new HashMap //scopeDecls.clear
+		termDecls = new HashMap //scopeDecls.clear
 		flexDecls = new HashMap //flexDecls.clear
 		flexClauses = new HashMap //flexClauses.clear
 		
@@ -468,14 +538,14 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 		probingFormula = ''
 
 		setDecls = ""
-		anonSetNum = 0
+		anonSetCount = 0
 	}
 
 	// helper function to generate anonymous sets, returning membership f-n name
 	private def String generateAnonSet(Expression set) {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
 
-		val funName = '''anonSetMb«anonSetNum++»''';
+		val funName = '''anonSetMb«anonSetCount++»''';
 		val z3TypeName = switch (elemType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
 
 		// declaring an anonymous set	 
@@ -485,6 +555,14 @@ class SmtFormulaGeneratorHerbrand implements SmtFormulaGenerator {
 		''';
 		funName
 	}
-
+	
+	// skolem or herbrand term
+	public def String resolveTerm(String term) { 
+		val params = termParams.get(term)
+		if (params.size > 0) { // and recursively go down 
+			'''(«term» «params.map[resolveTerm(it.key)].join(' ')»)''' 
+		} else // a constant term
+			term
+	}
 
 }

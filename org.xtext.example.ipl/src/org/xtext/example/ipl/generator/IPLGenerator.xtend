@@ -10,11 +10,13 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
+import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
 import org.xtext.example.ipl.smt.herbrand.SmtVerifierHerbrand
 import org.xtext.example.ipl.standalone.DirectPrismChecker
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
+import org.xtext.example.ipl.smt.herbrand.SmtFormulaGeneratorHerbrand
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -48,6 +50,11 @@ class IPLGenerator extends AbstractGenerator {
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 					
+				(new SmtVerifierHerbrand).findModels(f, spec, filename, fsa )
+				
+				if(true)
+					return ;
+				
 				if(!IPLRigidityProvider::isRigid(f)) { // non-rigid, full-scale IPL
 					// find a model declaration
 					val mdls = spec.decls.filter[it instanceof ModelDecl]
@@ -68,7 +75,7 @@ class IPLGenerator extends AbstractGenerator {
 		]
 		
 		//direct check in comparison
-		(new DirectPrismChecker).directCheck(fsa)
+		//(new DirectPrismChecker).directCheck(fsa)
 		
 		// output timing results
 		TimeRec::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)

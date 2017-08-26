@@ -187,7 +187,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 	}
 
 	// NOT USED
-	override public def String generateSmtFormula(Formula f) {
+	override public def String generateFormulaSmtFind(Formula f) {
 		/*reset
 
 		// this populates anonymous sets
@@ -211,7 +211,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 		(assert «formulaStr»)'''*/
 	}
 
-	override public def String generateSmtFormulaNeg(Formula f, boolean probing) {
+	override public def String generateFormulaSmtCheck(Formula f, boolean probing) {
 		reset
 
 		// this populates anonymous sets
@@ -242,7 +242,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
 
 	// set repeatedly only during model finding
-	override public def setBlockingValues(List<Map<String, Object>> blocks) {
+	override public def setVarBlockingValues(List<Map<String, Object>> blocks) {
 		blockingValues = blocks
 	}
 	
@@ -263,7 +263,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
 	// returns the scope declaration
 	// won't clear it later
-	override public def getFormulaScopeDecls() {
+	override public def getFormulaTermDecls() {
 		scopeDecls
 	}
 

@@ -12,6 +12,7 @@ import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
+import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
@@ -50,15 +51,20 @@ class VarValueTransformer {
 		replaceVars(f.right)
 		return f
 	}
+	
+	private dispatch def EObject replaceVars(Negation f) {
+		replaceVars(f.child)
+		return f
+	}
 
 	private dispatch def EObject replaceVars(QAtom f) {
-		replaceVars(f.exp)
+		val exp = replaceVars(f.exp)
 
 		// eliminate quantification
 		if (vals.containsKey(f.^var))
 			EcoreUtil::replace(f, f.exp)
 		
-		return f.exp
+		return exp
 	}
 
 	private dispatch def EObject replaceVars(TAtom f) {
@@ -117,7 +123,8 @@ class VarValueTransformer {
 			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, v)
 			return v
-		}
+		} else 
+			return f
 	}
 
 	private dispatch def EObject replaceVars(PropertyExpression f) {

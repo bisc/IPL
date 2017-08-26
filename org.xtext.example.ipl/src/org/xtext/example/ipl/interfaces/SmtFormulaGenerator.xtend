@@ -12,16 +12,16 @@ interface SmtFormulaGenerator {
 	// FORMULA GENERATION 
 	 
 	// generate SMT for formula 	
-	public def String generateSmtFormula(Formula f)
+	public def String generateFormulaSmtFind(Formula f)
 	
 	// generate SMT for negated formula
-	public def String generateSmtFormulaNeg(Formula f, boolean probing)
+	public def String generateFormulaSmtCheck(Formula f, boolean probing)
 	
 	// FORMULA VALUES 
 
 	// returns the scope declaration
 	// won't clear it later
-	public def Map getFormulaScopeDecls() 
+	public def Map getFormulaTermDecls() 
 
 	// won't clear it later
 	public def Map getFormulaFlexDecls() 
@@ -31,7 +31,7 @@ interface SmtFormulaGenerator {
 
 	// EXTERNAL MODIFICATIONS 
 
-	public def void setBlockingValues(List<Map<String, Object>> blocks)
+	public def void setVarBlockingValues(List<Map<String, Object>> blocks)
 	
 	// set only for the final call
 	public def void setFlexsVals(Map vals) 

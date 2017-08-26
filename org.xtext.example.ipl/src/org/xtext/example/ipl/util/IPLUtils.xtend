@@ -106,5 +106,10 @@ class IPLUtils {
 		varName + '_probe'
 	}
 	
+	// var name to probe name
+	public def static String skolem(String varName) {
+		varName + '_skol'
+	}
+	
 	
 }

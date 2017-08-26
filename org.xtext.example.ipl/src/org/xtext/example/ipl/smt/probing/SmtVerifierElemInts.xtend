@@ -63,7 +63,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		TimeRec::stopTimer("findNegModels")
 
 		// remove blocking values
-		smtGenerator.blockingValues = new ArrayList
+		smtGenerator.varBlockingValues = new ArrayList
 		
 		// now the current formula state is populated: 
 		// scope decls are set, but can get spoiled by rigid verification
@@ -73,7 +73,7 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		// what remains is to save flex clauses
 		flexClauses = smtGenerator.formulaFlexClauses
 		// reset blocking state of the smt generator because find models was just called
-		smtGenerator.blockingValues = new ArrayList
+		smtGenerator.varBlockingValues = new ArrayList
 		
 		// if scope vals are empty, add one just to continue 
 		if (scopeVals.size == 0)
@@ -222,10 +222,10 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			backgroundSmt = smtGenerator.generateViewSmt(s)
 
 		// initial run of formula to initialize scope declarations 
-		var formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
+		var formulaSmt = smtGenerator.generateFormulaSmtCheck(f, true)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.formulaScopeDecls
+		scopeDecls = smtGenerator.formulaTermDecls
 		flexDecls = smtGenerator.formulaFlexDecls
 		println('''Scope: «scopeDecls»; Flex: «flexDecls»''')
 		
@@ -273,9 +273,9 @@ public class SmtVerifierElemInts implements SmtVerifier {
 				return false
 			}
 
-			smtGenerator.blockingValues = scopeVals
+			smtGenerator.varBlockingValues = scopeVals
 			// a new iteration
-			formulaSmt = smtGenerator.generateSmtFormulaNeg(f, true)
+			formulaSmt = smtGenerator.generateFormulaSmtCheck(f, true)
 			println("Done generating IPL SMT")
 		}
 
@@ -289,10 +289,10 @@ public class SmtVerifierElemInts implements SmtVerifier {
 		if(!smtGenerator.isViewGenerated)
 			backgroundSmt = smtGenerator.generateViewSmt(s)
 
-		val String formulaSmt = smtGenerator.generateSmtFormulaNeg(f, false)
+		val String formulaSmt = smtGenerator.generateFormulaSmtCheck(f, false)
 		println("Done generating IPL SMT")
 
-		scopeDecls = smtGenerator.formulaScopeDecls
+		scopeDecls = smtGenerator.formulaTermDecls
 
 		val filenameWithExt = filename + '.smt'
 		fsa.generateFile(filenameWithExt, backgroundSmt + formulaSmt + ''' 
