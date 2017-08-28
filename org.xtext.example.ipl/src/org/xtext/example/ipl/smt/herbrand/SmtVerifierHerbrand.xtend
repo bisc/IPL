@@ -213,7 +213,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 				return true
 			} else if (z3ResFirstLine == "sat") {
 				println('''sat; looking for models with terms: «termDecls»''')
-				if (!populateEvals(z3ResAfterFirst)) {
+				if (!populateEvals(z3ResAfterFirst)) { // side effect: populates termVals
 					println("Finding models error; stopping model search")
 					return false
 				}
@@ -372,7 +372,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
 		// then two more parentheses, then end of input 
 		// zero group - everything that matched
-		// first group - name of the ter
+		// first group - name of the terminal
 		// second group - the value 
 		'''\A\(\(\(*([\p{Alnum}_]*).*\s([\p{Alnum}\.])*\)\)\z'''
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''

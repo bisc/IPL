@@ -83,12 +83,11 @@ class SmtFormulaGeneratorHerbrand {
 	private String probingFormula = ''
 	private boolean probingFormulaSwitch = false // switch on when generating probes, for modelexpr 
  
-	// NOT USED
 	public def String generateFormulaSmtFind(Formula f) {
 		reset
 		
-		val herb = herbrandizeAndSkolemize(f)
-		println(IPLPrettyPrinter::print_formula(herb))
+		val herb = herbrandizeAndSkolemize(f.copy)
+		println('Herbrandized: ' + IPLPrettyPrinter::print_formula(herb))
 		
 		// this populates anonymous sets
 		val formulaStr = generateFormula(herb)
@@ -105,11 +104,11 @@ class SmtFormulaGeneratorHerbrand {
 			; Flex decls
 			«generateSmtFlexDecl»
 			
-			; Probing
+			; Blocking
 			«generateBlockingClauses»
 			
 			; Formula 
-			«'(assert (not ' + formulaStr  +'))'»'''
+			«'(assert ' + formulaStr  +')'»'''
 
 		/*reset
 
@@ -531,6 +530,7 @@ class SmtFormulaGeneratorHerbrand {
 		termDecls = new HashMap //scopeDecls.clear
 		flexDecls = new HashMap //flexDecls.clear
 		flexClauses = new HashMap //flexClauses.clear
+		termTypeRestrictions = ''
 		
 		flexArgs.clear
 		flexNum = 0
