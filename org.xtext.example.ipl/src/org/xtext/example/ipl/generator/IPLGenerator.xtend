@@ -50,10 +50,10 @@ class IPLGenerator extends AbstractGenerator {
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 					
-				(new SmtVerifierHerbrand).findModels(f, spec, filename, fsa )
+				/*(new SmtVerifierHerbrand).findModels(f, spec, filename, fsa )
 				
 				if(true)
-					return ;
+					return ;*/
 				
 				if(!IPLRigidityProvider::isRigid(f)) { // non-rigid, full-scale IPL
 					// find a model declaration

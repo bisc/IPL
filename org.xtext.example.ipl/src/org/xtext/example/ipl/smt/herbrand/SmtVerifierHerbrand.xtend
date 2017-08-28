@@ -305,10 +305,10 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 			var Matcher m = p.matcher(seq)
 
 			if (m.find) {
-				println('Match found in: ' + seq)
+				/*println('Match found in: ' + seq)
 				println('Groups: ')
 				for (i : 0 ..< m.groupCount + 1)
-					println(i + ':' + m.group(i))
+					println(i + ':' + m.group(i))*/
 
 				val termName = m.group(1) // see modelParsingPattern
 				val valueSmt = m.group(2)

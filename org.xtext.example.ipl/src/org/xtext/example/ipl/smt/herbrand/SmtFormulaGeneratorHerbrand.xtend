@@ -53,8 +53,11 @@ class SmtFormulaGeneratorHerbrand {
 	private var Map<String, IPLType> termDecls = new HashMap
 	// list of parameters for each variable term. Empty list if no parameters
 	private var Map<String, List<Pair<String, IPLType>>> termParams = new HashMap
-	
+	// a generated string that asserts that each term belongs to its type
 	private var String termTypeRestrictions
+	
+	// for quantified variables in their pure form; used for flexible clauses
+	private var Map<String, IPLType> quantVarDecls = new HashMap
 
 	// for flexible abstractions 
 	// type details of flex "variables"; flexName -> flexVarType
@@ -98,7 +101,7 @@ class SmtFormulaGeneratorHerbrand {
 «setDecls» '''»
 			
 			; Term defs & type restrictions
-			«generateTermDecl»
+			«generateSmtTermDecl»
 			«termTypeRestrictions»
 			
 			; Flex decls
@@ -145,7 +148,7 @@ class SmtFormulaGeneratorHerbrand {
 «setDecls» '''»
 					
 					; Term defs & type restrictions
-					«generateTermDecl»
+					«generateSmtTermDecl»
 					«termTypeRestrictions»
 					
 					; Flex decls
@@ -227,7 +230,8 @@ class SmtFormulaGeneratorHerbrand {
 	private def dispatch String generateFormula(QAtom q) {
 
 		val varType = (tp.typeOf(q.set) as SetType).elemType;
-		termDecls.put(q.^var, varType)
+		//termDecls.put(q.^var, varType) -- vars don't go into term decls
+		quantVarDecls.put(q.^var, varType) // if in this clause, then operating variables -- not terms
 
 		val quant = if(q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		// forall comes with implication, exists with conjunction
@@ -240,8 +244,8 @@ class SmtFormulaGeneratorHerbrand {
 			
 			// TODO the bottom part can be factored out as a helper function for all types (argument: membership set)
 			// probing constraint - archelem
-			if (IPLConfig.ENABLE_PROBING_VARS) 
-				probingClauses.put(IPLUtils::probe(q.^var), '''(assert («archElemMbFun» «IPLUtils::probe(q.^var)»))''')
+//			if (IPLConfig.ENABLE_PROBING_VARS) 
+//				probingClauses.put(IPLUtils::probe(q.^var), '''(assert («archElemMbFun» «IPLUtils::probe(q.^var)»))''')
 
 			// FIXME inserting the blocking at the innermost quantification, not sure if right
 			var blockingClauses = '' /*if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
@@ -260,8 +264,8 @@ class SmtFormulaGeneratorHerbrand {
 				val z3TypeName = switch (varType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
 
 				// probing constraint - set
-				if (IPLConfig.ENABLE_PROBING_VARS) 
-					probingClauses.put(IPLUtils::probe(q.^var), '''(assert («setMbFunName» «IPLUtils::probe(q.^var)»))''')
+//				if (IPLConfig.ENABLE_PROBING_VARS) 
+//					probingClauses.put(IPLUtils::probe(q.^var), '''(assert («setMbFunName» «IPLUtils::probe(q.^var)»))''')
 				
 				// FIXME inserting the blocking at the innermost quantification, not sure if right
 				var blockingClauses = ''/*if (q.getAllContents(false).forall[! (it instanceof QAtom)]) // if no more qatoms down below
@@ -322,7 +326,7 @@ class SmtFormulaGeneratorHerbrand {
 		// check if it's one of the terms
 		if (termDecls.containsKey(id.id)) 
 			resolveTerm(id.id)
-		else // not a term
+		else // not a term (e.g., a quantified variable)
 			id.id
 	}
 
@@ -344,11 +348,11 @@ class SmtFormulaGeneratorHerbrand {
 	// === FLEXIBLE GENERATION FUNCTIONS ===
 	private def dispatch String generateFormula(ModelExpr mdex) {
 
-		if (probingFormulaSwitch) { // when probing, need to apply an existing abstraction to probes
+		/*if (probingFormulaSwitch) { // when probing, need to apply an existing abstraction to probes
 				// TODO fix this hack that assumes only one flexible abstraction
 				val abst = flexClauses.keySet.get(0)
 				return '''(«abst» «flexArgs.get(abst).map[IPLUtils::probe(it)].join(' ')»)'''
-		}
+		}*/
 
 		// normal flow: 
 		
@@ -451,8 +455,9 @@ class SmtFormulaGeneratorHerbrand {
 
 	}
 	
+	// generates declarations of herb/skolem terms; empty if none
 	// needs to be populated with terms already, after generating for formula
-	private def String generateTermDecl() {
+	private def String generateSmtTermDecl() {
 		termDecls.keySet.map[ termName |
 		'''(declare-fun «termName» «{
 			val params = termParams.get(termName)
@@ -461,37 +466,7 @@ class SmtFormulaGeneratorHerbrand {
 		].join('\n')
 	}
 	
-	// needs to be populated with proper abstractions already, after generating for formula
-	private def String generateSmtFlexDecl() {
-		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
-			val funDecls = flexDecls.keySet.map [
-				'''(declare-fun «it» («flexArgs.get(it).map[IPLUtils::typesIPL2Smt(termDecls.get(it))].join(' ')») ''' +
-					'''«switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
-			].join('\n') + '\n'
-			
-			var asserts = ''
-			for ( scopeVal : flexsVals.keySet ) {
-				val flexsVal = flexsVals.get(scopeVal) // set of flexible variables
-				asserts += flexsVal.keySet.map[ flexName | {
-					val args = flexArgs.get(flexName) // (scope vars) arguments
-					if (args.size > 0) // function
-						'''(assert (= («flexName» «args.map[scopeVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
-					else // constant, no parentheses
-						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
-					}	
-				].join('\n')
-			} 
-			
-			funDecls + asserts
-			
-		} else { // no args
-			flexDecls.keySet.map [
-				'''(declare-const «it» «switch (flexDecls.get(it)) { IntType: "Int" RealType: "Real" BoolType: "Bool" }»)'''
-			].join('\n') + '\n'
-			throw new UnsupportedOperationException("Not updated for flexs interp as above")
-		}
-	}
-	
+
 	private def String getArchElemMbFun(ComponentType ct) {
 		'is' + ct.name.replace('.', '_')
 	}
@@ -505,32 +480,84 @@ class SmtFormulaGeneratorHerbrand {
 		].join('\n') + '\n'
 	}
 
-
+	// creates a new symbol for an abstraction of a flexible clause
 	private def String createFlexAbstraction(IPLType type) {
-
+		
+		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex 
+			
+		val String abstrName = '''_flex«flexNum++»'''
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) {
-			val String name = '''_flex«flexNum++»'''
-			flexDecls.put(name, type)
+			flexDecls.put(abstrName, type)
 
-			flexArgs.put(name, new ArrayList)
-			termDecls.forEach [ varName, varType |
-				flexArgs.get(name).add(varName)
+			flexArgs.put(abstrName, new ArrayList)
+			paramDecls.forEach [ varName, varType |
+				flexArgs.get(abstrName).add(varName)
 			]
-			name
+			abstrName
 		} else {
-			val String name = '''_flex«flexNum++»'''
-			flexDecls.put(name, new BoolType)
-			name
+			flexDecls.put(abstrName, type)
+			abstrName
 		}
+	}
+	
+	// creates smt declarations of flexible abstractions
+	// needs to be populated with proper abstractions already, after generating for formula
+	private def String generateSmtFlexDecl() {
+		
+		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex 
+		
+		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
+			val funDecls = flexDecls.keySet.map [
+				'''(declare-fun «it» («flexArgs.get(it).
+						map[IPLUtils::typesIPL2Smt(paramDecls.get(it))].join(' ')») ''' +
+				'''«flexDecls.get(it).typesIPL2Smt»)'''
+			].join('\n') + '\n'
+			
+			var asserts = ''
+			for ( flexVal : flexsVals.keySet ) { // an evaluation of quant vars (encoded as terms)
+				val flexsVal = flexsVals.get(flexVal) // set of flexible variables
+				asserts += flexsVal.keySet.map[ flexName | {
+					val args = flexArgs.get(flexName) // arguments (encoded as quant vars, so will need conversion to terms) 
+					if (args.size > 0) // function
+						'''(assert (= («flexName» «args.map[flexVal.get(IPLUtils::skolem(it))].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
+					else // constant, no parentheses
+						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
+					}	
+				].join('\n')
+			} 
+			
+			funDecls + asserts
+			
+		} else { // no args
+			flexDecls.keySet.map [
+				'''(declare-const «it» «flexDecls.get(it).typesIPL2Smt»)'''
+			].join('\n') + '\n'
+			throw new UnsupportedOperationException("Not updated for flexs interp as above")
+		}
+	}
+	
+	
+	// decide which declarations to use - terms or vars (depending on use case) 
+	private def Map<String, IPLType> decideParamDeclsForFlex (){
+		if (!termDecls.empty && !quantVarDecls.empty)
+			throw new UnexpectedException("Error: both terms and quant vars are considered")
+			
+		if (!termDecls.empty) 
+			termDecls
+		else if (!quantVarDecls.empty)
+			quantVarDecls
+		else 
+			new HashMap // neither: then no parameters for the abstraction
 	}
 	
 	// reset the formula parsing state
 	private def reset() {
 		// creating new ones to be independent from its clients
 		termDecls = new HashMap //scopeDecls.clear
+		termTypeRestrictions = ''
 		flexDecls = new HashMap //flexDecls.clear
 		flexClauses = new HashMap //flexClauses.clear
-		termTypeRestrictions = ''
+		quantVarDecls = new HashMap
 		
 		flexArgs.clear
 		flexNum = 0
