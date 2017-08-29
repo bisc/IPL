@@ -327,6 +327,12 @@ public class SmtVerifierElemInts implements SmtVerifier {
 			false
 		}
 	}
+	
+	// finds all variable assignments that satisfy a formula
+	// NOT USED
+	override public def Boolean findModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+		throw new UnexpectedException('Method not used')
+	}
 
 	// get (additional) variable evaluations from the model (z3 output)
 	// touches: modelFound, scopeVals; reads: scopeDecls

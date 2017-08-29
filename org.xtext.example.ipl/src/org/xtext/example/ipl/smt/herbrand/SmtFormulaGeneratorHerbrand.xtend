@@ -3,9 +3,9 @@ package org.xtext.example.ipl.smt.herbrand
 import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.HashMap
+import java.util.LinkedList
 import java.util.List
 import java.util.Map
-import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -24,11 +24,9 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
-import org.xtext.example.ipl.iPL.TAtom
-import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
-import org.xtext.example.ipl.transform.ProbeTransformer
+import org.xtext.example.ipl.transform.VarTermTransformer
+import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
@@ -38,11 +36,9 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
-import static extension org.xtext.example.ipl.util.IPLUtils.*
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.transform.VarTermTransformer
-import org.xtext.example.ipl.util.IPLPrettyPrinter
+import static extension org.xtext.example.ipl.util.IPLUtils.*
 
 // implementation of formula generation with herbrandization and uninterpreted sorts 
 class SmtFormulaGeneratorHerbrand {
@@ -64,7 +60,7 @@ class SmtFormulaGeneratorHerbrand {
 	private var Map<String, IPLType> flexDecls = new HashMap 
 	 // mapping between clauses and var names; flexName -> <IPL lang elem>
 	private var Map<String, ModelExpr> flexClauses = new HashMap
-	 // argument names (from scope) of flex clauses; flexName -> <varName>. Does not face externally
+	 // argument names (from scope) of flex clauses; flexName -> <varName>
 	private var Map<String, List<String>> flexArgs = new HashMap
 	private var flexNum = 0 // for naming flexible abstractions
 	
@@ -168,7 +164,6 @@ class SmtFormulaGeneratorHerbrand {
 		flexsVals = vals
 	}
 
-
 	// returns the scope declaration
 	// won't clear it later
 	public def Map getFormulaTermDecls() {
@@ -187,6 +182,11 @@ class SmtFormulaGeneratorHerbrand {
 	// won't clear it later
 	public def Map getFormulaFlexClauses() {
 		flexClauses
+	}
+	
+	// won't clear it later
+	public def Map<String, List<String>> getFormulaFlexArgs() {
+		flexArgs
 	}
 
 	/*public def String getLastFormulaScopeEvals(){
@@ -351,8 +351,8 @@ class SmtFormulaGeneratorHerbrand {
 		
 		// poll downstream for type & generate an abstraction
 		val String abst = switch(mdex.expr){
-			ProbQuery:	createFlexAbstraction(new BoolType)
-			RewardQuery:  createFlexAbstraction(new RealType)
+			ProbQuery:	createFlexAbstraction(mdex, new BoolType)
+			RewardQuery:  createFlexAbstraction(mdex ,new RealType)
 			default:  throw new UnexpectedException('Unknown model formula') 
 		}
 		
@@ -474,18 +474,26 @@ class SmtFormulaGeneratorHerbrand {
 	}
 
 	// creates a new symbol for an abstraction of a flexible clause
-	private def String createFlexAbstraction(IPLType type) {
+	private def String createFlexAbstraction(ModelExpr mdex, IPLType type) {
 		
 		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex 
+			
 			
 		val String abstrName = '''_flex«flexNum++»'''
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) {
 			flexDecls.put(abstrName, type)
 
 			flexArgs.put(abstrName, new ArrayList)
-			paramDecls.forEach [ varName, varType |
-				flexArgs.get(abstrName).add(varName)
+			
+			// decide the parameter list: 
+			// find all contents of expression that are also terms/vars
+			mdex.eAllContents.filter(ID).forEach[
+				if(paramDecls.containsKey(it.id))
+					flexArgs.get(abstrName).add(it.id)	
 			]
+			/*paramDecls.forEach [ varName, varType |
+				flexArgs.get(abstrName).add(varName)
+			]*/
 			abstrName
 		} else {
 			flexDecls.put(abstrName, type)
@@ -500,24 +508,38 @@ class SmtFormulaGeneratorHerbrand {
 		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex 
 		
 		if (IPLConfig.ENABLE_FLEXIBLE_ABSTRACTION_WITH_ARGS) { // with args
+			// generate declarations
 			val funDecls = flexDecls.keySet.map [
 				'''(declare-fun «it» («flexArgs.get(it).
 						map[IPLUtils::typesIPL2Smt(paramDecls.get(it))].join(' ')») ''' +
 				'''«flexDecls.get(it).typesIPL2Smt»)'''
 			].join('\n') + '\n'
 			
-			var asserts = ''
-			for ( flexVal : flexsVals.keySet ) { // an evaluation of quant vars (encoded as terms)
-				val flexsVal = flexsVals.get(flexVal) // set of flexible variables
-				asserts += flexsVal.keySet.map[ flexName | {
-					val args = flexArgs.get(flexName) // arguments (encoded as quant vars, so will need conversion to terms) 
-					if (args.size > 0) // function
-						'''(assert (= («flexName» «args.map[flexVal.get(IPLUtils::skolem(it))].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
-					else // constant, no parentheses
-						'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
-					}	
-				].join('\n')
-			} 
+			// generate interpretations from term valuations
+			var asserts = '' 
+			if (!flexsVals.empty) { // an optimization 
+				// map flex name -> map <term name -> term value>, to block redundant assertions
+				val Map<String, List<Map<String, Object>>> projectionBlocks = new HashMap
+				flexDecls.keySet.forEach[projectionBlocks.put(it, new LinkedList)] // initialize proj blocks
+				for ( termVal : flexsVals.keySet ) { // an evaluation of quant vars (encoded as terms)
+					val flexsVal = flexsVals.get(termVal) // set of flexible variables with their values
+					asserts += flexsVal.keySet.map[ flexName | {
+						val args = flexArgs.get(flexName).map[IPLUtils::skolem(it)] // arguments (encoded as quant vars, so need conversion to terms) 
+						val termValFiltered = termVal.filter[termName, obj| 
+							args.contains(termName)
+						] 
+						if (projectionBlocks.get(flexName).contains(termValFiltered)) { 
+							'' // already generated an assertion for this, skipping
+						} else { // first time processing this value 
+							projectionBlocks.get(flexName).add(termValFiltered)
+							if (args.size > 0) // function
+								'''(assert (= («flexName» «args.map[termVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' + '\n'
+							else // constant, no parentheses
+								'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
+						}
+					}].join('\n')
+				} 
+			}
 			
 			funDecls + asserts
 			

@@ -16,6 +16,8 @@ interface SmtVerifier {
 	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
 	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) 
 	
+	public def Boolean findModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa)
+	
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
 	public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa)

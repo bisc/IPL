@@ -50,9 +50,7 @@ class IPLGenerator extends AbstractGenerator {
 		
 		TimeRec::reset 
 		
-		// delete old markers
-		if (markers.containsKey(resource.URI))
-			markers.get(resource.URI).forEach[it.delete]
+		deleteMarkers(resource)
 	}
 
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
@@ -93,8 +91,8 @@ class IPLGenerator extends AbstractGenerator {
 	}
 	
 	def private createMarker(Resource resource, int line, boolean result) { 
-		var z3FilePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(z3FilePath))
+		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
 		
 		val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
 		
@@ -117,7 +115,17 @@ class IPLGenerator extends AbstractGenerator {
 			marker.setAttribute(IMarker.LINE_NUMBER, line); 
 		} else 
 			throw new UnexpectedException('Failed to create a result marker')
-				
+	}
+	
+	def private deleteMarkers(Resource resource) { 
+		// delete own markers
+		if (markers.containsKey(resource.URI))
+			markers.get(resource.URI).forEach[it.delete]
+		
+		// in case markers carried over from an earlier session
+		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
+		file.deleteMarkers(IMarker.PROBLEM, true, 0)
 	}
 	
 	override public void afterGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
