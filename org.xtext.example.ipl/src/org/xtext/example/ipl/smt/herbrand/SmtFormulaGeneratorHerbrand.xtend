@@ -136,6 +136,7 @@ class SmtFormulaGeneratorHerbrand {
 		(assert «formulaStr»)'''*/
 	}
 
+	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f, boolean probing) {
 		reset
 
@@ -147,16 +148,8 @@ class SmtFormulaGeneratorHerbrand {
 			'''; Anonymous sets
 «setDecls» '''»
 					
-					; Term defs & type restrictions
-					«generateSmtTermDecl»
-					«termTypeRestrictions»
-					
 					; Flex decls
 					«generateSmtFlexDecl»
-					
-					; Probing
-					«if (IPLConfig.ENABLE_PROBING_VARS && probing) 
-			probingClauses.values.join('\n') + generateBlockingClauses + '\n' + probingFormula »
 					
 					; Formula 
 					«if (!probing) 
@@ -369,7 +362,7 @@ class SmtFormulaGeneratorHerbrand {
 		// generate smt for the abstraction
 		// non-nullary functions need extra ( ) around them
 		if (args !== null && args.length > 0){
-			'''(«abst» «args.map[it].join(' ')»)'''
+			'''(«abst» «args.map[resolveTerm(it)].join(' ')»)'''
 		} else
 			abst
 	}
@@ -389,7 +382,7 @@ class SmtFormulaGeneratorHerbrand {
 		
 		termTypeRestrictions = '' 
 		val Map<String, String> oldVar2New = new HashMap
-
+ 
 		// TODO have to be careful to not touch QRATOMS
 		// first unwrap qatoms and populate sets as needed
 		val i = f.eAll.filter(QAtom)
@@ -586,9 +579,9 @@ class SmtFormulaGeneratorHerbrand {
 	// skolem or herbrand term
 	public def String resolveTerm(String term) { 
 		val params = termParams.get(term)
-		if (params.size > 0) { // and recursively go down 
+		if (params !== null && params.size  > 0) { // and recursively go down 
 			'''(«term» «params.map[resolveTerm(it.key)].join(' ')»)''' 
-		} else // a constant term
+		} else // a constant term -- or a quantified variable
 			term
 	}
 
