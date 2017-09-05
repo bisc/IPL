@@ -287,7 +287,6 @@ class SmtFormulaGeneratorQrem {
 	// does not resolve terms -- they are all IDs
 	private def Formula removeQuants(Formula f) {
 		// assumes that all QATOMS are in the front 
-//		val List<Pair<String, IPLType>> existentialVars = new ArrayList
 		freeVarTypeRests = ''
 		val Map<String, String> oldVar2New = new HashMap
 
@@ -297,24 +296,11 @@ class SmtFormulaGeneratorQrem {
 		while (i.hasNext) {
 			val QAtom q = i.next
 
-			val varName = IPLUtils::skolem(q.^var)
+			val varName = IPLUtils::freeVar(q.^var)
 			oldVar2New.put(q.^var, varName)
 			val varType = (tp.typeOf(q.set) as SetType).elemType;
 			freeVarDecls.put(varName, varType)
-
-			// val paramNames = new ArrayList
-			// termParams.put(varName, paramNames)
-			val quant = if (q.op == 'forall' || q.op == 'A') {
-					// this gets herbrandized, so all existential vars so far become params
-//				existentialVars.forEach[paramNames.add(it)]
-					'forall'
-				} else {
-					// this gets skolemized, but since all universal quants are gone, it can be just a constant
-//				existentialVars.add(varName -> varType)
-					'exists'
-				}
-			// forall comes with implication, exists with conjunction
-			// val quantOp = if(quant == 'forall') '=>' else 'and'
+				
 			// generate type restrictions
 			// switching on the set member type
 			switch (varType) {
@@ -323,10 +309,6 @@ class SmtFormulaGeneratorQrem {
 
 					freeVarTypeRests += '''(assert («archElemMbFun» «varName»))
 					'''
-
-				// actual quantified expression
-				// '''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var») «blockingClauses»)
-				// «generateFormula(q.exp)»))'''
 				}
 				IntType,
 				RealType,
@@ -335,11 +317,6 @@ class SmtFormulaGeneratorQrem {
 
 					freeVarTypeRests += '''(assert («setMbFunName» «varName»))
 					'''
-
-				// val z3TypeName = switch (varType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
-				// actual quantified expression
-				// '''(«quant» ((«q.^var» «z3TypeName»)) («quantOp» (and («setMbFunName» «q.^var») «blockingClauses») 
-				// «generateFormula(q.exp)»))'''
 				}
 				default:
 					throw new IllegalArgumentException('Unimplemented set member type')
@@ -424,7 +401,7 @@ class SmtFormulaGeneratorQrem {
 				val flexsVal = flexsVals.get(termVal) // set of flexible variables with their values
 				asserts += flexsVal.keySet.map [ flexName |
 					{
-						val args = flexArgs.get(flexName).map[IPLUtils::skolem(it)] // arguments (encoded as quant vars, so need conversion to terms) 
+						val args = flexArgs.get(flexName).map[IPLUtils::freeVar(it)] // arguments (encoded as quant vars, so need conversion to terms) 
 						val termValFiltered = termVal.filter [ termName, obj |
 							args.contains(termName)
 						]
@@ -481,10 +458,9 @@ class SmtFormulaGeneratorQrem {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
 
 		val funName = '''anonSetMb«anonSetCount++»''';
-		val z3TypeName = switch (elemType) { IntType: "Int" RealType: "Real" BoolType: "Bool" }
 
 		// declaring an anonymous set	 
-		setDecls += '''(define-fun «funName» ((_x «z3TypeName»)) Bool
+		setDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
 		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
 		) ) 
 		''';

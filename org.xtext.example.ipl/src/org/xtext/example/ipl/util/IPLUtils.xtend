@@ -112,7 +112,7 @@ class IPLUtils {
 	}
 	
 	// var name to probe name
-	public def static String free(String varName) {
+	public def static String freeVar(String varName) {
 		varName + '_free'
 	}
 	

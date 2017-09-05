@@ -3,6 +3,7 @@ package org.xtext.example.ipl.smt.qrem;
 import java.net.URL
 import java.rmi.UnexpectedException
 import java.util.ArrayList
+import java.util.Arrays
 import java.util.HashMap
 import java.util.LinkedList
 import java.util.List
@@ -18,6 +19,7 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
+import org.xtext.example.ipl.transform.PrenexTransformer
 import org.xtext.example.ipl.transform.VarValueTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
@@ -27,7 +29,6 @@ import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
-import java.util.Arrays
 
 // implementation of generation by mapping ArchElem -> Int
 public class SmtVerifierQrem implements SmtVerifier {
@@ -54,15 +55,17 @@ public class SmtVerifierQrem implements SmtVerifier {
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		termVals.clear
+		
+		val pnfFormula = (new PrenexTransformer).toPrenexNormalForm(origFormula)
 
 		// check if it's valid anyway, regardless of flexible terms
 		println('Checking if rigid verification discharges the formula')
-		if (verifyRigidFormula(origFormula, spec, filename, fsa))
+		if (verifyRigidFormula(pnfFormula, spec, filename, fsa))
 			return true
 
 		// find models: candidate valuations for sat of negformula
 		TimeRec::startTimer("findNegModels")
-		if (!findModels(origFormula, spec, filename, fsa))
+		if (!findModels(pnfFormula, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
 		TimeRec::stopTimer("findNegModels")
 
@@ -78,7 +81,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		smtFormulaGenerator.flexsVals = findFlexsVals(md, filename, fsa)
 
 		// run the ultimate smt here
-		println('Final verification after MCs: ' + pp.print(origFormula))
+		println('Final verification after MCs: ' + pp.print(pnfFormula))
 		return verifyRigidFormula(origFormula, spec, filename + "-final", fsa)
 
 	}

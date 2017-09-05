@@ -24,7 +24,7 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.impl.FunImpl
 import org.xtext.example.ipl.validation.IPLType
 
-// replaces vars with skolem/herbrand terms
+// replaces vars with free constants
 class VarFreeVarTransformer {
 	
 	private var Map<String, String> var2Term  
@@ -80,9 +80,8 @@ class VarFreeVarTransformer {
 	}
 	
 	private dispatch def EObject replaceVars(ID f){ 
-		// replace var with a new term
+		// replace var with a free const
 		if(var2Term.containsKey(f.id)) {
-			val termName = var2Term.get(f.id)
 			
 			val EClass ei = IPLPackage.eINSTANCE.ID
 			val ID i = EcoreUtil::create(ei) as ID
@@ -90,21 +89,6 @@ class VarFreeVarTransformer {
 			EcoreUtil::replace(f, i)
 			EcoreUtil::delete(f)
 			return i
-		
-//			// IDs for vars without params, and funcs for vars with params
-//			if (params.size > 0) {
-//				val EClass ei = IPLPackage.eINSTANCE.fun
-//				val Fun fun = EcoreUtil::create(ei) as Fun
-//				params.forEach[ p, num | 
-//					val EClass ec = IPLPackage.eINSTANCE.ID
-//					val ID i = EcoreUtil::create(ec) as ID
-//					i.id = param
-//					(i as FunImpl).args.add(i)
-//				]
-//				return fun
-//			} else { //no params 
-//
-//			}
 		} else 
 			return f
 	}
