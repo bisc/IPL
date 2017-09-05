@@ -23,7 +23,7 @@ import org.eclipse.xtext.generator.IGeneratorContext
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
-import org.xtext.example.ipl.smt.herbrand.SmtVerifierHerbrand
+import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
@@ -69,14 +69,14 @@ class IPLGenerator extends AbstractGenerator {
 						println('Error: cannot verify non-rigid formulas without a model')
 					} else {  
 						TimeRec::startTimer("verifyNonRigidFormula")
-						val boolean res = (new SmtVerifierHerbrand).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+						val boolean res = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
 						TimeRec::stopTimer("verifyNonRigidFormula")
 						
 						println("IPL non-rigid formula verified, result: " + res)
 						createMarker(resource, node.startLine, res)
 					} 
 				} else { //rigid, shortcut
-						val res = (new SmtVerifierHerbrand).verifyRigidFormula(f, spec, filename, fsa)
+						val res = (new SmtVerifierQrem).verifyRigidFormula(f, spec, filename, fsa)
 						println("IPL rigid formula verified, result: " + res)
 						createMarker(resource, node.startLine, res)
 				}
@@ -90,10 +90,12 @@ class IPLGenerator extends AbstractGenerator {
 		TimeRec::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
 	}
 	
+	// creates a marker with a verification result
 	def private createMarker(Resource resource, int line, boolean result) { 
 		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
 		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
 		
+		// create a marker
 		val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
 		
 		var markerList = markers.get(resource.URI) 
@@ -103,8 +105,8 @@ class IPLGenerator extends AbstractGenerator {
 		}
 		markerList.add(marker)
 		
+		// set marker attributes
 		if (marker.exists()) {
-			println('Marker exists') 
 			if (result) { 
 				marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO);
 				marker.setAttribute(IMarker.MESSAGE, "Formula valid");
