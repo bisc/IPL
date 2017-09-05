@@ -96,7 +96,7 @@ class IPLUtils {
 			BoolType: 'Bool'
 			IntType: 'Int'
 			RealType: 'Real'
-			ComponentType: 'ArchElem' // conversion by ID to integer
+			ComponentType: 'ArchElem'
 			default: 'UNKNOWN TYPE'
 		}
 	}
@@ -109,6 +109,11 @@ class IPLUtils {
 	// var name to probe name
 	public def static String skolem(String varName) {
 		varName + '_skol'
+	}
+	
+	// var name to probe name
+	public def static String free(String varName) {
+		varName + '_free'
 	}
 	
 	

@@ -91,7 +91,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		if (!smtViewGenerator.isViewGenerated)
 			viewSmt = smtViewGenerator.generateViewSmt(s)
 
-		val String formulaSmt = smtFormulaGenerator.generateFormulaSmtCheck(f, false)
+		val String formulaSmt = smtFormulaGenerator.generateFormulaSmtCheck(f)
 		println("Done generating IPL SMT")
 
 		termDecls = smtFormulaGenerator.formulaTermDecls
@@ -257,7 +257,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		termDecls = smtFormulaGenerator.formulaTermDecls
 		flexDecls = smtFormulaGenerator.formulaFlexDecls
-		val termParams = smtFormulaGenerator.formulaTermParams
 		println('''Terms: «termDecls»; Flex: «flexDecls»''')
 
 		// no variables -> no need to look for models
@@ -272,7 +271,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 			fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + ''' 
 				
 				(check-sat) 
-				«termDecls.keySet.map['(get-value (' + smtFormulaGenerator.resolveTerm(it) + '))'].join('\n')»
+				«termDecls.keySet.map['(get-value (' + /*smtFormulaGenerator.resolveTerm(*/it + '))'].join('\n')»
 				
 			''')
 
@@ -324,11 +323,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// get (additional) variable evaluations from the model (z3 output)
 	// touches: modelFound, scopeVals; reads: scopeDecls
 	private def Boolean populateEvals(String[] z3ResAfterFirst) {
-		// note: z3 doesn't return values of quantified vars on (eval <varname) or (get value (<varlist>))
-		// the only way to get the values is to:
-		// (1) ensure they are sufficiently bound with user-provided symbols
-		// (2) run (get-model)
-		// ideally, one would parse out arbitrary skolem functions and extract values from them
 		// find the string with value with regex
 		var modelFound = true // assume so until proven otherwise
 		val newEval = new HashMap
@@ -358,46 +352,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				throw new UnexpectedException("Match not found")
 			}
 		]
-		/*/
 
-		 * var Pattern p = Pattern.compile(modelParsingPattern(varName))
-		 * var Matcher m = p.matcher(z3Res)
-
-		 * // some sequential logic here to simplify code
-		 * var matchFound = false
-
-		 * // try to find the actual variable first
-		 * if (m.find)
-		 * 	matchFound = true
-		 * else if (!IPLConfig.ENABLE_PROBING_VARS)
-		 * 	println('''Error parsing z3 output: match for «varName» (type «varType») not found in:
-		 * 		 «z3Res»''')
-
-		 * // if failed, try to find its probe
-		 * if (!matchFound && IPLConfig.ENABLE_PROBING_VARS) {
-		 * 	p = Pattern.compile(modelParsingPattern(varName + '_probe'))
-		 * 	m = p.matcher(z3Res)
-		 * 	if (m.find)
-		 * 		matchFound = true
-		 * 	else {
-		 * 		println('''Error parsing z3 output: match for «varName» and «varName»_probe (type «varType») not found in:
-		 * 		 «z3Res»''')
-		 * 		modelFound = false
-		 * 	}
-		 * }
-
-		 * if (matchFound) {
-		 * 	val typeSmt = m.group(2) // see modelParsingPattern
-		 * 	val valueSmt = m.group(3)
-		 * 	addValueToEval(newEval, varName, valueSmt, varType, typeSmt)
-		 * } else
-		 * 	modelFound = false
-
-		 * // has to be only one match per variable
-		 * if (m.find) {
-		 * 	println('''Error parsing z3 output: several matches for «varName»; unexpected second: «m.group» ''')
-		 * 	modelFound = false
-		 }*/
 		println('Values found:' + termVals)
 		modelFound
 	}
@@ -412,30 +367,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 		// second group - the value 
 		'''\A\(\(\(*([\p{Alnum}_]*).*\s([\p{Alnum}\.])*\)\)\z'''
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
-	}
-
-	// returns a get-value parsing pattern for constants 
-	private def String constParsingPattern(String varName) {
-		// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
-		// then parentheses with something, then a type (word, 1st group) in parentheses
-		// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
-		// zero group - everything that matched
-		// first group - exclamation signs (may be not there for probes)
-		// second ground - the type
-		// third group - the value 
-		'''\(define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
-	}
-
-	// returns a model parsing pattern (complex enough that deserves its own function) 
-	private def String funParsingPattern(String varName) {
-		// decoding: (define fun, then var name, then a group of ! followed by any digits (possibly repeated), 
-		// then parentheses with something, then a type (word, 1st group) in parentheses
-		// then whitespace (incl \n), then the value (alphanumeric, with possible dots, 2nd group)
-		// zero group - everything that matched
-		// first group - exclamation signs (may be not there for probes)
-		// second ground - the type
-		// third group - the value 
-		'''\(define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
 
 	// helper function: adds a value to a valuation, doing all the checks as well 
