@@ -1,9 +1,7 @@
 package org.xtext.example.ipl.transform
 
-import java.util.List
-import java.util.Map
-import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
+import org.eclipse.emf.ecore.EStructuralFeature
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -11,7 +9,7 @@ import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
-import org.xtext.example.ipl.iPL.IPLPackage
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.ModelParamExpr
 import org.xtext.example.ipl.iPL.Negation
@@ -21,9 +19,6 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.impl.FunImpl
-import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.iPL.IPLSpec
 
 // transforms a formula into its prenex normal form
 class PrenexTransformer {
@@ -31,12 +26,20 @@ class PrenexTransformer {
 	private QAtom curQuant
 	
 	def Formula toPrenexNormalForm(Formula f) { 
-		// flow:  
+		// flow:
+		// find the insertion point  
 		// find the outermost quantifier
 		// propagate it out, path guided by econtainers 
 		// repeat for the next quant
 		var formulaTop = f
-		var QAtom insertionPt = null
+		var QAtom insertionPt = null // the deepest qatom in the prenex part
+		
+		// locate the insertion point, if it exists; otherwise leave as null
+		var EObject iter = f
+		while(iter instanceof QAtom)
+			iter = iter.exp
+		if (iter !== f)
+			insertionPt = iter.eContainer as QAtom
 		
 		do {
 			curQuant = null
@@ -44,33 +47,38 @@ class PrenexTransformer {
 			
 			if (curQuant !== null) {
 				
-				// count negations
-				var EObject iter = curQuant 
+				// count negations before curQuant
+				iter = curQuant
 				var int negCount = 0
 				
-				while(iter !== null && !(iter instanceof IPLSpec)) { 
+				while(iter !== null && iter !== formulaTop && !(iter instanceof IPLSpec)) { 
 					val iterUp = iter.eContainer // step up one level
 					
 					if (iterUp instanceof Negation) //negation
 						negCount++ 
 					else if (iterUp instanceof FormulaOperation) // premise of implication
-						if (iterUp.op == '->' && iterUp.left === iterUp)
+						if (iterUp.op == '->' && iterUp.left === iter)
 							negCount++ 
 						
 					iter = iterUp
 				} 
 				
-				// remove quantification from its place
-				EcoreUtil::replace(curQuant, curQuant.exp)
+				// remove quantification from its place, update formula top as needed
+				if (formulaTop === curQuant)
+					formulaTop = curQuant.exp 
+				EcoreUtil::replace(curQuant, curQuant.exp) // this makes curQuant.exp = null, curQuant.eContainer = null
 				
 				// propagate the quantifier back
-				if(insertionPt !== null) { // insert into a sequence of qatoms
-					curQuant.exp = insertionPt.exp
-					insertionPt.exp = curQuant
-				} else { // the first discovered QAtom is placed at the top of the formula
-					curQuant.exp = formulaTop
+				if(insertionPt !== null) { 
+					// insert curQuant between insertionPt and its exp  
+					curQuant.exp = insertionPt.exp // this reassigns insertionPt.exp.eContainer
+					insertionPt.exp = curQuant // this reassigns curQuant.eContainer
+					// move insertion point to curQuant
 					insertionPt = curQuant
+				} else { // the first discovered QAtom is placed at the top of the formula
+					curQuant.exp = formulaTop // this reassigns formulaTop.eContainer
 					formulaTop = curQuant
+					insertionPt = curQuant
 				} 
 				
 				// invert the quantifier as needed
@@ -80,9 +88,6 @@ class PrenexTransformer {
 					else 
 						curQuant.op = 'forall'
 				
-				/*val EClass ei = IPLPackage.eINSTANCE.QAtom
-				val QAtom qa = EcoreUtil::create(ei) as QAtom
-				qa.op = 'forall'*/				
 			}
 		} while(curQuant !== null)
 		
@@ -90,7 +95,7 @@ class PrenexTransformer {
 	} 
 	
 	private dispatch def EObject findOutmostQuant(QAtom f){ 
-		curQuant = f
+		curQuant = f // found!
 	}
 	
 	private dispatch def EObject findOutmostQuant(FormulaOperation f){ 
@@ -132,7 +137,7 @@ class PrenexTransformer {
 		f
 	}
 	private dispatch def EObject findOutmostQuant(Negation f){
-		findOutmostQuant(f)
+		findOutmostQuant(f.child)
 	}
 	
 	private dispatch def EObject findOutmostQuant(TAtom f){ 

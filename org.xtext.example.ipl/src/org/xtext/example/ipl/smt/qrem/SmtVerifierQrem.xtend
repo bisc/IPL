@@ -11,7 +11,6 @@ import java.util.Map
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
-import org.eclipse.emf.ecore.util.EcoreUtil
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
@@ -29,6 +28,8 @@ import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
+
+import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
 // implementation of generation by mapping ArchElem -> Int
 public class SmtVerifierQrem implements SmtVerifier {
@@ -55,14 +56,16 @@ public class SmtVerifierQrem implements SmtVerifier {
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		termVals.clear
-		
-		val pnfFormula = (new PrenexTransformer).toPrenexNormalForm(origFormula)
-
-		// check if it's valid anyway, regardless of flexible terms
+		 
+		// check if it's valid in its current form with any interpretation of flexible terms
 		println('Checking if rigid verification discharges the formula')
-		if (verifyRigidFormula(pnfFormula, spec, filename, fsa))
+		if (verifyRigidFormula(origFormula, spec, filename, fsa))
 			return true
 
+		// transform to prenex normal form; make a copy to not mess with IPLSpec
+		val pnfFormula = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
+		println('Prenex normal form: ' + pp.print(pnfFormula))
+		
 		// find models: candidate valuations for sat of negformula
 		TimeRec::startTimer("findNegModels")
 		if (!findModels(pnfFormula, spec, filename, fsa))
@@ -82,8 +85,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + pp.print(pnfFormula))
-		return verifyRigidFormula(origFormula, spec, filename + "-final", fsa)
-
+		val res = verifyRigidFormula(pnfFormula, spec, filename + "-final", fsa)
+		pnfFormula.delete(true)
+		return res
 	}
 	
 	// simple verification of negated formula
@@ -138,7 +142,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// Map<Map<String, Object>, Map<String, Object>> 
 	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) { 
 		// now the current formula state is populated: 
-		// scope decls are set, but can get spoiled by rigid verification
+		// scope decls are set, but can get spoiled by rigid verification, so making a copy
 		val oldScopeDecls = termDecls.immutableCopy
 		
 		// if term vals are empty, add one just to continue 
@@ -182,7 +186,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 					val ModelExpr origflexMdlExpr = flexClauses.get(flexName)
 	
 					// make a copy to feed to prism, to not spoil the original formula it for further iterations
-					var newflexMdlExpr = EcoreUtil::copy(origflexMdlExpr)
+					var newflexMdlExpr = origflexMdlExpr.copy
 	
 					println('Flexible formula before replacement: ' + pp.print(newflexMdlExpr) + ", params: " +
 						newflexMdlExpr.params.vals.map[pp.print(it)])
@@ -197,12 +201,12 @@ public class SmtVerifierQrem implements SmtVerifier {
 					) as ModelExpr
 	
 					// set up prism data
-					var prop = pp.print(newflexMdlExpr)
+					val prop = pp.print(newflexMdlExpr)
 					// prop = prop.substring(1, prop.length-1) // remove $
 					val paramVals = newflexMdlExpr.params.vals.map[pp.print(it)]
 	
 					// don't need the copied formula anymore
-					EcoreUtil::delete(newflexMdlExpr)
+					newflexMdlExpr.delete(true)
 	
 					println('''Invoking PRISM: model «md.name», params «md.params», param vals «paramVals», prop «prop»''')
 	

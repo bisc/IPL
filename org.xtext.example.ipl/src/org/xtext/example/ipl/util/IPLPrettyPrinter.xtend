@@ -36,7 +36,7 @@ class IPLPrettyPrinter {
 	}
 	
 	dispatch def String print(Negation f){
-		'''!«print(f.child)»'''
+		'''!(«print(f.child)»)'''
 	}
 	
 	dispatch def String print(QAtom f){ 

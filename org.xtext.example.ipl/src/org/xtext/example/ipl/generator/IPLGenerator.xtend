@@ -56,7 +56,7 @@ class IPLGenerator extends AbstractGenerator {
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
-		// have to renew smt verifier every formula to not carry state in SMTGenerator over
+		// have to make a new instance of Verifier for every formula to not carry over Generator's state
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it

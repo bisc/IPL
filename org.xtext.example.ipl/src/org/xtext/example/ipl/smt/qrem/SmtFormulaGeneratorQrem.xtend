@@ -6,7 +6,6 @@ import java.util.HashMap
 import java.util.LinkedList
 import java.util.List
 import java.util.Map
-import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Expression
@@ -25,7 +24,6 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.transform.VarTermTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
@@ -76,11 +74,11 @@ class SmtFormulaGeneratorQrem {
 	public def String generateFormulaSmtFind(Formula f) {
 		reset
 
-		val herb = removeQuants(f.copy)
-		println('Herbrandized: ' + IPLPrettyPrinter::print_formula(herb))
+		val Formula fQF = removeQuants(f.copy)
+		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
 
 		// this populates anonymous sets
-		val formulaStr = generateFormula(herb)
+		val formulaStr = generateFormula(fQF)
 
 		'''
 		«if (setDecls.length > 0)
@@ -279,11 +277,8 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// === HELPER FUNCTIONS === 
-	private def toPrenexNormalForm(Formula f) {
-		// TODO have to be careful to not touch QRATOMS
-	}
 
-	// replaces quantified variables with herbrand or skolem terms
+	// replaces quantified variables with free constant terms
 	// does not resolve terms -- they are all IDs
 	private def Formula removeQuants(Formula f) {
 		// assumes that all QATOMS are in the front 
