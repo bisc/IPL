@@ -28,7 +28,7 @@ import org.xtext.example.ipl.iPL.PrismExpr
  */
 class IPLValidator extends AbstractIPLValidator {
 	
-	val typeProvider = new IPLTypeProvider
+	val typeProvider = new IPLTypeProviderLookup
 	
 	public static val WRONG_TYPE = 'wrongType'
 	public static val UNDEFINED = 'undefined'

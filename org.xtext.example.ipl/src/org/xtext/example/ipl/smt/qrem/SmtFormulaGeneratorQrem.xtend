@@ -13,6 +13,7 @@ import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
 import org.xtext.example.ipl.iPL.ModelExpr
@@ -24,12 +25,13 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.transform.VarFreeVarTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.validation.IPLTypeProvider
+import org.xtext.example.ipl.validation.IPLTypeProviderSpec
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
@@ -37,12 +39,11 @@ import org.xtext.example.ipl.validation.SetType
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
-import org.xtext.example.ipl.transform.VarFreeVarTransformer
 
 // implementation of formula generation with removal of quantifiers
 class SmtFormulaGeneratorQrem {
 
-	private val tp = new IPLTypeProvider
+	private var IPLTypeProviderSpec tp  
 
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
@@ -73,6 +74,9 @@ class SmtFormulaGeneratorQrem {
 
 	public def String generateFormulaSmtFind(Formula f) {
 		reset
+		val spec = f.getContainerOfType(IPLSpec)
+		if (spec !== null)
+			tp = new IPLTypeProviderSpec(spec)
 
 		val Formula fQF = removeQuants(f.copy)
 		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
@@ -103,6 +107,9 @@ class SmtFormulaGeneratorQrem {
 	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f) {
 		reset
+		val spec = f.getContainerOfType(IPLSpec)
+		if (spec !== null)
+			tp = new IPLTypeProviderSpec(spec)
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
@@ -225,9 +232,9 @@ class SmtFormulaGeneratorQrem {
 
 	private def dispatch String generateFormula(Fun f) {
 		if (f.args.length > 0)
-			'''(«f.name.name» «f.args.map[generateFormula(it)].join(' ')»)''' // FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
+			'''(«f.decl.name» «f.args.map[generateFormula(it)].join(' ')»)''' // FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
 		else
-			'''«f.name.name»'''
+			'''«f.decl.name»'''
 	}
 
 	private def dispatch String generateFormula(PropertyExpression pe) {
@@ -293,7 +300,7 @@ class SmtFormulaGeneratorQrem {
 
 			val varName = IPLUtils::freeVar(q.^var)
 			oldVar2New.put(q.^var, varName)
-			val varType = (tp.typeOf(q.set) as SetType).elemType;
+			val varType = (tp.typeOf(q.set) as SetType).elemType; // goes up to IPLSpec
 			freeVarDecls.put(varName, varType)
 				
 			// generate type restrictions

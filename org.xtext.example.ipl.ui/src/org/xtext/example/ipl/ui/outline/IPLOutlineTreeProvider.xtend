@@ -13,6 +13,6 @@ import org.xtext.example.ipl.iPL.Fun
  */
 class IPLOutlineTreeProvider extends DefaultOutlineTreeProvider {
 	def _text(Fun f) {
-		f.name.name.toString
+		f.decl.name.toString
 	}
 }

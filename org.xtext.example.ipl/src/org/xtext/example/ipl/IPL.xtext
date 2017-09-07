@@ -104,7 +104,7 @@ Const:
 ;
 
 Fun:
-	name=[FunDecl] '(' (args += Term)? (',' args += Term)* ')'
+	decl/*name*/=[FunDecl] '(' (args += Term)? (',' args += Term)* ')'
 ;
 
 // EXPRESSIONS

@@ -5,6 +5,7 @@ import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
+import org.xtext.example.ipl.iPL.BFunDecl
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
@@ -75,7 +76,7 @@ class IPLPrettyPrinter {
 	}
 	
 	dispatch def String print(Fun f){ 
-		'''«f.name»(«f.args.map[print(it)].join(' ')»)'''
+		'''«f.decl.name»(«f.args.map[print(it)].join(' ')»)'''
 	}
 	
 	dispatch def String print(ID f){ 

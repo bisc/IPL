@@ -52,7 +52,7 @@ import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.validation.IPLTypeProvider
+import org.xtext.example.ipl.validation.IPLTypeProviderLookup
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
@@ -65,7 +65,7 @@ import static extension org.eclipse.xtext.EcoreUtil2.*
 // implementation of generation by mapping ArchElem -> Int
 class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
-	private val tp = new IPLTypeProvider
+	private val tp = new IPLTypeProviderLookup
 
 	// state for formula part
 	// all quantified variables: name, type
@@ -438,9 +438,9 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 
 	private def dispatch String generateFormula(Fun f) {
 		if (f.args.length > 0)
-			'''(«f.name.name» «f.args.map[generateFormula(it)].join(' ')»)''' //FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
+			'''(«f.decl.name» «f.args.map[generateFormula(it)].join(' ')»)''' //FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
 		else
-			'''«f.name.name»'''
+			'''«f.decl.name»'''
 	}
 
 	private def dispatch String generateFormula(PropertyExpression pe) {

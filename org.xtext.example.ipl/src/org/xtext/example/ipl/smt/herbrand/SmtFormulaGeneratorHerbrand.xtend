@@ -31,7 +31,7 @@ import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.validation.IPLTypeProvider
+import org.xtext.example.ipl.validation.IPLTypeProviderLookup
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
@@ -43,7 +43,7 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 // implementation of formula generation with herbrandization and uninterpreted sorts 
 class SmtFormulaGeneratorHerbrand {
 
-	private val tp = new IPLTypeProvider
+	private val tp = new IPLTypeProviderLookup
 
 	// all terms replacing quantified variables (herbs or skolems): name, type
 	private var Map<String, IPLType> termDecls = new HashMap
@@ -306,9 +306,9 @@ class SmtFormulaGeneratorHerbrand {
 
 	private def dispatch String generateFormula(Fun f) {
 		if (f.args.length > 0)
-			'''(«f.name.name» «f.args.map[generateFormula(it)].join(' ')»)''' //FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
+			'''(«f.decl.name» «f.args.map[generateFormula(it)].join(' ')»)''' //FOR arg : f.args» «generateFormula(arg)»«ENDFOR»
 		else
-			'''«f.name.name»'''
+			'''«f.decl.name»'''
 	}
 
 	private def dispatch String generateFormula(PropertyExpression pe) {

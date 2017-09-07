@@ -5,6 +5,7 @@ import java.util.HashMap
 import java.util.List
 import java.util.Map
 import org.eclipse.xtext.resource.IEObjectDescription
+import org.osate.aadl2.AadlPackage
 import org.osate.aadl2.BooleanLiteral
 import org.osate.aadl2.ComponentImplementation
 import org.osate.aadl2.IntegerLiteral
@@ -120,38 +121,42 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		'''
 	}
-	
-		
-	override public def isViewGenerated() {
+
+	override public def boolean isViewGenerated() {
 		viewGenerated
 	}
-	
-		
+
 	// product of background generation; resets it itself
-	override public def getPropTypeMap() {
+	override public def Map getPropTypeMap() {
 		propTypeMap
 	}
-	
+
 	// same
-	override public def getPropValueMap() {
+	override public def Map getPropValueMap() {
 		propValueMap
 	}
-	
-	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap, Map<Integer, List<Integer>> subCompMap) {
+
+	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
+		Map<Integer, List<Integer>> subCompMap) {
 
 		if (comp instanceof SubprogramImplementation || comp instanceof SubprogramGroupImplementation) {
 			// Fail...
 			throw new RuntimeException("Can't instantiate subprogram")
 		}
 
+		// instantiate aadl model
 		val inst = InstantiateModel::buildInstanceModelFile(comp)
 		val cic = new ComponentIndexCache
-
-		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, cic, subCompMap)]
+		// find a package and get all property set imports 
+		val AadlPackage cont = comp.getContainerOfType(AadlPackage)
+		val pss = cont.ownedPublicSection.importedUnits.filter [
+			it instanceof PropertySet
+		].toList as List // up-casting to make the function swallow this list
+		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, cic, subCompMap, pss)]
 	}
-	
+
 	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map, ComponentIndexCache cic,
-		 Map<Integer, List<Integer>> subCompMap) {
+		Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
 
 		val index = cic.indexForComp(comp)
 
@@ -171,24 +176,21 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 				ComponentInstance: {
 					val scIndex = cic.indexForComp(it)
 					propTypeMap.put(name, new ComponentType('EMPTY'))
-					
-					if(propValueMap.get(name) === null)
+
+					if (propValueMap.get(name) === null)
 						propValueMap.put(name, new HashMap)
-					
+
 					propValueMap.get(name).put(index, scIndex)
-					
-					//propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
-						//index, scIndex.toString
+
+					// propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
+					// index, scIndex.toString
 					subCompMap.add(index, scIndex)
 				}
 			}
 		]
 
-		// handling properties
-		for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(
-			comp.getComponentClassifier())) {
-
-			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
+		// handling properties more parsimoniously
+		for (ps : propsets)
 			for (prop : ps.ownedProperties) { // each property
 				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
 					val type = IPLUtils::typeFromPropType(prop)
@@ -197,30 +199,27 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 								PropertyUtils::getSimplePropertyValue(comp, prop)
 							} catch (PropertyNotPresentException e) {
 								null
-							} 
+							}
 
 						// have to go through this dance because otherwise does not get cast
 						val value = switch propExp {
 							BooleanLiteral: propExp.getValue()
-							IntegerLiteral: toIntExact(propExp.getValue()) //it returns long
+							IntegerLiteral: toIntExact(propExp.getValue()) // it returns long
 							RealLiteral: propExp.getValue()
 							default: null
 						}
 
 						if (value !== null) {
 							propTypeMap.put(prop.name, type)
-							if(propValueMap.get(prop.name)=== null)
+							if (propValueMap.get(prop.name) === null)
 								propValueMap.put(prop.name, new HashMap)
-							
+
 							propValueMap.get(prop.name).put(index, value)
 						}
 					}
 				}
 			}
-		}
 	}
-
-
 
 	static class ComponentIndexCache {
 		var next = 0
@@ -237,7 +236,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		}
 
 	}
-	
+
 	private def <K, V> add(Map<K, List<V>> map, K key, V item) {
 		if (map.get(key) === null) {
 			map.put(key, new ArrayList<V>)
@@ -245,6 +244,5 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		map.get(key).add(item)
 	}
-	
 
 }

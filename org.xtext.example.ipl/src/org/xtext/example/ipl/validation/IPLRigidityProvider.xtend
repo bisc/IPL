@@ -44,7 +44,7 @@ class IPLRigidityProvider {
 	}
 	
 	static def dispatch boolean isRigid(Fun f) {
-		!(f.name instanceof MFunDecl)
+		!(f.decl instanceof MFunDecl)
 	}
 
 	static def dispatch boolean isRigid(ID e) {

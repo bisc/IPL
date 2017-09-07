@@ -342,10 +342,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 			var Matcher m = p.matcher(seq)
 
 			if (m.find) {
-				/*println('Match found in: ' + seq)
+				println('Match found in: ' + seq)
 				println('Groups: ')
 				for (i : 0 ..< m.groupCount + 1)
-					println(i + ':' + m.group(i))*/
+					println(i + ':' + m.group(i))
 
 				val termName = m.group(1) // see modelParsingPattern
 				val valueSmt = m.group(2)
@@ -366,13 +366,13 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 	// returns a model parsing pattern (complex enough that deserves its own function) 
 	private def String modelParsingPattern() {
-		// decoding: beginning of input, two escaped parentheses, basically anything 
+		// decoding: beginning of input, two escaped parentheses, basically any name with alphanum and underscores 
 		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
 		// then two more parentheses, then end of input 
 		// zero group - everything that matched
 		// first group - name of the terminal
 		// second group - the value 
-		'''\A\(\(\(*([\p{Alnum}_]*).*\s([\p{Alnum}\.])*\)\)\z'''
+		'''\A\(\(([\p{Alnum}_]*)\s([\p{Alnum}\.]*)\)\)\z'''
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
 

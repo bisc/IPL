@@ -1,11 +1,13 @@
 package org.xtext.example.ipl.validation
 
+import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
+import org.osate.aadl2.AadlPackage
 import org.osate.aadl2.AadlReal
 import org.osate.aadl2.ComponentClassifier
 import org.osate.aadl2.ComponentImplementation
@@ -50,10 +52,15 @@ import org.xtext.example.ipl.iPL.ViewDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-class IPLTypeProvider {
+// a version of the type provider working for a given spec
+class IPLTypeProviderSpec {
 	
-	HashMap<ComponentInstance, List<Property>> instPropCache = new HashMap
 	HashMap<ComponentClassifier, List<Property>> classifierPropCache = new HashMap
+	IPLSpec spec 
+	
+	new(IPLSpec _spec){
+		spec = _spec
+	}
 	
 	def IPLType fromType(Type t) {
 		switch (t) {
@@ -64,48 +71,16 @@ class IPLTypeProvider {
 			TypeLst: new ListType(fromType((t as TypeLst).elem))
 		}
 	}
-	
-	// declarations and IDs
-	def dispatch IPLType typeOf(ID e) {
-		// Resolve id here
-		val name = e.id
-		
-//		System::out.println("####<" + e.id + ">####")
-		
-		val decls = e.getContainerOfType(IPLSpec).decls
-		
-		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
-		
-		if (decl !== null) {
-			return switch (decl) {
-				VarDecl: fromType(decl.type)
-				STVarDecl: fromType(decl.type)
-				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
-				ViewDecl: fromComponentImpl(decl.ref)
-			}
-		} else {
-			for (c : (e.allContainers.filter[it instanceof QAtom])) {
-				val q = c as QAtom
-				if (q !== null && q.^var == name) {
-//					System::out.println("****<" + q.set + ">****")
-					val type = typeOf(q.set)
-					if (type instanceof SetType)
-						return (type as SetType).elemType
-					else
-					// This is an error, but assume this is what the user meant
-						return type
-				}
-			}
-			return null
-		}
-	}
-	
+
 	// accepts a reference to the topmost element 
 	def populatePropCache(ComponentImplementation ref) { 
 		// TODO: do for all components and all properties at once? 
 	}
 	
 	def IPLType fromComponentImpl(ComponentImplementation ref) {
+		if (true)
+			throw new UnexpectedException("This function is not supposed to be called")
+			 
 		// this function never seems to be called...
 		if (ref instanceof SubprogramImplementation
 			|| ref instanceof SubprogramGroupImplementation) {
@@ -137,7 +112,7 @@ class IPLTypeProvider {
 	def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
 //		System::out.println(inst.children.map[switch (it) {
 //			ComponentInstance: it.name
-//			PropertyAssociationInstance: it.property.name
+//			PropertyAssociationInstance: it.property.name 
 //			default: "N/A"
 //		}])
 		
@@ -163,8 +138,13 @@ class IPLTypeProvider {
 		// populate the cache if needed
 		if (classifierPropCache.get(ref) === null) {
 			classifierPropCache.put(ref, newArrayList())
-			for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(ref)) {
-				val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
+			// get all imported property definitions
+			val List<PropertySet> propsets = ref.getContainerOfType(AadlPackage).publicSection.importedUnits.filter[
+				it instanceof PropertySet
+			].toList as List
+			for (PropertySet ps : propsets) { 
+			//for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(ref)) {
+				//val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 				for (prop : ps.ownedProperties) {
 
 					val propType = fromPropType(prop)
@@ -205,6 +185,40 @@ class IPLTypeProvider {
 			AadlInteger: new IntType
 			AadlReal: new RealType
 			default: null
+		}
+	}
+	
+		
+	// declarations and IDs
+	def dispatch IPLType typeOf(ID e) {
+		// Resolve id here
+		val name = e.id
+		
+		val decls = spec.decls
+		
+		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
+		
+		if (decl !== null) {
+			return switch (decl) {
+				VarDecl: fromType(decl.type)
+				STVarDecl: fromType(decl.type)
+				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
+				ViewDecl: fromComponentImpl(decl.ref)
+			}
+		} else {
+			for (c : (e.allContainers.filter[it instanceof QAtom])) {
+				val q = c as QAtom
+				if (q !== null && q.^var == name) {
+//					System::out.println("****<" + q.set + ">****")
+					val type = typeOf(q.set)
+					if (type instanceof SetType)
+						return (type as SetType).elemType
+					else
+					// This is an error, but assume this is what the user meant
+						return type
+				}
+			}
+			return null
 		}
 	}
 	
@@ -254,7 +268,7 @@ class IPLTypeProvider {
 	}
 	
 	def dispatch IPLType typeOf(Fun f) {
-		fromType(f.name.retType)
+		fromType(f.decl.retType)
 	}
 	
 	def dispatch IPLType typeOf(ExprOperation e) {
@@ -285,16 +299,14 @@ class IPLTypeProvider {
 	}
 	
 	def getParamTypes(Fun fun) {		
-		fun.name.paramTypes.map[fromType]
+		fun.decl.paramTypes.map[fromType]
 	}
 	
 	def isDef(ID e) {
 		// Resolve id here
 		val name = e.id
 		
-		val decls = e.getContainerOfType(IPLSpec).decls
-		
-		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
+		val decl = spec.decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
 		if (decl !== null) {
 			true
