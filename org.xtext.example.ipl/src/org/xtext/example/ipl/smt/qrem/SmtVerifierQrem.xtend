@@ -295,9 +295,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 					// construct clauseVal and clauseType with updated references to newFlexExpr
 					val Map<Formula, Object> clauseValUpd = new HashMap
 					val clauseVal = transferClauseVals.get(varVal)
-					clauseVal.forEach[clause, value|
-						clauseValUpd.put(copier.get(clause) as Formula, value)
-					]
+					if (clauseVal !== null)
+						clauseVal.forEach[clause, value|
+							clauseValUpd.put(copier.get(clause) as Formula, value)
+						]
 					
 					val Map<Formula, IPLType> clauseTypeUpd = new HashMap
 					transferClausesTypes.forEach[clause, type|
@@ -362,14 +363,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		}
 		flexsVals		
-	}
-
-	// finds all variable assignments that satisfy a negated formula
-	// thus, these are candidates for the formula to NOT be valid
-	// @returns true if managed to find all models, false otherwise 
-	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
-	override public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
-		throw new UnexpectedException('Method not used')
 	}
 
 	// get (additional) variable evaluations from the model (z3 output)

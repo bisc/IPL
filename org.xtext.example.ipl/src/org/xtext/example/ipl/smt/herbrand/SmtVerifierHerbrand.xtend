@@ -317,7 +317,7 @@ public class SmtVerifierHerbrand implements SmtVerifier {
 	// thus, these are candidates for the formula to NOT be valid
 	// @returns true if managed to find all models, false otherwise 
 	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
-	override public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
 		throw new UnexpectedException('Method not used')
 	}
 

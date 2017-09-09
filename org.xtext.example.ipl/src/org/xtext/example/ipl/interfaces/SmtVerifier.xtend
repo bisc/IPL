@@ -10,12 +10,10 @@ interface SmtVerifier {
 	public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa)
 		
-	// finds all variable assignments that satisfy a negated formula
+	// finds all variable assignments that satisfy a formula
 	// thus, these are candidates for the formula to NOT be valid
 	// @returns true if managed to find all models, false otherwise 
 	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
-	public def Boolean findNegModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) 
-	
 	public def Boolean findModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa)
 	
 	// simple verification of negated formula

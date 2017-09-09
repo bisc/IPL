@@ -42,6 +42,8 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
+// expected flow: genCheck -> remove quant -> genFind -> genCheck 
+// (no quant reset between quant and genFind)
 class SmtFormulaGeneratorQrem {
 	private var IPLTypeProviderSpec tp // initialized in oc
 
@@ -69,7 +71,7 @@ class SmtFormulaGeneratorQrem {
 	private var Map<Formula, IPLType> transferClausesType = new HashMap
 
 	// for anonymous sets encoded as functions; does not face externally 
-	private var setDecls = ""
+	private var anonSetDecls = ""
 	private var anonSetCount = 0
 
 	// INPUTS
@@ -81,8 +83,9 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// generate a formula for finding models, with given types of free variables
+	// assumes the formula to be quantifier-free, relying on free var declarations
 	public def String generateFormulaSmtFind(Formula fQF) {
-		reset
+		resetDeepState // no resetting quant state here!
 
 		// assuming that quantifiers were removed and free var decls were set 
 		// set free var types for the provider  
@@ -92,9 +95,9 @@ class SmtFormulaGeneratorQrem {
 		val formulaStr = generateFormula(fQF)
 
 		'''
-		«if (setDecls.length > 0)
+		«if (anonSetDecls.length > 0)
 	'''; Anonymous sets
-«setDecls» '''»
+«anonSetDecls» '''»
 		
 		; Term defs & type restrictions
 		«generateSmtTermDecl»
@@ -110,18 +113,16 @@ class SmtFormulaGeneratorQrem {
 
 	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f) {
-		reset
-		// remove the possible carryover of free vars from model finding
-		freeVarDecls = new HashMap 
-		freeVarTypeRests = ''
+		resetDeepState
+		resetQuantState	// remove the possible carryover of free vars/ anon sets from model finding
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
 
 		'''
-		«if (setDecls.length > 0)
+		«if (anonSetDecls.length > 0)
 			'''; Anonymous sets
-«setDecls» '''» 
+«anonSetDecls» '''» 
 		
 		; Flex decls
 		«generateSmtFlexDecl»
@@ -130,13 +131,14 @@ class SmtFormulaGeneratorQrem {
 		(assert (not «formulaStr»))'''
 	}
  
-	// removes quantifiers from a prenexed formula
+	// removes quantifiers from a prenexed formula (assumes that all QATOMS are in the front)
 	// replaces quantified variables with free constant terms
 	// populates freeVarDecls and freeVarTypeRests
 	// does not resolve terms -- they are all IDs
 	public def Formula removeQuants(Formula f) {
-		// assumes that all QATOMS are in the front 
-		freeVarTypeRests = ''
+		resetDeepState
+		resetQuantState
+		
 		val Map<String, String> oldVar2New = new HashMap
 
 		// TODO have to be careful to not touch QRATOMS
@@ -438,7 +440,6 @@ class SmtFormulaGeneratorQrem {
 		}
 
 		funDecls + asserts
-
 	}
 
 	// decide which declarations to use - terms or vars (depending on use case) 
@@ -454,23 +455,27 @@ class SmtFormulaGeneratorQrem {
 			new HashMap // neither: then no parameters for the abstraction
 	}
 
-	// reset the formula parsing state
-	private def reset() {
-		// NOT doing this because want to be stateful and populate them freeVars with removeQuant
-		//freeVarDecls = new HashMap 
-		//freeVarTypeRests = ''
+	// reset the parsing state of the quantifiers/free variables
+	// includes anonymous sets because they describe restrictions on free variables
+	private def resetQuantState() {
+		freeVarDecls = new HashMap
+		freeVarTypeRests = ''
+		quantVarDecls = new HashMap
+		
+		anonSetDecls = ""
+		anonSetCount = 0
+	}
+
+	// reset the parsing state of the formula's 'depths'
+	private def resetDeepState() {
 		// creating new storages to be independent from its clients
 		flexDecls = new HashMap // flexDecls.clear
 		flexClauses = new HashMap // flexClauses.clear
-		quantVarDecls = new HashMap
 		transferClausesSmt = new HashMap
 		transferClausesType = new HashMap
 
 		flexArgs.clear
 		flexNum = 0
-
-		setDecls = ""
-		anonSetCount = 0
 	}
 
 	// helper function to generate anonymous sets, returning membership f-n name
@@ -480,7 +485,7 @@ class SmtFormulaGeneratorQrem {
 		val funName = '''anonSetMb«anonSetCount++»''';
 
 		// declaring an anonymous set	 
-		setDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
+		anonSetDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
 		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
 		) ) 
 		''';
