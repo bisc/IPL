@@ -43,7 +43,7 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
 class SmtFormulaGeneratorQrem {
-	private var IPLTypeProviderSpec tp
+	private var IPLTypeProviderSpec tp // initialized in oc
 
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
@@ -73,11 +73,8 @@ class SmtFormulaGeneratorQrem {
 	private var anonSetCount = 0
 
 	// INPUTS
-	// SET EXTERNALLY blocking clauses for finding model values; 
-	private var List<Map<String, Object>> varBlockingValues = new ArrayList // has to be not null
 	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
-	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap // has to be not null
-	// CAN BE SET EXPTERNALLY - a type provider that needs a reference to a spec to function well, set in constructor
+	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = null
 
 	new(IPLSpec spec) {
 		tp = new IPLTypeProviderSpec(spec)
@@ -114,6 +111,9 @@ class SmtFormulaGeneratorQrem {
 	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f) {
 		reset
+		// remove the possible carryover of free vars from model finding
+		freeVarDecls = new HashMap 
+		freeVarTypeRests = ''
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
@@ -178,11 +178,6 @@ class SmtFormulaGeneratorQrem {
 
 	}
 
-	// set repeatedly only during model finding
-	public def setBlockingValues(List<Map<String, Object>> blocks) {
-		varBlockingValues = blocks
-	}
-
 	// set only for the final call
 	public def setFlexsVals(Map vals) {
 		flexsVals = vals
@@ -190,7 +185,7 @@ class SmtFormulaGeneratorQrem {
 
 	// returns the scope declaration
 	// won't clear it later
-	public def Map getFormulaVarDecls() {
+	public def Map getFormulaVarDecls() { 
 		freeVarDecls
 	}
 
@@ -370,15 +365,6 @@ class SmtFormulaGeneratorQrem {
 		'is' + ct.name.replace('.', '_')
 	}
 
-	// blocking for terms
-	private def String generateBlockingClauses() {
-		varBlockingValues.map [ nameValueMap |
-			'(assert (or ' + nameValueMap.keySet.map [ termName |
-				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
-			].join(' ') + '))'
-		].join('\n') + '\n'
-	}
-
 	public def String generateBlockingClauses(List<Map<String, Object>> blockingList) {
 		blockingList.map [ nameValueMap |
 			'(assert (or ' + nameValueMap.keySet.map [ termName |
@@ -424,8 +410,8 @@ class SmtFormulaGeneratorQrem {
 
 		// generate interpretations from term valuations
 		var asserts = ''
-		if (!flexsVals.empty) { // an optimization 
-		// map flex name -> map <term name -> term value>, to block redundant assertions
+		if (flexsVals !== null) { // an optimization 
+			// map flex name -> map <term name -> term value>, to block redundant assertions
 			val Map<String, List<Map<String, Object>>> projectionBlocks = new HashMap
 			flexDecls.keySet.forEach[projectionBlocks.put(it, new LinkedList)] // initialize proj blocks
 			for (termVal : flexsVals.keySet) { // an evaluation of quant vars (encoded as terms)

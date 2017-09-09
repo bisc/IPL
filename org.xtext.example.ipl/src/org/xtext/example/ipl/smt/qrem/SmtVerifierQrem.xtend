@@ -5,12 +5,12 @@ import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.HashMap
-import java.util.LinkedList
 import java.util.List
 import java.util.Map
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
+import org.eclipse.emf.ecore.util.EcoreUtil.Copier
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
@@ -18,6 +18,7 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
+import org.xtext.example.ipl.transform.ClauseValueTransformer
 import org.xtext.example.ipl.transform.PrenexTransformer
 import org.xtext.example.ipl.transform.VarValueTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
@@ -49,9 +50,11 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private var Map<String, ModelExpr> flexClauses
 	
 	// pointers to value transfer clauses, with smt gen code
+	// they implicitly reference the clauses in the QF formula
 	private var Map<Formula, String> transferClausesSmt 
 	private var Map<Formula, IPLType> transferClausesTypes 
-	private var List<Map<Formula, Object>> transferClauseVals = new ArrayList
+	private var Map<Map<String, Object>, Map<Formula, Object>>  transferClauseVals = new HashMap
+	//private var Map<Formula, Formula> transferClausesPNF2QF
 
 	// caching view smt
 	private var String viewSmt = ''
@@ -84,11 +87,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 			throw new UnexpectedException("Failed to find models, check the formula")
 		TimeRec::stopTimer("findNegModels")
 
-		// reset blocking state of the smt generator because find models was just called
-		smtFormulaGenerator.blockingValues = new ArrayList
-	
-		// term vals populated, if in existence
+		// freeVarDecls populated, if in existence
 		// flex decls are also set
+		// clause vals should be there too 
 		// what remains is to save flex clauses -- coming from fQF
 		flexClauses = smtFormulaGenerator.formulaFlexClauses
 
@@ -98,7 +99,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + pp.print(fPNF))
 		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa)
+		fQF.delete(true)
 		fPNF.delete(true)
+		
 		return res
 	}
 	
@@ -123,7 +126,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 			
 			(check-sat) 
 			(get-model)
-			
 		''')
 
 		System::out.println("Done generating SMT, see file " + filenameWithExt)
@@ -170,6 +172,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		flexDecls = smtFormulaGenerator.formulaFlexDecls
 		println('''Free vars: «freeVarDecls»; Flex: «flexDecls»''')
 
+		// values to be populated in the loop below
 		transferClausesSmt = smtFormulaGenerator.transferClausesSmt
 		transferClausesTypes = smtFormulaGenerator.transferClausesTypes
 
@@ -278,17 +281,36 @@ public class SmtVerifierQrem implements SmtVerifier {
 					flexVals.put(flexName, flexCache.get(filteredTermVal))
 				} else { // failed to find a cached value, have to run MC
 					// find a flexible subformula; original in the formula
-					val ModelExpr origflexMdlExpr = flexClauses.get(flexName)
+					val ModelExpr origFlexExpr = flexClauses.get(flexName)
 	
 					// make a copy to feed to prism, to not spoil the original formula it for further iterations
-					var newflexMdlExpr = origflexMdlExpr.copy
+					// to preserve clause pointers, use a copier which stores a map old->new for eobjects
+					//var newFlexExpr = origFlexExpr.copy
+					val Copier copier = new Copier();
+					var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
 	
-					println('Flexible formula before replacement: ' + pp.print(newflexMdlExpr) + ", params: " +
-						newflexMdlExpr.params.vals.map[pp.print(it)])
+					println('Flexible formula before replacement: ' + pp.print(newFlexExpr) + 
+						", params: " + newFlexExpr.params.vals.map[pp.print(it)])
+					
+					// construct clauseVal and clauseType with updated references to newFlexExpr
+					val Map<Formula, Object> clauseValUpd = new HashMap
+					val clauseVal = transferClauseVals.get(varVal)
+					clauseVal.forEach[clause, value|
+						clauseValUpd.put(copier.get(clause) as Formula, value)
+					]
+					
+					val Map<Formula, IPLType> clauseTypeUpd = new HashMap
+					transferClausesTypes.forEach[clause, type|
+						clauseTypeUpd.put(copier.get(clause) as Formula, type)
+					]
+					
+					// put values of clauses into formula (e.g. aggregate expressions in model params) 
+					newFlexExpr = (new ClauseValueTransformer).replaceClausesWithValues(
+						newFlexExpr, clauseValUpd, clauseTypeUpd) as ModelExpr
 	
-					// put rigid values into it (including model parameters and property values)
-					newflexMdlExpr = (new VarValueTransformer).replaceVarsWithValues(
-						newflexMdlExpr,
+					// put rigid values into formula (including model parameters and property values)
+					newFlexExpr = (new VarValueTransformer).replaceVarsWithValues(
+						newFlexExpr,
 						varVal,
 						oldScopeDecls,
 						smtViewGenerator.propTypeMap,
@@ -296,14 +318,14 @@ public class SmtVerifierQrem implements SmtVerifier {
 					) as ModelExpr
 	
 					// set up prism data
-					val prop = pp.print(newflexMdlExpr)
+					val prop = pp.print(newFlexExpr)
+					val paramVals = newFlexExpr.params.vals.map[pp.print(it)]
 					// prop = prop.substring(1, prop.length-1) // remove $
-					val paramVals = newflexMdlExpr.params.vals.map[pp.print(it)]
 	
 					// don't need the copied formula anymore
-					newflexMdlExpr.delete(true)
+					newFlexExpr.delete(true)
 	
-					println('''Invoking PRISM: model «md.name», params «md.params», param vals «paramVals», prop «prop»''')
+					println('''Invoking PRISM: model «md.name», prop «prop», params «md.params», param vals «paramVals», ''')
 	
 					// call model checker and replace part of formula with the result
 					TimeRec::startTimer("new PrismPlugin")
@@ -384,8 +406,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 		]
 		
 		// parse evaluations for clauses
-		val newClauseEval = new HashMap
-		transferClauseVals.add(newClauseEval)
+		val Map<Formula, Object> newClauseEval = new HashMap
+		transferClauseVals.put(newVarEval, newClauseEval)
 		val Pattern p2 = Pattern.compile(clauseValueParsingPattern)
 		transferClausesSmt.forEach[ clause, smtCode, count | 
 			val seq = z3ResAfterFirst.get(freeVarDecls.size + count)
