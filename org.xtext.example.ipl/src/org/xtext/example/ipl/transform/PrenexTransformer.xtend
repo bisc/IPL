@@ -1,7 +1,8 @@
 package org.xtext.example.ipl.transform
 
+import java.util.HashMap
+import java.util.Map
 import org.eclipse.emf.ecore.EObject
-import org.eclipse.emf.ecore.EStructuralFeature
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -19,6 +20,7 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtom
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.validation.IPLType
 
 // transforms a formula into its prenex normal form
 class PrenexTransformer {

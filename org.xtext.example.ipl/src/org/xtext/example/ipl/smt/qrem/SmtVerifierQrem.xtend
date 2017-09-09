@@ -31,31 +31,38 @@ import org.xtext.example.ipl.validation.RealType
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
-// implementation of generation by mapping ArchElem -> Int
+// implementation of generation by removing quants and mapping ArchElem -> Int
+// makes copies of formula and manages mappings between them
 public class SmtVerifierQrem implements SmtVerifier {
 
-	private val smtViewGenerator = new SmtViewGeneratorQrem
-	private val smtFormulaGenerator = new SmtFormulaGeneratorQrem
+	private val SmtViewGeneratorQrem smtViewGenerator = new SmtViewGeneratorQrem
+	private var SmtFormulaGeneratorQrem smtFormulaGenerator = null // initialized on call
 
 	// declarations of quantified variables
-	private var Map<String, IPLType> termDecls
+	private var Map<String, IPLType> freeVarDecls
 	// each map in the list is an valuation of all declared variables
-	private var List<Map<String, Object>> termVals = new ArrayList<Map<String, Object>>
+	private var List<Map<String, Object>> freeVarVals = new ArrayList<Map<String, Object>>
 
 	// declarations of flexible abstractions
 	private var Map<String, IPLType> flexDecls
 	// pointers to flexible clauses, by name
 	private var Map<String, ModelExpr> flexClauses
+	
+	// pointers to value transfer clauses, with smt gen code
+	private var Map<Formula, String> transferClausesSmt 
+	private var Map<Formula, IPLType> transferClausesTypes 
+	private var List<Map<Formula, Object>> transferClauseVals = new ArrayList
 
 	// caching view smt
 	private var String viewSmt = ''
 	
 	val IPLPrettyPrinter pp = new IPLPrettyPrinter
-
+	
 	// standard IPL verification
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
-		termVals.clear
+		freeVarVals.clear
+		smtFormulaGenerator = new SmtFormulaGeneratorQrem(spec)
 		 
 		// check if it's valid in its current form with any interpretation of flexible terms
 		println('Checking if rigid verification discharges the formula')
@@ -63,12 +70,17 @@ public class SmtVerifierQrem implements SmtVerifier {
 			return true
 
 		// transform to prenex normal form; make a copy to not mess with IPLSpec
-		val pnfFormula = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
-		println('Prenex normal form: ' + pp.print(pnfFormula))
+		val fPNF = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
+		println('Prenex normal form: ' + pp.print(fPNF))
+		
+		// remove quantifiers and populate freeVarDecls
+		val Formula fQF = smtFormulaGenerator.removeQuants(fPNF.copy)
+		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
 		
 		// find models: candidate valuations for sat of negformula
+		// populate transfer clauses 
 		TimeRec::startTimer("findNegModels")
-		if (!findModels(pnfFormula, spec, filename, fsa))
+		if (!findModels(fQF, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
 		TimeRec::stopTimer("findNegModels")
 
@@ -77,31 +89,34 @@ public class SmtVerifierQrem implements SmtVerifier {
 	
 		// term vals populated, if in existence
 		// flex decls are also set
-		// what remains is to save flex clauses
+		// what remains is to save flex clauses -- coming from fQF
 		flexClauses = smtFormulaGenerator.formulaFlexClauses
 
 		// find valuations for each flexible abstraction
 		smtFormulaGenerator.flexsVals = findFlexsVals(md, filename, fsa)
 
 		// run the ultimate smt here
-		println('Final verification after MCs: ' + pp.print(pnfFormula))
-		val res = verifyRigidFormula(pnfFormula, spec, filename + "-final", fsa)
-		pnfFormula.delete(true)
+		println('Final verification after MCs: ' + pp.print(fPNF))
+		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa)
+		fPNF.delete(true)
 		return res
 	}
 	
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
-	override public def boolean verifyRigidFormula(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
+	override public def boolean verifyRigidFormula(Formula f, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
 		TimeRec::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if (!smtViewGenerator.isViewGenerated)
-			viewSmt = smtViewGenerator.generateViewSmt(s)
+			viewSmt = smtViewGenerator.generateViewSmt(spec)
+		// can be called by itself or from non-rigid, so need to check 
+		if (smtFormulaGenerator === null)
+			smtFormulaGenerator = new SmtFormulaGeneratorQrem(spec)
 
 		val String formulaSmt = smtFormulaGenerator.generateFormulaSmtCheck(f)
 		println("Done generating IPL SMT")
 
-		termDecls = smtFormulaGenerator.formulaTermDecls
+		freeVarDecls = smtFormulaGenerator.formulaVarDecls
 
 		val filenameWithExt = filename + '.smt'
 		fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + ''' 
@@ -136,18 +151,98 @@ public class SmtVerifierQrem implements SmtVerifier {
 			false
 		}
 	}
-	
+		
+	// finds all variable assignments that satisfy a QF formula
+	// @returns true if managed to find all models, false otherwise 
+	// implicit result: populates termDecls, flexDecls, clauses, termVals 
+	override public Boolean findModels(Formula fQF, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
+		freeVarVals.clear
+
+		// optimization: not rerun AADL generation for every model find
+		if (!smtViewGenerator.isViewGenerated)
+			viewSmt = smtViewGenerator.generateViewSmt(spec)
+
+		// need just one run of generation to initialize var/clause declarations 
+		var formulaSmt = smtFormulaGenerator.generateFormulaSmtFind(fQF)
+		println("Done generating IPL SMT")
+
+		freeVarDecls = smtFormulaGenerator.formulaVarDecls
+		flexDecls = smtFormulaGenerator.formulaFlexDecls
+		println('''Free vars: «freeVarDecls»; Flex: «flexDecls»''')
+
+		transferClausesSmt = smtFormulaGenerator.transferClausesSmt
+		transferClausesTypes = smtFormulaGenerator.transferClausesTypes
+
+		// no variables -> no need to look for models
+		if (freeVarDecls.size == 0) {
+			println('No free vars; aborting model search')
+			return true
+		}
+		
+		// model search loop 
+		println("Starting SMT model search...")
+		val filenameWithExt = filename + '.smt'
+		var String blockingClauses = ''
+		while (true) {
+			
+			fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + '\n\n' + '''  
+				; Blocking 
+				«blockingClauses»
+				
+				(check-sat) 
+				
+				«freeVarDecls.keySet.map['(get-value (' + /*smtFormulaGenerator.resolveTerm(*/it + '))'].join('\n') + '\n'»
+				
+				«transferClausesSmt.values.map['(get-value (' + it + '))'].join('\n') + '\n'»
+			''')
+
+			System::out.println("Done generating SMT, see file " + filenameWithExt)
+
+			// call smt 
+			val z3Filename = fsa.getURI(filenameWithExt)
+			val z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
+			TimeRec::startTimer("z3")
+			val z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+			TimeRec::stopTimer("z3")
+			val z3ResLines = z3Res.split('\n')
+			val z3ResFirstLine = z3ResLines.get(0)
+			val String[] z3ResAfterFirst = Arrays.copyOfRange(z3ResLines, 1, z3ResLines.size)
+
+			// interpret smt results
+			if (z3ResFirstLine == "unsat") {
+				println("unsat; all models found")
+				// interpret: if the scope is empty, then the formula has been shown to be invalid
+				// if the scope is not empty, then we might have blocked the values - thus finding all models 				
+				return true
+			} else if (z3ResFirstLine == "sat") {
+				println('''sat; looking for models with terms: «freeVarDecls»''')
+				if (!populateEvals(z3ResAfterFirst)) { // side effect: populates termVals
+					println("Finding models error; stopping model search")
+					return false
+				}
+			} else {
+				println("SMT error; stopping model search: " + z3ResLines.join('\n'))
+				return false
+			}
+
+			// a new iteration
+			blockingClauses = smtFormulaGenerator.generateBlockingClauses(freeVarVals)
+		}
+
+	}
+
 	// find valuations for each flexible variable
+	// implicitly works on references to the QF instance of the formula
 	// returns a map: term evaluation -> flex values 
 	// Map<Map<String, Object>, Map<String, Object>> 
 	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) { 
 		// now the current formula state is populated: 
 		// scope decls are set, but can get spoiled by rigid verification, so making a copy
-		val oldScopeDecls = termDecls.immutableCopy
+		val oldScopeDecls = freeVarDecls.immutableCopy
 		
 		// if term vals are empty, add one just to continue 
-		if (termVals.size == 0)
-			termVals.add(new HashMap)
+		if (freeVarVals.size == 0)
+			freeVarVals.add(new HashMap)
 
 		// collect all values of flex variable
 		// set of scope vals (name, value) -> <flex name -> value(s)>
@@ -159,11 +254,11 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// basically go through candidate valuations one by one, obtaining MC results for each
 		// need an immutable copy because verifyRigidFormula clears evals for itself (actually now it doesnt)
-		for (termVal : termVals.immutableCopy) {
+		for (varVal : freeVarVals.immutableCopy) {
 			// above but for a given scope eval
 			val Map<String, Object> flexVals = new HashMap
 
-			println("Considering valuation " + termVal)
+			println("Considering valuation " + varVal)
 			// var boolean flexVerRes = true
 			// iterate through flexible parts (although not expecting > 1)
 			for (e : flexDecls.entrySet) {
@@ -175,7 +270,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				
 				// check if cache contains the values
 				var flexCache = flexsValueCache.get(flexName) 
-				val filteredTermVal = termVal.filter[termName, obj | // leaves the evals that are params of the flex
+				val filteredTermVal = varVal.filter[termName, obj | // leaves the evals that are params of the flex
 					smtFormulaGenerator.formulaFlexArgs.get(flexName).contains(termName)
 				]
 				if (flexCache !== null && flexCache.containsKey(filteredTermVal)) { // cache contains, use the value 
@@ -194,7 +289,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 					// put rigid values into it (including model parameters and property values)
 					newflexMdlExpr = (new VarValueTransformer).replaceVarsWithValues(
 						newflexMdlExpr,
-						termVal,
+						varVal,
 						oldScopeDecls,
 						smtViewGenerator.propTypeMap,
 						smtViewGenerator.propValueMap
@@ -241,82 +336,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 				} // end if
 
 			} // done for all flex vars 
-			flexsVals.put(termVal, flexVals)
+			flexsVals.put(varVal, flexVals)
 
 		}
 		flexsVals		
-	}
-		
-	// finds all variable assignments that satisfy a formula
-	// thus, these are candidates for the formula to NOT be valid
-	// @returns true if managed to find all models, false otherwise 
-	// implicit result: populates scopeDecls and flexDecls; maybe scopeVals 
-	override public Boolean findModels(Formula f, IPLSpec s, String filename, IFileSystemAccess2 fsa) {
-		termVals.clear
-
-		// optimization: not rerun AADL generation for every model find
-		if (!smtViewGenerator.isViewGenerated)
-			viewSmt = smtViewGenerator.generateViewSmt(s)
-
-		// initial run of formula to initialize scope declarations 
-		var formulaSmt = smtFormulaGenerator.generateFormulaSmtFind(f)
-		println("Done generating IPL SMT")
-
-		termDecls = smtFormulaGenerator.formulaTermDecls
-		flexDecls = smtFormulaGenerator.formulaFlexDecls
-		println('''Terms: «termDecls»; Flex: «flexDecls»''')
-
-		// no variables -> no need to look for models
-		if (termDecls.size == 0) {
-			println('No terms for quantified variables; aborting model search')
-			return true
-		}
-		// model search loop 
-		println("Starting SMT model search...")
-		val filenameWithExt = filename + '.smt'
-		while (true) {
-			fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + ''' 
-				
-				(check-sat) 
-				«termDecls.keySet.map['(get-value (' + /*smtFormulaGenerator.resolveTerm(*/it + '))'].join('\n')»
-				
-			''')
-
-			System::out.println("Done generating SMT, see file " + filenameWithExt)
-
-			// call smt 
-			var z3Filename = fsa.getURI(filenameWithExt)
-			var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
-			TimeRec::startTimer("z3")
-			var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
-			TimeRec::stopTimer("z3")
-			var z3ResLines = z3Res.split('\n')
-			val z3ResFirstLine = z3ResLines.get(0)
-			val String[] z3ResAfterFirst = Arrays.copyOfRange(z3ResLines, 1, z3ResLines.size)
-
-			// interpret smt results
-			if (z3ResFirstLine == "unsat") {
-				println("unsat; all models found")
-				// interpret: if the scope is empty, then the formula has been shown to be invalid
-				// if the scope is not empty, then we might have blocked the values - thus finding all models 				
-				return true
-			} else if (z3ResFirstLine == "sat") {
-				println('''sat; looking for models with terms: «termDecls»''')
-				if (!populateEvals(z3ResAfterFirst)) { // side effect: populates termVals
-					println("Finding models error; stopping model search")
-					return false
-				}
-			} else {
-				println("SMT error; stopping model search: " + z3ResLines.join('\n'))
-				return false
-			}
-
-			smtFormulaGenerator.blockingValues = termVals
-			// a new iteration
-			formulaSmt = smtFormulaGenerator.generateFormulaSmtFind(f)
-			println("Done generating IPL SMT")
-		}
-
 	}
 
 	// finds all variable assignments that satisfy a negated formula
@@ -332,14 +355,14 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private def Boolean populateEvals(String[] z3ResAfterFirst) {
 		// find the string with value with regex
 		var modelFound = true // assume so until proven otherwise
-		val newEval = new HashMap
-		termVals.add(newEval)
 
-		val Pattern p = Pattern.compile(modelParsingPattern)
-
-		termDecls.forEach [ name, termType, count |
+		// parse evaluations for vars
+		val newVarEval = new HashMap
+		freeVarVals.add(newVarEval)
+		val Pattern p1 = Pattern.compile(varValueParsingPattern)
+		freeVarDecls.forEach [ name, termType, count |
 			val seq = z3ResAfterFirst.get(count)
-			var Matcher m = p.matcher(seq)
+			var Matcher m = p1.matcher(seq)
 
 			if (m.find) {
 				/*println('Match found in: ' + seq)
@@ -351,21 +374,42 @@ public class SmtVerifierQrem implements SmtVerifier {
 				val valueSmt = m.group(2)
 				 
 				if(name != termName)
-					println('''Naming error: term «name» is not «termName»''')
+					throw new UnexpectedException('''Naming error: term «name» is not «termName»''')
 				
-				addValueToEval(newEval, termName, valueSmt, termType)
+				addValueToEval(newVarEval, termName, valueSmt, termType)
 			} else {
 				println('Match not found in: ' + seq)
 				throw new UnexpectedException("Match not found")
 			}
 		]
+		
+		// parse evaluations for clauses
+		val newClauseEval = new HashMap
+		transferClauseVals.add(newClauseEval)
+		val Pattern p2 = Pattern.compile(clauseValueParsingPattern)
+		transferClausesSmt.forEach[ clause, smtCode, count | 
+			val seq = z3ResAfterFirst.get(freeVarDecls.size + count)
+			var Matcher m = p2.matcher(seq)
+			
+			if (m.find) {
+				val valueSmt = m.group(1) // see the pattern
+				
+				/*println('Match found in: ' + seq)
+				println('Groups: ')
+				for (i : 0 ..< m.groupCount + 1)
+					println(i + ':' + m.group(i))*/
+				
+				addValueToEval(newClauseEval, clause, valueSmt, transferClausesTypes.get(clause))
+			}
+		]
 
-		println('Values found:' + termVals)
+		println('Var values found:' + freeVarVals)
+		println('Clause values found:' + transferClauseVals)
 		modelFound
 	}
 
-	// returns a model parsing pattern (complex enough that deserves its own function) 
-	private def String modelParsingPattern() {
+	// returns a regex parsing pattern for free variable values (complex enough that deserves its own function) 
+	private def String varValueParsingPattern() {
 		// decoding: beginning of input, two escaped parentheses, basically any name with alphanum and underscores 
 		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
 		// then two more parentheses, then end of input 
@@ -375,12 +419,23 @@ public class SmtVerifierQrem implements SmtVerifier {
 		'''\A\(\(([\p{Alnum}_]*)\s([\p{Alnum}\.]*)\)\)\z'''
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
+	
+	// returns a regex parsing pattern for value transfer clauses (complex enough that deserves its own function) 
+	private def String clauseValueParsingPattern() {
+		// decoding: beginning of input, two escaped parentheses, then anything 
+		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
+		// then two more parentheses, then end of input 
+		// zero group - everything that matched
+		// first group - the value 
+		'''\A\(\(.*\s([\p{Alnum}\.]*)\)\)\z'''
+	}
 
 	// helper function: adds a value to a valuation, doing all the checks as well 
-	private def addValueToEval(Map<String, Object> eval, String varName, String valueSmt, IPLType termType) {
+	// the map is from the Object type (String, Formula, ...) to Object (Value)
+	private def addValueToEval(Map eval, Object key, String valueSmt, IPLType termType) {
 		// if evals don't have a var, add a list
-		if (!eval.containsKey(varName))
-			eval.put(varName, new LinkedList)
+		//if (!eval.containsKey(varName))
+			//eval.put(varName, new LinkedList)
 
 		/*if (smtType != IPLUtils::typesIPL2Smt(termType))
 			if (!(smtType == 'Int' && termType instanceof ComponentType)) // special case
@@ -388,16 +443,16 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		switch (termType) { // variable type from scope
 			IntType:
-				eval.put(varName, Integer.parseInt(valueSmt))
+				eval.put(key, Integer.parseInt(valueSmt))
 			RealType:
-				eval.put(varName, Float.parseFloat(valueSmt))
+				eval.put(key, Float.parseFloat(valueSmt))
 			BoolType:
-				eval.put(varName, Boolean.parseBoolean(valueSmt))
+				eval.put(key, Boolean.parseBoolean(valueSmt))
 			ComponentType: {
-				eval.put(varName, Integer.parseInt(valueSmt)) // because ArchElem is a renaming of Int
+				eval.put(key, Integer.parseInt(valueSmt)) // because ArchElem is a renaming of Int
 			}
 			default:
-				println('''Type error: undefined type «termType» of variable «varName»''')
+				println('''Type error: undefined type «termType» of variable «key»''')
 		}
 	}
 	

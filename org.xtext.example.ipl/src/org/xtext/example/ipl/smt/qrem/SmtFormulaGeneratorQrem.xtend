@@ -41,9 +41,9 @@ import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
 
 // implementation of formula generation with removal of quantifiers
+// not allowed to copy formulas
 class SmtFormulaGeneratorQrem {
-
-	private var IPLTypeProviderSpec tp  
+	private var IPLTypeProviderSpec tp
 
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
@@ -63,23 +63,33 @@ class SmtFormulaGeneratorQrem {
 	// argument names (from scope) of flex clauses; flexName -> <varName>
 	private var Map<String, List<String>> flexArgs = new HashMap
 	private var flexNum = 0 // for naming flexible abstractions
+	// clauses for which values need to be transferred + their generated SMT code 
+	private var Map<Formula, String> transferClausesSmt = new HashMap
+	// clauses to their types
+	private var Map<Formula, IPLType> transferClausesType = new HashMap
+
+	// for anonymous sets encoded as functions; does not face externally 
+	private var setDecls = ""
+	private var anonSetCount = 0
+
 	// INPUTS
 	// SET EXTERNALLY blocking clauses for finding model values; 
 	private var List<Map<String, Object>> varBlockingValues = new ArrayList // has to be not null
 	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
 	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap // has to be not null
-	// anonymous sets encoded as functions; does not face externally 
-	private var setDecls = ""
-	private var anonSetCount = 0
+	// CAN BE SET EXPTERNALLY - a type provider that needs a reference to a spec to function well, set in constructor
 
-	public def String generateFormulaSmtFind(Formula f) {
+	new(IPLSpec spec) {
+		tp = new IPLTypeProviderSpec(spec)
+	}
+
+	// generate a formula for finding models, with given types of free variables
+	public def String generateFormulaSmtFind(Formula fQF) {
 		reset
-		val spec = f.getContainerOfType(IPLSpec)
-		if (spec !== null)
-			tp = new IPLTypeProviderSpec(spec)
 
-		val Formula fQF = removeQuants(f.copy)
-		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
+		// assuming that quantifiers were removed and free var decls were set 
+		// set free var types for the provider  
+		tp.freeVarTypes = freeVarDecls
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(fQF)
@@ -96,9 +106,6 @@ class SmtFormulaGeneratorQrem {
 		; Flex decls
 		«generateSmtFlexDecl»
 		
-		; Blocking
-		«generateBlockingClauses»
-		
 		; Formula 
 		«'(assert ' + formulaStr  +')'»'''
 
@@ -107,9 +114,6 @@ class SmtFormulaGeneratorQrem {
 	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f) {
 		reset
-		val spec = f.getContainerOfType(IPLSpec)
-		if (spec !== null)
-			tp = new IPLTypeProviderSpec(spec)
 
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
@@ -125,6 +129,54 @@ class SmtFormulaGeneratorQrem {
 		; Formula 
 		(assert (not «formulaStr»))'''
 	}
+ 
+	// removes quantifiers from a prenexed formula
+	// replaces quantified variables with free constant terms
+	// populates freeVarDecls and freeVarTypeRests
+	// does not resolve terms -- they are all IDs
+	public def Formula removeQuants(Formula f) {
+		// assumes that all QATOMS are in the front 
+		freeVarTypeRests = ''
+		val Map<String, String> oldVar2New = new HashMap
+
+		// TODO have to be careful to not touch QRATOMS
+		// first unwrap qatoms and populate sets as needed
+		val i = f.eAll.filter(QAtom)
+		while (i.hasNext) {
+			val QAtom q = i.next
+
+			val varName = IPLUtils::freeVar(q.^var)
+			oldVar2New.put(q.^var, varName)
+			val varType = (tp.typeOf(q.set) as SetType).elemType; // goes up to IPLSpec
+			freeVarDecls.put(varName, varType)
+
+			// generate type restrictions
+			// switching on the set member type
+			switch (varType) {
+				ComponentType: {
+					val archElemMbFun = getArchElemMbFun(varType as ComponentType)
+
+					freeVarTypeRests += '''(assert («archElemMbFun» «varName»))
+					'''
+				}
+				IntType,
+				RealType,
+				BoolType: {
+					val setMbFunName = generateAnonSet(q.set);
+
+					freeVarTypeRests += '''(assert («setMbFunName» «varName»))
+					'''
+				}
+				default:
+					throw new IllegalArgumentException('Unimplemented set member type')
+			}
+		}
+
+		// replace variables in the rest of the formula		
+		// FIXME is this cast safe? 
+		(new VarFreeVarTransformer).replaceVarsWithTerms(f, oldVar2New, freeVarDecls) as Formula
+
+	}
 
 	// set repeatedly only during model finding
 	public def setBlockingValues(List<Map<String, Object>> blocks) {
@@ -138,7 +190,7 @@ class SmtFormulaGeneratorQrem {
 
 	// returns the scope declaration
 	// won't clear it later
-	public def Map getFormulaTermDecls() {
+	public def Map getFormulaVarDecls() {
 		freeVarDecls
 	}
 
@@ -155,6 +207,14 @@ class SmtFormulaGeneratorQrem {
 	// won't clear it later
 	public def Map<String, List<String>> getFormulaFlexArgs() {
 		flexArgs
+	}
+
+	public def Map getTransferClausesSmt() {
+		transferClausesSmt
+	}
+
+	public def Map getTransferClausesTypes() {
+		transferClausesType
 	}
 
 	// === RIGID GENERATION FUNCTIONS ===
@@ -272,8 +332,16 @@ class SmtFormulaGeneratorQrem {
 			default: throw new UnexpectedException('Unknown model formula')
 		}
 
+		// save the clause, get args
 		flexClauses.put(abst, mdex)
 		val args = flexArgs.get(abst)
+
+		// save the param terms for later evaluation
+		mdex.params.vals.forEach [
+			transferClausesSmt.put(it, generateFormula(it))
+			transferClausesType.put(it, tp.typeOf(it))
+		// println('Type of clause ' + it + ' is ' + tp.typeOf(it))
+		]
 
 		// generate smt for the abstraction
 		// non-nullary functions need extra ( ) around them
@@ -284,53 +352,6 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// === HELPER FUNCTIONS === 
-
-	// replaces quantified variables with free constant terms
-	// does not resolve terms -- they are all IDs
-	private def Formula removeQuants(Formula f) {
-		// assumes that all QATOMS are in the front 
-		freeVarTypeRests = ''
-		val Map<String, String> oldVar2New = new HashMap
-
-		// TODO have to be careful to not touch QRATOMS
-		// first unwrap qatoms and populate sets as needed
-		val i = f.eAll.filter(QAtom)
-		while (i.hasNext) {
-			val QAtom q = i.next
-
-			val varName = IPLUtils::freeVar(q.^var)
-			oldVar2New.put(q.^var, varName)
-			val varType = (tp.typeOf(q.set) as SetType).elemType; // goes up to IPLSpec
-			freeVarDecls.put(varName, varType)
-				
-			// generate type restrictions
-			// switching on the set member type
-			switch (varType) {
-				ComponentType: {
-					val archElemMbFun = getArchElemMbFun(varType as ComponentType)
-
-					freeVarTypeRests += '''(assert («archElemMbFun» «varName»))
-					'''
-				}
-				IntType,
-				RealType,
-				BoolType: {
-					val setMbFunName = generateAnonSet(q.set);
-
-					freeVarTypeRests += '''(assert («setMbFunName» «varName»))
-					'''
-				}
-				default:
-					throw new IllegalArgumentException('Unimplemented set member type')
-			}
-		}
-
-		// replace variables in the rest of the formula		
-		// FIXME is this cast safe? 
-		(new VarFreeVarTransformer).replaceVarsWithTerms(f, oldVar2New, freeVarDecls) as Formula
-
-	}
-
 	// generates declarations of free variables; empty if none
 	// needs to be populated with terms already, after generating for formula
 	private def String generateSmtTermDecl() {
@@ -352,6 +373,14 @@ class SmtFormulaGeneratorQrem {
 	// blocking for terms
 	private def String generateBlockingClauses() {
 		varBlockingValues.map [ nameValueMap |
+			'(assert (or ' + nameValueMap.keySet.map [ termName |
+				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
+			].join(' ') + '))'
+		].join('\n') + '\n'
+	}
+
+	public def String generateBlockingClauses(List<Map<String, Object>> blockingList) {
+		blockingList.map [ nameValueMap |
 			'(assert (or ' + nameValueMap.keySet.map [ termName |
 				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
 			].join(' ') + '))'
@@ -441,12 +470,15 @@ class SmtFormulaGeneratorQrem {
 
 	// reset the formula parsing state
 	private def reset() {
-		// creating new ones to be independent from its clients
-		freeVarDecls = new HashMap // scopeDecls.clear
-		freeVarTypeRests = ''
+		// NOT doing this because want to be stateful and populate them freeVars with removeQuant
+		//freeVarDecls = new HashMap 
+		//freeVarTypeRests = ''
+		// creating new storages to be independent from its clients
 		flexDecls = new HashMap // flexDecls.clear
 		flexClauses = new HashMap // flexClauses.clear
 		quantVarDecls = new HashMap
+		transferClausesSmt = new HashMap
+		transferClausesType = new HashMap
 
 		flexArgs.clear
 		flexNum = 0

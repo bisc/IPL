@@ -4,6 +4,7 @@ import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
+import java.util.Map
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
@@ -57,12 +58,22 @@ class IPLTypeProviderSpec {
 	
 	HashMap<ComponentClassifier, List<Property>> classifierPropCache = new HashMap
 	IPLSpec spec 
+	Map<String, IPLType> freeVarTypes = null
 	
 	new(IPLSpec _spec){
 		spec = _spec
 	}
 	
-	def IPLType fromType(Type t) {
+	new(IPLSpec _spec, Map<String, IPLType> _freeVarTypes){
+		spec = _spec
+		freeVarTypes = _freeVarTypes
+	}
+	
+	def setFreeVarTypes(Map<String, IPLType> _freeVarTypes) {
+		freeVarTypes = _freeVarTypes
+	}
+	
+	private def IPLType fromType(Type t) {
 		switch (t) {
 			TypeInt: new IntType
 			TypeReal: new RealType
@@ -72,12 +83,7 @@ class IPLTypeProviderSpec {
 		}
 	}
 
-	// accepts a reference to the topmost element 
-	def populatePropCache(ComponentImplementation ref) { 
-		// TODO: do for all components and all properties at once? 
-	}
-	
-	def IPLType fromComponentImpl(ComponentImplementation ref) {
+	private def IPLType fromComponentImpl(ComponentImplementation ref) {
 		if (true)
 			throw new UnexpectedException("This function is not supposed to be called")
 			 
@@ -109,7 +115,7 @@ class IPLTypeProviderSpec {
 		fromComponentInst(inst, prop_cache)
 	}
 	
-	def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
+	private def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
 //		System::out.println(inst.children.map[switch (it) {
 //			ComponentInstance: it.name
 //			PropertyAssociationInstance: it.property.name 
@@ -131,7 +137,7 @@ class IPLTypeProviderSpec {
 		ct
 	}
 	
-	def IPLType fromComponentClassifier(ComponentClassifier ref) {
+	private def IPLType fromComponentClassifier(ComponentClassifier ref) {
 		
 		val ct = new ComponentType(ref.name) 
 		
@@ -179,7 +185,7 @@ class IPLTypeProviderSpec {
 
 	}
 	
-	def IPLType fromPropType(Property property) {
+	private def IPLType fromPropType(Property property) {
 		switch (property.propertyType) {
 			AadlBoolean: new BoolType
 			AadlInteger: new IntType
@@ -190,7 +196,7 @@ class IPLTypeProviderSpec {
 	
 		
 	// declarations and IDs
-	def dispatch IPLType typeOf(ID e) {
+	public def dispatch IPLType typeOf(ID e) {
 		// Resolve id here
 		val name = e.id
 		
@@ -198,6 +204,7 @@ class IPLTypeProviderSpec {
 		
 		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
+		// try finding a declaration of the variable
 		if (decl !== null) {
 			return switch (decl) {
 				VarDecl: fromType(decl.type)
@@ -205,7 +212,12 @@ class IPLTypeProviderSpec {
 				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
 				ViewDecl: fromComponentImpl(decl.ref)
 			}
-		} else {
+		} else { 
+			if(freeVarTypes !== null)
+				if (freeVarTypes.containsKey(name))
+					return freeVarTypes.get(name)
+			
+			// without declaration, try finding a QAtom declaring a variable
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
 				if (q !== null && q.^var == name) {
@@ -218,11 +230,15 @@ class IPLTypeProviderSpec {
 						return type
 				}
 			}
+			
+			
+			
+			// giving up, haven't found anything
 			return null
 		}
 	}
 	
-	def dispatch IPLType typeOf(Const c) {
+	public def dispatch IPLType typeOf(Const c) {
 		switch (c) {
 			Int: new IntType
 			Real: new RealType
@@ -232,53 +248,53 @@ class IPLTypeProviderSpec {
 	}
 	
 	// for null - incomplete and incorrect parsing results
-	def dispatch IPLType typeOf(Void x) {
+	public def dispatch IPLType typeOf(Void x) {
 		println('Null typing results - possible error')
 		null
 	}
 	
-	def dispatch IPLType typeOf(Set s) {
+	public def dispatch IPLType typeOf(Set s) {
 		if (s.members.size != 0)
 			new SetType(typeOf(s.members.get(0))) 
 		else 
 			new SetType(null)
 	}
 	
-	def dispatch IPLType typeOf(Lst s) {
+	public def dispatch IPLType typeOf(Lst s) {
 		if (s.members.size != 0)
 			new ListType(typeOf(s.members.get(0))) 
 		else 
 			new ListType(null)
 	}
 	
-	def dispatch IPLType typeOf(Formula f) {
+	public def dispatch IPLType typeOf(Formula f) {
 		new BoolType
 	}
 	
-	def dispatch IPLType typeOf(TAtom f) {
+	public def dispatch IPLType typeOf(TAtom f) {
 		new BoolType
 	}
 	
-	def dispatch IPLType typeOf(QAtom f) {
+	public def dispatch IPLType typeOf(QAtom f) {
 		new BoolType
 	}
 	
-	def dispatch IPLType typeOf(TermFormula f) {
+	public def dispatch IPLType typeOf(TermFormula f) {
 		new BoolType
 	}
 	
-	def dispatch IPLType typeOf(Fun f) {
+	public def dispatch IPLType typeOf(Fun f) {
 		fromType(f.decl.retType)
 	}
 	
-	def dispatch IPLType typeOf(ExprOperation e) {
+	public def dispatch IPLType typeOf(ExprOperation e) {
 		if (e.left.typeOf instanceof RealType || e.right.typeOf instanceof RealType)
 			new RealType
 		else
 			new IntType
 	}
 	
-	def dispatch IPLType typeOf(PropertyExpression p) {
+	public def dispatch IPLType typeOf(PropertyExpression p) {
 		val type = typeOf(p.left)
 		
 		switch (type) {
@@ -287,22 +303,22 @@ class IPLTypeProviderSpec {
 		}
 	}
 	
-	def dispatch IPLType typeOf(ModelExpr me) {
+	public def dispatch IPLType typeOf(ModelExpr me) {
 		typeOf(me.expr)
 	}
 	
-	def dispatch IPLType typeOf(PrismExpr pq) {//used to be ProbQuery
+	public def dispatch IPLType typeOf(PrismExpr pq) {//used to be ProbQuery
 		if(pq.value instanceof QM)
 			new RealType
 		else 
 			new BoolType
 	}
 	
-	def getParamTypes(Fun fun) {		
+	public def getParamTypes(Fun fun) {		
 		fun.decl.paramTypes.map[fromType]
 	}
 	
-	def isDef(ID e) {
+	public def isDef(ID e) {
 		// Resolve id here
 		val name = e.id
 		
