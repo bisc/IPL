@@ -388,8 +388,11 @@ class SmtFormulaGeneratorQrem {
 		// decide the parameter list: 
 		// find all contents of expression that are also terms/vars
 		mdex.eAllContents.filter(ID).forEach [
-			if (paramDecls.containsKey(it.id))
-				flexArgs.get(abstrName).add(it.id)
+			if (paramDecls.containsKey(it.id)) { 
+				val argList = flexArgs.get(abstrName)
+				if(!argList.contains(it.id))
+					argList.add(it.id)	
+			}
 		]
 		/*paramDecls.forEach [ varName, varType |
 		 * 	flexArgs.get(abstrName).add(varName)
