@@ -241,7 +241,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) { 
 		// now the current formula state is populated: 
 		// scope decls are set, but can get spoiled by rigid verification, so making a copy
-		val oldScopeDecls = freeVarDecls.immutableCopy
+		
+		// since free vars are not touched by QF formulas, it's safe to not make copies anymore.
+		//val oldScopeDecls = freeVarDecls.immutableCopy
 		
 		// if term vals are empty, add one just to continue 
 		if (freeVarVals.size == 0)
@@ -255,9 +257,14 @@ public class SmtVerifierQrem implements SmtVerifier {
 		// flex name ->  (proj val -> flex value) 
 		val Map<String, Map< Map<String, Object>, Object>> flexsValueCache = new HashMap
 
+		// init the checker
+		TimeRec::startTimer("new PrismPlugin")
+		val PrismPlugin prism = new PrismPlugin(md.name, fsa)
+		TimeRec::stopTimer("new PrismPlugin")
+		
 		// basically go through candidate valuations one by one, obtaining MC results for each
 		// need an immutable copy because verifyRigidFormula clears evals for itself (actually now it doesnt)
-		for (varVal : freeVarVals.immutableCopy) {
+		for (varVal : freeVarVals/*.immutableCopy*/) {
 			// above but for a given scope eval
 			val Map<String, Object> flexVals = new HashMap
 
@@ -313,7 +320,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 					newFlexExpr = (new VarValueTransformer).replaceVarsWithValues(
 						newFlexExpr,
 						varVal,
-						oldScopeDecls,
+						freeVarDecls,//oldScopeDecls,
 						smtViewGenerator.propTypeMap,
 						smtViewGenerator.propValueMap
 					) as ModelExpr
@@ -328,11 +335,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 	
 					println('''Invoking PRISM: model «md.name», prop «prop», params «md.params», param vals «paramVals», ''')
 	
-					// call model checker and replace part of formula with the result
-					TimeRec::startTimer("new PrismPlugin")
-					val PrismPlugin prism = new PrismPlugin(md.name, fsa)
-					TimeRec::stopTimer("new PrismPlugin")
-	
+					// call model checker and save the result
 					TimeRec::startTimer("prismCheck")
 					val Object flexVal = switch (flexType) {
 						RealType: {
