@@ -12,4 +12,5 @@ Require-Bundle: org.xtext.example.ipl,
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Export-Package: org.xtext.example.ipl.ide.contentassist.antlr,
  org.xtext.example.ipl.ide.contentassist.antlr.internal
+ 
 
