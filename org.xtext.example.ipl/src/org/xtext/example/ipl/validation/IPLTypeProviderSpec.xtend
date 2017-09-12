@@ -40,7 +40,7 @@ import org.xtext.example.ipl.iPL.STVarDecl
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtom
-import org.xtext.example.ipl.iPL.TermFormula
+//import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypeBool
 import org.xtext.example.ipl.iPL.TypeInt
@@ -279,9 +279,9 @@ class IPLTypeProviderSpec {
 		new BoolType
 	}
 	
-	public def dispatch IPLType typeOf(TermFormula f) {
+	/*public def dispatch IPLType typeOf(TermFormula f) {
 		new BoolType
-	}
+	}*/
 	
 	public def dispatch IPLType typeOf(Fun f) {
 		fromType(f.decl.retType)

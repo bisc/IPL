@@ -93,12 +93,30 @@ class IPLValidator extends AbstractIPLValidator {
 	
 	@Check
 	def checkTypes(TAtom t) {
+		if (t === null || t.op === null)
+			return;  
 		
-		val expType = getType(t.exp)
-		
-		if (!(expType instanceof BoolType)) {
-			error("expected bool type, but was " + expType,
-				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
+		if (t.op == 'U' || t.op == 'UNTIL') { // binary
+			val expType1 = getType(t.left)
+			val expType2 = getType(t.right)
+			
+			if (!(expType1 instanceof BoolType)) {
+				error("expected bool type, but was " + expType1,
+					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
+			}
+			
+			if (!(expType2 instanceof BoolType)) {
+				error("expected bool type, but was " + expType2,
+					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
+			}
+			
+		} else { // unary
+			val expType = getType(t.exp)
+			
+			if (!(expType instanceof BoolType)) {
+				error("expected bool type, but was " + expType,
+					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
+			}
 		}
 	}
 	
@@ -209,11 +227,11 @@ class IPLValidator extends AbstractIPLValidator {
 		}
 	}
 	
-	@Check
+	//@Check
 	def checkModality(TAtom t) {
-		val inModelExpr = t.getContainerOfType(ModelExpr) !== null
+		val missingModelExpr = t.getContainerOfType(ModelExpr) === null
 		
-		if (!inModelExpr) {
+		if (missingModelExpr) {
 			error("Modality used outside behavioral model expression",
 						IPLPackage.Literals.TATOM__OP, INV_FLEXIBLE)
 		}

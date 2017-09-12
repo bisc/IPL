@@ -391,7 +391,7 @@ class SmtFormulaGeneratorQrem {
 			if (paramDecls.containsKey(it.id)) { 
 				val argList = flexArgs.get(abstrName)
 				if(!argList.contains(it.id))
-					argList.add(it.id)	
+					argList.add(it.id)
 			}
 		]
 		/*paramDecls.forEach [ varName, varType |

@@ -41,7 +41,7 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TAtom
-import org.xtext.example.ipl.iPL.TermFormula
+//import org.xtext.example.ipl.iPL.TermFormula
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
@@ -406,7 +406,7 @@ class SmtGeneratorElemInts implements SmtFormulaGenerator, SmtViewGenerator {
 			probingFormula += '(assert ' + switch(replExp) { // have to do this because not clear what replExp casts to 
 				FormulaOperation: generateFormula(replExp)
 				Negation: generateFormula(replExp)
-				TermFormula:  generateFormula(replExp)
+				//TermFormula:  generateFormula(replExp)
 				TAtom: generateFormula(replExp)
 				QAtom: throw new UnexpectedException("Not supposed to work on QAtoms") 
 			} + ')\n'

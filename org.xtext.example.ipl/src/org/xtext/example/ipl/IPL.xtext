@@ -86,7 +86,6 @@ Bool:
 	value=('true' | 'false')
 ;
 
-
 Real returns ecore::EDouble:
 	INT '.' INT (('e' | 'E') INT)?
 ;
@@ -107,7 +106,7 @@ Fun:
 	decl/*name*/=[FunDecl] '(' (args += Term)? (',' args += Term)* ')'
 ;
 
-// EXPRESSIONS
+// EXPRESSIONS / TERMS
 
 Expression:
 	Addition;
@@ -137,23 +136,48 @@ PrimaryExpression returns Expression:
 	ModelExpr
 ;
 
-// TERMS
+// ATOMS / FORMULAS
 
-Term returns TermFormula: 
-	'(' TermFormula ')' | (=> Expression)
+Formula returns Formula: /* => is to direct TAtom that may start with formula op */
+	 /*(=> FormulaOperation) |*/ TAtom | QAtom 
 ;
 
-TermFormula returns TermFormula:
+QAtom returns Formula:
+	{QAtom} op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression '|' exp=Formula 
+;
+
+TAtom returns Formula: // has to stay modularized
+	{TAtom} op=(ALWAYS | NEXT | EVENTUALLY) exp=FormulaOperation 
+	| FormulaOperation ({TAtom.left=current} op=UNTIL right=FormulaOperation)* 
+	//| left=FormulaOperation op=UNTIL right=FormulaOperation 
+	// '(' exp=Formula ')' //| //used to have parentheses 
+		// | '(' left=Formula ')' op=UNTIL '(' right=Formula ')'  
+;
+
+FormulaOperation returns Formula:
+	NegFormula ({FormulaOperation.left=current} op=(AND | OR | IMP) right=NegFormula)* 
+;
+
+NegFormula returns Formula:
+	{Negation} NOT child=NegFormula | FormulaBase
+;
+
+FormulaBase returns Formula:/* => is to direct ModelExpr */
+	(=> TermFormula) | '(' Formula ')'
+	 //|  ModelExpr //| //| TAtom | ModelExpr
+;
+
+TermFormula returns Formula:
 		Term ({TermOperation.left=current} op=(LT | LTE | GT | GTE | EQ | NE) right=Term)*
 ;
 
-// ATOMS
-
-QAtom:
-	op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression '|' exp=Formula 
+Term returns Formula: // => directs left parenthesis '('
+	 // '(' Formula /*TermFormula*/ ')'  | 
+	 // (=> Expression )
+	 Expression 
 ;
 
-Formula:
+/*Formula:
 	NegFormula ({FormulaOperation.left=current} op=(AND | OR | IMP) right=NegFormula)* | (-> QAtom)
 ;
 
@@ -163,7 +187,7 @@ NegFormula returns Formula:
 
 FormulaBase returns Formula:
 	(=> TermFormula) | '(' Formula ')' | TAtom | ModelExpr
-;
+;*/
 
 // BEHAVIORAL MODEL 
 
@@ -180,7 +204,7 @@ ModelParamExpr:
 // PCTL-specific syntax
 
 			
-PrismExpr:
+PrismExpr: // has to stay modularized
 	 (ProbQuery | RewardQuery) 
 ;
 
@@ -209,9 +233,6 @@ RewardQuery:
 //-----------------------------------------------------------------------------
 // LTL-specific syntax
 
-TAtom: //TODO: make until binary
-	op=(ALWAYS | NEXT | UNTIL | EVENTUALLY) '(' exp=Formula ')' //used to have parentheses 
-;
 
 //-----------------------------------------------------------------------------
 terminal AND:
