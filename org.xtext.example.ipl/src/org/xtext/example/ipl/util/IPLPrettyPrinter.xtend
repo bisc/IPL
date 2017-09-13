@@ -5,7 +5,6 @@ import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
-import org.xtext.example.ipl.iPL.BFunDecl
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
@@ -20,7 +19,8 @@ import org.xtext.example.ipl.iPL.QM
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
 class IPLPrettyPrinter {
@@ -44,10 +44,13 @@ class IPLPrettyPrinter {
 		'''«f.op» «f.^var»: «print(f.set)» | «print(f.exp)»'''
 	}
 	
-	dispatch def String print(TAtom f){ 
-		'''«f.op» «print(f.exp)»'''
+	dispatch def String print(TAtomUnary f){ 
+		'''«f.op» («print(f.exp)»)''' // extra parentheses for prism
 	}
 	
+	dispatch def String print(TAtomBinary f){ 
+		'''(«print(f.left)») «f.op» («print(f.right)»)''' // extra parentheses for prism
+	}
 	/*dispatch def print(Const f){
 		'''«f.»''' 
 	}*/

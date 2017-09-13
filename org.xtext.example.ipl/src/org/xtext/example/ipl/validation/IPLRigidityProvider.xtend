@@ -11,7 +11,8 @@ import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.SortDecl
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 
@@ -23,7 +24,11 @@ class IPLRigidityProvider {
 		q.set.rigid && q.exp.rigid
 	}
 	
-	static def dispatch boolean isRigid(TAtom t) {
+	static def dispatch boolean isRigid(TAtomUnary t) {
+		false
+	}
+	
+	static def dispatch boolean isRigid(TAtomBinary t) {
 		false
 	}
 	

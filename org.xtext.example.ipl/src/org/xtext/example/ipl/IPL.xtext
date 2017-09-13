@@ -147,11 +147,18 @@ QAtom returns Formula:
 ;
 
 TAtom returns Formula: // has to stay modularized
-	{TAtom} op=(ALWAYS | NEXT | EVENTUALLY) exp=FormulaOperation 
-	| FormulaOperation ({TAtom.left=current} op=UNTIL right=FormulaOperation)* 
+	TAtomUnary | TAtomBinary 
 	//| left=FormulaOperation op=UNTIL right=FormulaOperation 
 	// '(' exp=Formula ')' //| //used to have parentheses 
 		// | '(' left=Formula ')' op=UNTIL '(' right=Formula ')'  
+;
+
+TAtomUnary returns Formula: 
+	{TAtomUnary} op=(ALWAYS | NEXT | EVENTUALLY) exp=FormulaOperation 
+;
+
+TAtomBinary returns Formula: 
+	FormulaOperation ({TAtomBinary.left=current} op=UNTIL right=FormulaOperation)* 
 ;
 
 FormulaOperation returns Formula:

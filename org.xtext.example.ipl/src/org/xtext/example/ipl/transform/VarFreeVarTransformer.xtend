@@ -1,6 +1,5 @@
 package org.xtext.example.ipl.transform
 
-import java.util.List
 import java.util.Map
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
@@ -19,9 +18,9 @@ import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.impl.FunImpl
 import org.xtext.example.ipl.validation.IPLType
 
 // replaces vars with free constants
@@ -48,8 +47,14 @@ class VarFreeVarTransformer {
 		return replaceVars(f.child)
 	}
 	
-	private dispatch def EObject replaceVars(TAtom f){ 
+	private dispatch def EObject replaceVars(TAtomUnary f){ 
 		return replaceVars(f.exp)
+	}
+	
+	private dispatch def EObject replaceVars(TAtomBinary f){
+		replaceVars(f.left)
+		replaceVars(f.right)
+		return f
 	}
 	
 	private dispatch def EObject replaceVars(QAtom f){ 

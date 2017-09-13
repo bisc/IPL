@@ -3,251 +3,235 @@
  */
 package org.xtext.example.ipl.validation
 
-import org.xtext.example.ipl.iPL.FormulaOperation
+import java.util.HashMap
 import org.eclipse.xtext.validation.Check
-import org.xtext.example.ipl.iPL.IPLPackage
-import org.xtext.example.ipl.iPL.QAtom
-import org.xtext.example.ipl.iPL.TAtom
-import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.ExprOperation
+import org.xtext.example.ipl.iPL.Formula
+import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
+import org.xtext.example.ipl.iPL.IPLPackage
+import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.PropertyExpression
+import org.xtext.example.ipl.iPL.QAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
+import org.xtext.example.ipl.iPL.TermOperation
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
-import java.util.HashMap
-import org.xtext.example.ipl.iPL.ModelExpr
-import org.xtext.example.ipl.iPL.PrismExpr
 
 /**
  * This class contains custom validation rules. 
- *
+ * 
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#validation
  */
 class IPLValidator extends AbstractIPLValidator {
-	
+
 	val typeProvider = new IPLTypeProviderLookup
-	
+
 	public static val WRONG_TYPE = 'wrongType'
 	public static val UNDEFINED = 'undefined'
 	public static val INV_FLEXIBLE = 'invalidFlexible'
-	
+
 	private static val cache = new HashMap<Formula, IPLType>
 
 	def IPLType getType(Formula f) {
-		
+
 		var type = cache.get(f)
-		
+
 		if (type === null) {
 			type = typeProvider.typeOf(f)
 			cache.put(f, type);
 		}
-	
+
 //		// Apparently we can't have a StructRef to a child of a container?	
 //		if (type == null && f instanceof ID)
 //			error("Undefined symbol " + (f as ID).id,
 //						IPLPackage.Literals.ID__ID, WRONG_TYPE)
-			
 		type
 	}
 
 	@Check
 	def checkTypes(FormulaOperation op) {
-		
+
 		val leftType = getType(op.left)
-		
+
 		if (!(leftType instanceof BoolType)) {
-			error("expected bool type, but was " + leftType,
-				IPLPackage.Literals.FORMULA_OPERATION__LEFT, WRONG_TYPE)
+			error("expected bool type, but was " + leftType, IPLPackage.Literals.FORMULA_OPERATION__LEFT, WRONG_TYPE)
 		}
-		
+
 		val rightType = getType(op.right)
-		
+
 		if (!(rightType instanceof BoolType)) {
-			error("expected bool type, but was " + rightType,
-				IPLPackage.Literals.FORMULA_OPERATION__RIGHT, WRONG_TYPE)
+			error("expected bool type, but was " + rightType, IPLPackage.Literals.FORMULA_OPERATION__RIGHT, WRONG_TYPE)
 		}
-		
+
 	}
-	
+
 	@Check
 	def checkTypes(QAtom q) {
-		
+
 		val expType = getType(q.exp)
-		
+
 		if (!(expType instanceof BoolType)) {
-			error("expected bool type, but was " + expType,
-				IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
+			error("expected bool type, but was " + expType, IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
 		}
-		
+
 		val setType = getType(q.set);
-		
+
 		if (!(setType instanceof SetType)) {
-			error("expected set type, but was " + setType,
-				IPLPackage.Literals.QATOM__SET, WRONG_TYPE)
+			error("expected set type, but was " + setType, IPLPackage.Literals.QATOM__SET, WRONG_TYPE)
 		}
-		
+
 	}
-	
+
 	@Check
-	def checkTypes(TAtom t) {
+	def checkTypes(TAtomBinary t) {
 		if (t === null || t.op === null)
-			return;  
-		
-		if (t.op == 'U' || t.op == 'UNTIL') { // binary
-			val expType1 = getType(t.left)
-			val expType2 = getType(t.right)
-			
-			if (!(expType1 instanceof BoolType)) {
-				error("expected bool type, but was " + expType1,
-					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
-			}
-			
-			if (!(expType2 instanceof BoolType)) {
-				error("expected bool type, but was " + expType2,
-					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
-			}
-			
-		} else { // unary
-			val expType = getType(t.exp)
-			
-			if (!(expType instanceof BoolType)) {
-				error("expected bool type, but was " + expType,
-					IPLPackage.Literals.TATOM__EXP, WRONG_TYPE)
-			}
+			return;
+
+		val expType1 = getType(t.left)
+		val expType2 = getType(t.right)
+
+		if (!(expType1 instanceof BoolType)) {
+			error("expected bool type, but was " + expType1, IPLPackage.Literals.TATOM_BINARY__LEFT, WRONG_TYPE)
+		}
+
+		if (!(expType2 instanceof BoolType)) {
+			error("expected bool type, but was " + expType2, IPLPackage.Literals.TATOM_BINARY__RIGHT, WRONG_TYPE)
+		}
+
+	}
+
+	@Check
+	def checkTypes(TAtomUnary t) {
+		val expType = getType(t.exp)
+
+		if (!(expType instanceof BoolType)) {
+			error("expected bool type, but was " + expType, IPLPackage.Literals.TATOM_UNARY__EXP, WRONG_TYPE)
 		}
 	}
-	
+
 	@Check
 	def checkTypes(TermOperation op) {
-		
+
 		val leftType = getType(op.left)
 		val rightType = getType(op.left)
-		
+
 		switch (op.op) {
 			case "<",
 			case ">",
 			case "<=",
-			case ">=": {		
+			case ">=": {
 				if (!(leftType instanceof IntType || leftType instanceof RealType)) {
-					error("expected numeric type, but was " + leftType,
-						IPLPackage.Literals.TERM_OPERATION__LEFT, WRONG_TYPE)
+					error("expected numeric type, but was " + leftType, IPLPackage.Literals.TERM_OPERATION__LEFT,
+						WRONG_TYPE)
 				}
-				
+
 				if (!(rightType instanceof IntType || rightType instanceof RealType)) {
-					error("expected numeric type, but was " + rightType,
-						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
+					error("expected numeric type, but was " + rightType, IPLPackage.Literals.TERM_OPERATION__RIGHT,
+						WRONG_TYPE)
 				}
 			}
-			
 			case "=",
 			case "!=": {
 				if (leftType != rightType) {
-					error("expected equal types, but left was " + leftType +
-						" and right was " + rightType,
+					error("expected equal types, but left was " + leftType + " and right was " + rightType,
 						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
 				}
 			}
 		}
 	}
-	
+
 	@Check
 	def checkTypes(ExprOperation op) {
-		
+
 		val leftType = getType(op.left)
 		val rightType = getType(op.left)
-		
+
 		if (!(leftType instanceof IntType || leftType instanceof RealType)) {
-			error("expected numeric type, but was " + leftType,
-				IPLPackage.Literals.EXPR_OPERATION__LEFT, WRONG_TYPE)
+			error("expected numeric type, but was " + leftType, IPLPackage.Literals.EXPR_OPERATION__LEFT, WRONG_TYPE)
 		}
-		
+
 		if (!(rightType instanceof IntType || rightType instanceof RealType)) {
-			error("expected numeric type, but was " + rightType,
-				IPLPackage.Literals.EXPR_OPERATION__RIGHT, WRONG_TYPE)
+			error("expected numeric type, but was " + rightType, IPLPackage.Literals.EXPR_OPERATION__RIGHT, WRONG_TYPE)
 		}
 	}
-	
+
 	@Check
 	def checkTypes(Fun f) {
 		val paramTypesIt = typeProvider.getParamTypes(f).iterator()
-		
+
 		for (a : f.args) {
-			
+
 			if (!paramTypesIt.hasNext) {
-				error("wrong number of arguments to function",
-					IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
+				error("wrong number of arguments to function", IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
 			} else {
 				val expType = paramTypesIt.next
 				val actType = getType(a)
 				if (actType != expType) {
-					error("expected " + expType + " type, but was " + actType,
-						IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
+					error("expected " + expType + " type, but was " + actType, IPLPackage.Literals.FUN__ARGS,
+						WRONG_TYPE)
 				}
 			}
 		}
 	}
-	
+
 	@Check
 	def checkTypes(PropertyExpression p) {
 		val type = getType(p.left)
-		
+
 		switch (type) {
-			ComponentType: if (type.getMemberType(p.right.id) === null) {
-								error("Not a property: " + p.right.id,
-									IPLPackage.Literals.PROPERTY_EXPRESSION__RIGHT, UNDEFINED)
-							}
-			default: error("Not an archelem",
-									IPLPackage.Literals.PROPERTY_EXPRESSION__LEFT, WRONG_TYPE)
+			ComponentType:
+				if (type.getMemberType(p.right.id) === null) {
+					error("Not a property: " + p.right.id, IPLPackage.Literals.PROPERTY_EXPRESSION__RIGHT, UNDEFINED)
+				}
+			default:
+				error("Not an archelem", IPLPackage.Literals.PROPERTY_EXPRESSION__LEFT, WRONG_TYPE)
 		}
 	}
-	
+
 	@Check
 	def checkDefined(ID id) {
 		if (!typeProvider.isDef(id)) {
-			error("Undefined symbol " + id.id,
-						IPLPackage.Literals.ID__ID, UNDEFINED)
+			error("Undefined symbol " + id.id, IPLPackage.Literals.ID__ID, UNDEFINED)
 		}
 	}
-	
+
 	@Check
 	def checkFlexibleQuant(QAtom t) {
-		val inModality = t.getContainerOfType(TAtom) !== null
-		
+		val inModality = t.getContainerOfType(TAtomUnary) !== null ||
+			 t.getContainerOfType(TAtomBinary) !== null
+
 		if (inModality && !t.exp.rigid) {
-			error("Flexible quantification used inside modality",
-						IPLPackage.Literals.QATOM__EXP, INV_FLEXIBLE)
+			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__EXP, INV_FLEXIBLE)
 		}
-		
+
 		if (inModality && !t.set.rigid) {
-			error("Flexible quantification used inside modality",
-						IPLPackage.Literals.QATOM__SET, INV_FLEXIBLE)
+			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__SET, INV_FLEXIBLE)
 		}
 	}
-	
-	//@Check
-	def checkModality(TAtom t) {
+
+	// @Check
+	// TODO rethink this validation
+	/*def checkModality(TAtom t) {
 		val missingModelExpr = t.getContainerOfType(ModelExpr) === null
-		
+
 		if (missingModelExpr) {
-			error("Modality used outside behavioral model expression",
-						IPLPackage.Literals.TATOM__OP, INV_FLEXIBLE)
+			error("Modality used outside behavioral model expression", IPLPackage.Literals.TATOM__OP, INV_FLEXIBLE)
 		}
-	}
-	
+	}*/
+
 	@Check
 	def checkModelExpr(ModelExpr t) {
 		val inModelExpr = t.allContainers.findFirst[it instanceof ModelExpr] !== null
-		
+
 		if (inModelExpr) {
-			error("Nested model expressions",
-						IPLPackage.Literals.PRISM_EXPR__EXPR, INV_FLEXIBLE)
+			error("Nested model expressions", IPLPackage.Literals.PRISM_EXPR__EXPR, INV_FLEXIBLE)
 		}
 	}
-	
-	// TODO check that no more than one model 
-	
-	// TODO check that declared and passed model parameters match 	
+
+// TODO check that no more than one model 
+// TODO check that declared and passed model parameters match 	
 }

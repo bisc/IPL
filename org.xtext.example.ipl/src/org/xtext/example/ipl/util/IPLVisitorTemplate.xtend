@@ -14,7 +14,8 @@ import org.xtext.example.ipl.iPL.Prop
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
 class IPLVisitorTemplate {
@@ -33,7 +34,10 @@ class IPLVisitorTemplate {
 		
 	}
 	
-	dispatch def visit(TAtom f){ 
+	dispatch def visit(TAtomUnary f){ 
+	}
+	
+	dispatch def visit(TAtomBinary f){ 
 	}
 	
 	dispatch def visit(Const f){ 

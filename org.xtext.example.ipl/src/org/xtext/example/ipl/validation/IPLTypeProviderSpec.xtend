@@ -39,8 +39,8 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.STVarDecl
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDecl
-import org.xtext.example.ipl.iPL.TAtom
-//import org.xtext.example.ipl.iPL.TermFormula
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypeBool
 import org.xtext.example.ipl.iPL.TypeInt
@@ -271,7 +271,11 @@ class IPLTypeProviderSpec {
 		new BoolType
 	}
 	
-	public def dispatch IPLType typeOf(TAtom f) {
+	public def dispatch IPLType typeOf(TAtomUnary f) {
+		new BoolType
+	}
+	
+	public def dispatch IPLType typeOf(TAtomBinary f) {
 		new BoolType
 	}
 	

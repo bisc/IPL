@@ -15,7 +15,8 @@ import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.PrismExpr
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
@@ -96,11 +97,21 @@ class ClauseValueTransformer {
 		}
 	}
 
-	private dispatch def EObject replace(TAtom f) {
+	private dispatch def EObject replace(TAtomUnary f) {
 		if (formulaValues.containsKey(f))
 			return valueForFormula(f)
 		else {
 			replace(f.exp)
+			return f
+		}
+	}
+	
+	private dispatch def EObject replace(TAtomBinary f) {
+		if (formulaValues.containsKey(f))
+			return valueForFormula(f)
+		else {
+			replace(f.left)
+			replace(f.right)
 			return f
 		}
 	}

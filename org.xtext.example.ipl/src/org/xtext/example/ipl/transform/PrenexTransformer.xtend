@@ -1,7 +1,5 @@
 package org.xtext.example.ipl.transform
 
-import java.util.HashMap
-import java.util.Map
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.iPL.Const
@@ -18,9 +16,9 @@ import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.RewardQuery
-import org.xtext.example.ipl.iPL.TAtom
+import org.xtext.example.ipl.iPL.TAtomBinary
+import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.validation.IPLType
 
 // transforms a formula into its prenex normal form
 class PrenexTransformer {
@@ -142,8 +140,14 @@ class PrenexTransformer {
 		findOutmostQuant(f.child)
 	}
 	
-	private dispatch def EObject findOutmostQuant(TAtom f){ 
+	private dispatch def EObject findOutmostQuant(TAtomUnary f){ 
 		findOutmostQuant(f.exp)
+	}
+	
+	private dispatch def EObject findOutmostQuant(TAtomBinary f){ 
+		findOutmostQuant(f.left)
+		if(curQuant === null)
+			findOutmostQuant(f.right)
 	}
 
 	private dispatch def EObject findOutmostQuant(Const f){ 
