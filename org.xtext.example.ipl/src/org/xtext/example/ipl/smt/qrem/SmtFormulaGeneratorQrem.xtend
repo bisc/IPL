@@ -336,11 +336,12 @@ class SmtFormulaGeneratorQrem {
 
 		// normal flow: 
 		// poll downstream for type & generate an abstraction
-		val String abst = switch (mdex.expr) {
+		val String abst =  createFlexAbstraction(mdex, tp.typeOf(mdex)) 
+		/*switch (mdex.expr) {
 			ProbQuery: createFlexAbstraction(mdex, new BoolType)
 			RewardQuery: createFlexAbstraction(mdex, new RealType)
 			default: throw new UnexpectedException('Unknown model formula')
-		}
+		}*/
 
 		// save the clause, get args
 		flexClauses.put(abst, mdex)
