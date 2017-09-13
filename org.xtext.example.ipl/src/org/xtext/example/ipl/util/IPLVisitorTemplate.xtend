@@ -26,7 +26,7 @@ class IPLVisitorTemplate {
 	dispatch def visit(FormulaOperation f){ 
 	}
 	
-	dispatch def String visit(Negation f){
+	dispatch def visit(Negation f){
 		
 	}
 	
@@ -54,8 +54,10 @@ class IPLVisitorTemplate {
 	
 	dispatch def visit(PropertyExpression f){ 
 	}
-	dispatch def String print(Prop f){
+	
+	dispatch def visit(Prop f){
 	}
+	
 	dispatch def visit(TermOperation f){ 
 	}
 	

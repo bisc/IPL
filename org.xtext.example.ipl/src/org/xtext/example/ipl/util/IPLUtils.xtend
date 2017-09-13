@@ -101,20 +101,14 @@ class IPLUtils {
 		}
 	}
 	
-	// var name to probe name
-	public def static String probe(String varName) {
-		varName + '_probe'
-	}
-	
-	// var name to probe name
-	public def static String skolem(String varName) {
-		varName + '_skol'
-	}
-	
-	// var name to probe name
+	// var name to free var name
 	public def static String freeVar(String varName) {
 		varName + '_free'
 	}
 	
+	// var name to propositional abstraction name
+	public def static String propAbst(String varName) {
+		varName + '_propAbst'
+	}
 	
 }

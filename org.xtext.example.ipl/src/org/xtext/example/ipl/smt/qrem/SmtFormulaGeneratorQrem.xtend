@@ -25,8 +25,8 @@ import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.transform.PropAbstTransformer
 import org.xtext.example.ipl.transform.VarFreeVarTransformer
-import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
@@ -36,9 +36,9 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
-import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
+import org.xtext.example.ipl.util.IPLPrettyPrinter
 
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
@@ -46,7 +46,7 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 // (no quant reset between quant and genFind)
 class SmtFormulaGeneratorQrem {
 	private var IPLTypeProviderSpec tp // initialized in oc
-
+	// QUANT STATE: variables tracking quantifiers
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
 	// list of parameters for each variable term. Empty list if no parameters
@@ -57,6 +57,11 @@ class SmtFormulaGeneratorQrem {
 	// for quantified variables in their pure form; used for flexible clauses
 	private var Map<String, IPLType> quantVarDecls = new HashMap
 
+	// for anonymous sets encoded as functions; does not face externally 
+	private var anonSetDecls = ""
+	private var anonSetCount = 0
+
+	// DEEP STATE: variables tracking abstractions & transfer clauses
 	// for flexible abstractions 
 	// type details of flex "variables"; flexName -> flexVarType
 	private var Map<String, IPLType> flexDecls = new HashMap
@@ -70,29 +75,35 @@ class SmtFormulaGeneratorQrem {
 	// clauses to their types
 	private var Map<Formula, IPLType> transferClausesType = new HashMap
 
-	// for anonymous sets encoded as functions; does not face externally 
-	private var anonSetDecls = ""
-	private var anonSetCount = 0
-
 	// INPUTS
-	// SET EXTERNALLY interpretation of flexible variables; set of scope vals (name, value) -> <flex name -> value(s)>; 
-	private var Map<Map<String, Object>, Map<String, Object>> flexsVals = null
+	// SET EXTERNALLY interpretation of flexible variables; 
+	// flex name -> <(varname, value) -> flex value>; 
+	private var Map<String, Map<Map<String, Object>, Object>> flexsVals = null
 
 	new(IPLSpec spec) {
 		tp = new IPLTypeProviderSpec(spec)
 	}
 
 	// generate a formula for finding models, with given types of free variables
-	// assumes the formula to be quantifier-free, relying on free var declarations
+	// assumes the formula to be quantifier-free, free var declarations populated
 	public def String generateFormulaSmtFind(Formula fQF) {
 		resetDeepState // no resetting quant state here!
-
 		// assuming that quantifiers were removed and free var decls were set 
 		// set free var types for the provider  
 		tp.freeVarTypes = freeVarDecls
 
-		// this populates anonymous sets
-		val formulaStr = generateFormula(fQF)
+		// create a probabilistic abstraction
+		val trans = new PropAbstTransformer
+		val fPropAbst = trans.performPropAbst(fQF.copy, tp)
+		println('Prop abst: ' + IPLPrettyPrinter::print_formula(fPropAbst))
+		val String fPropAbstSmt = generateFormula(fPropAbst)
+		val String propAbstDecls = trans.getPropAbstNames.map [
+			'(declare-const ' + it + ' Bool)\n'
+		].join('\n')
+		fPropAbst.delete(true)
+		resetDeepState // may have encountered flex symbols, forget them
+		// create the actual formula (this populates anonymous sets)
+		val formulaSmt = generateFormula(fQF)
 
 		'''
 		«if (anonSetDecls.length > 0)
@@ -103,19 +114,21 @@ class SmtFormulaGeneratorQrem {
 		«generateSmtTermDecl»
 		«freeVarTypeRests»
 		
+		; Prop abstr decls
+		«propAbstDecls»
+		
 		; Flex decls
 		«generateSmtFlexDecl»
 		
 		; Formula 
-		«'(assert ' + formulaStr  +')'»'''
+		«'(assert (distinct\n' + formulaSmt + '\n' + fPropAbstSmt +'\n))'»'''
 
 	}
 
 	// checks sat(neg formula) without creating terms 
 	public def String generateFormulaSmtCheck(Formula f) {
 		resetDeepState
-		resetQuantState	// remove the possible carryover of free vars/ anon sets from model finding
-
+		resetQuantState // remove the possible carryover of free vars/ anon sets from model finding
 		// this populates anonymous sets
 		val formulaStr = generateFormula(f)
 
@@ -130,7 +143,7 @@ class SmtFormulaGeneratorQrem {
 		; Formula 
 		(assert (not «formulaStr»))'''
 	}
- 
+
 	// removes quantifiers from a prenexed formula (assumes that all QATOMS are in the front)
 	// replaces quantified variables with free constant terms
 	// populates freeVarDecls and freeVarTypeRests
@@ -138,7 +151,7 @@ class SmtFormulaGeneratorQrem {
 	public def Formula removeQuants(Formula f) {
 		resetDeepState
 		resetQuantState
-		
+
 		val Map<String, String> oldVar2New = new HashMap
 
 		// TODO have to be careful to not touch QRATOMS
@@ -187,7 +200,7 @@ class SmtFormulaGeneratorQrem {
 
 	// returns the scope declaration
 	// won't clear it later
-	public def Map getFormulaVarDecls() { 
+	public def Map getFormulaVarDecls() {
 		freeVarDecls
 	}
 
@@ -388,9 +401,9 @@ class SmtFormulaGeneratorQrem {
 		// decide the parameter list: 
 		// find all contents of expression that are also terms/vars
 		mdex.eAllContents.filter(ID).forEach [
-			if (paramDecls.containsKey(it.id)) { 
+			if (paramDecls.containsKey(it.id)) {
 				val argList = flexArgs.get(abstrName)
-				if(!argList.contains(it.id))
+				if (!argList.contains(it.id))
 					argList.add(it.id)
 			}
 		]
@@ -413,35 +426,38 @@ class SmtFormulaGeneratorQrem {
 				'''«flexDecls.get(it).typesIPL2Smt»)'''
 		].join('\n') + '\n'
 
-		// generate interpretations from term valuations
 		var asserts = ''
+		// generate flex interpretations from free var valuations
 		if (flexsVals !== null) { // an optimization 
-			// map flex name -> map <term name -> term value>, to block redundant assertions
+		// block redundant assertions (because of filtered args)
+		// map flex name -> map <term name -> term value>, to block redundant assertions
 			val Map<String, List<Map<String, Object>>> projectionBlocks = new HashMap
 			flexDecls.keySet.forEach[projectionBlocks.put(it, new LinkedList)] // initialize proj blocks
-			for (termVal : flexsVals.keySet) { // an evaluation of quant vars (encoded as terms)
-				val flexsVal = flexsVals.get(termVal) // set of flexible variables with their values
-				asserts += flexsVal.keySet.map [ flexName |
-					{
-						val args = flexArgs.get(flexName).map[IPLUtils::freeVar(it)] // arguments (encoded as quant vars, so need conversion to terms) 
-						val termValFiltered = termVal.filter [ termName, obj |
+			asserts = flexsVals.keySet.map [ flexName |
+				{ // a flexible term 
+					val args = flexArgs.get(flexName).map[IPLUtils::freeVar(it)] // arguments (encoded as quant vars, so need conversion to terms) 
+					val flexVals = flexsVals.get(flexName)
+					flexVals.keySet.map [ varVal | // an evaluation of quant vars (encoded as free vars)
+						val flexValue = flexVals.get(varVal)
+
+						val termValFiltered = varVal.filter [ termName, obj |
 							args.contains(termName)
 						]
+						// check if already asserted
 						if (projectionBlocks.get(flexName).contains(termValFiltered)) {
 							'' // already generated an assertion for this, skipping
 						} else { // first time processing this value 
 							projectionBlocks.get(flexName).add(termValFiltered)
 							if (args.size > 0) // function
-								'''(assert (= («flexName» «args.map[termVal.get(it)].join(' ')») «flexsVal.get(flexName)»))''' +
-									'\n'
+								'''(assert (= («flexName» «args.map[varVal.get(it)].join(' ')») «flexValue»))'''
 							else // constant, no parentheses
-								'''(assert (= «flexName» «flexsVal.get(flexName)»))''' + '\n'
+								'''(assert (= «flexName» «flexValue»))'''
 						}
-					}
-				].join('\n')
-			}
-		}
+					].join('\n')
+				}
+			].join('\n')
 
+		} // flexsVals ?= null
 		funDecls + asserts
 	}
 
@@ -464,7 +480,7 @@ class SmtFormulaGeneratorQrem {
 		freeVarDecls = new HashMap
 		freeVarTypeRests = ''
 		quantVarDecls = new HashMap
-		
+
 		anonSetDecls = ""
 		anonSetCount = 0
 	}

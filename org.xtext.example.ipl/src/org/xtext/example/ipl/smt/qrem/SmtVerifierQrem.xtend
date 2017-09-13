@@ -38,7 +38,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 	private val SmtViewGeneratorQrem smtViewGenerator = new SmtViewGeneratorQrem
 	private var SmtFormulaGeneratorQrem smtFormulaGenerator = null // initialized on call
-
 	// declarations of quantified variables
 	private var Map<String, IPLType> freeVarDecls
 	// each map in the list is an valuation of all declared variables
@@ -48,25 +47,24 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private var Map<String, IPLType> flexDecls
 	// pointers to flexible clauses, by name
 	private var Map<String, ModelExpr> flexClauses
-	
+
 	// pointers to value transfer clauses, with smt gen code
 	// they implicitly reference the clauses in the QF formula
-	private var Map<Formula, String> transferClausesSmt 
-	private var Map<Formula, IPLType> transferClausesTypes 
-	private var Map<Map<String, Object>, Map<Formula, Object>>  transferClauseVals = new HashMap
-	//private var Map<Formula, Formula> transferClausesPNF2QF
-
+	private var Map<Formula, String> transferClausesSmt
+	private var Map<Formula, IPLType> transferClausesTypes
+	private var Map<Map<String, Object>, Map<Formula, Object>> transferClauseVals = new HashMap
+	// private var Map<Formula, Formula> transferClausesPNF2QF
 	// caching view smt
 	private var String viewSmt = ''
-	
+
 	val IPLPrettyPrinter pp = new IPLPrettyPrinter
-	
+
 	// standard IPL verification
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		freeVarVals.clear
 		smtFormulaGenerator = new SmtFormulaGeneratorQrem(spec)
-		 
+
 		// check if it's valid in its current form with any interpretation of flexible terms
 		println('Checking if rigid verification discharges the formula')
 		if (verifyRigidFormula(origFormula, spec, filename, fsa))
@@ -75,17 +73,17 @@ public class SmtVerifierQrem implements SmtVerifier {
 		// transform to prenex normal form; make a copy to not mess with IPLSpec
 		val fPNF = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
 		println('Prenex normal form: ' + pp.print(fPNF))
-		
+
 		// remove quantifiers and populate freeVarDecls
 		val Formula fQF = smtFormulaGenerator.removeQuants(fPNF.copy)
 		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
-		
+
 		// find models: candidate valuations for sat of negformula
 		// populate transfer clauses 
-		TimeRec::startTimer("findNegModels")
+		TimeRec::startTimer("findModels")
 		if (!findModels(fQF, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
-		TimeRec::stopTimer("findNegModels")
+		TimeRec::stopTimer("findModels")
 
 		// freeVarDecls populated, if in existence
 		// flex decls are also set
@@ -101,10 +99,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa)
 		fQF.delete(true)
 		fPNF.delete(true)
-		
+
 		return res
 	}
-	
+
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
 	override public def boolean verifyRigidFormula(Formula f, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
@@ -153,7 +151,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 			false
 		}
 	}
-		
+
 	// finds all variable assignments that satisfy a QF formula
 	// @returns true if managed to find all models, false otherwise 
 	// implicit result: populates termDecls, flexDecls, clauses, termVals 
@@ -181,13 +179,13 @@ public class SmtVerifierQrem implements SmtVerifier {
 			println('No free vars; aborting model search')
 			return true
 		}
-		
+
 		// model search loop 
 		println("Starting SMT model search...")
 		val filenameWithExt = filename + '.smt'
 		var String blockingClauses = ''
 		while (true) {
-			
+
 			fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + '\n\n' + '''  
 				; Blocking 
 				«blockingClauses»
@@ -238,134 +236,122 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// implicitly works on references to the QF instance of the formula
 	// returns a map: term evaluation -> flex values 
 	// Map<Map<String, Object>, Map<String, Object>> 
-	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) { 
+	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) {
 		// now the current formula state is populated: 
-		// scope decls are set, but can get spoiled by rigid verification, so making a copy
-		
-		// since free vars are not touched by QF formulas, it's safe to not make copies anymore.
-		//val oldScopeDecls = freeVarDecls.immutableCopy
-		
-		// if term vals are empty, add one just to continue 
-		if (freeVarVals.size == 0)
-			freeVarVals.add(new HashMap)
 
-		// collect all values of flex variable
-		// set of scope vals (name, value) -> <flex name -> value(s)>
-		val Map<Map<String, Object>, Map<String, Object>> flexsVals = new HashMap
-		
+		// flex name -> <(var name, value) -> flex value>
+		val Map<String, Map<Map<String, Object>, Object>> flexsVals = new HashMap
+
 		// cache of values projected on parameters, to not repeat MC several times 
 		// flex name ->  (proj val -> flex value) 
-		val Map<String, Map< Map<String, Object>, Object>> flexsValueCache = new HashMap
-
+		// val Map<String, Map< Map<String, Object>, Object>> flexsFilteredValueCache = new HashMap
 		// init the checker
 		TimeRec::startTimer("new PrismPlugin")
 		val PrismPlugin prism = new PrismPlugin(md.name, fsa)
 		TimeRec::stopTimer("new PrismPlugin")
-		
-		// basically go through candidate valuations one by one, obtaining MC results for each
-		// need an immutable copy because verifyRigidFormula clears evals for itself (actually now it doesnt)
-		for (varVal : freeVarVals/*.immutableCopy*/) {
-			// above but for a given scope eval
-			val Map<String, Object> flexVals = new HashMap
 
-			println("Considering valuation " + varVal)
-			// var boolean flexVerRes = true
-			// iterate through flexible parts (although not expecting > 1)
-			for (e : flexDecls.entrySet) {
-				val flexName = e.key
-				val flexType = e.value
+		// go through flex variables one by one, obtaining MC results for each valuation
+		// need to go by flex because of their different args (may be a constant or values don't matter) 
+		for (e : flexDecls.entrySet) {
+			val flexName = e.key
+			val flexType = e.value
+			val flexArgs = smtFormulaGenerator.formulaFlexArgs.get(flexName)
+			println("Considering flex variable: " + flexName)
 
-				// String flexName, IPLType flexType |
-				println("Considering flex variable: " + flexName)
-				
-				// check if cache contains the values
-				var flexCache = flexsValueCache.get(flexName) 
-				val filteredTermVal = varVal.filter[termName, obj | // leaves the evals that are params of the flex
-					smtFormulaGenerator.formulaFlexArgs.get(flexName).contains(termName)
-				]
-				if (flexCache !== null && flexCache.containsKey(filteredTermVal)) { // cache contains, use the value 
-					print('Skipping val ')
-					flexVals.put(flexName, flexCache.get(filteredTermVal))
-				} else { // failed to find a cached value, have to run MC
-					// find a flexible subformula; original in the formula
-					val ModelExpr origFlexExpr = flexClauses.get(flexName)
-	
-					// make a copy to feed to prism, to not spoil the original formula it for further iterations
-					// to preserve clause pointers, use a copier which stores a map old->new for eobjects
-					//var newFlexExpr = origFlexExpr.copy
-					val Copier copier = new Copier();
-					var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
-	
-					println('Flexible formula before replacement: ' + pp.print(newFlexExpr) + 
-						", params: " + newFlexExpr.params.vals.map[pp.print(it)])
-					
-					// construct clauseVal and clauseType with updated references to newFlexExpr
-					val Map<Formula, Object> clauseValUpd = new HashMap
-					val clauseVal = transferClauseVals.get(varVal)
-					if (clauseVal !== null)
-						clauseVal.forEach[clause, value|
-							clauseValUpd.put(copier.get(clause) as Formula, value)
-						]
-					
-					val Map<Formula, IPLType> clauseTypeUpd = new HashMap
-					transferClausesTypes.forEach[clause, type|
-						clauseTypeUpd.put(copier.get(clause) as Formula, type)
+			var myFreeVarVals = freeVarVals
+			// if variables exist but no valuations -- no flex values matter 
+			// fine to skip 
+			if (flexArgs.size == 0 || myFreeVarVals.size > 0) { // negation of the above
+			// if no variables and no valuations -- the flex is a constant
+			// need one run to find the value			
+				if (flexArgs.size == 0 && myFreeVarVals.size == 0)
+					myFreeVarVals = newArrayList(new HashMap)
+
+				// (varname, varvalue) -> flex value
+				val Map<Map<String, Object>, Object> flexVals = new HashMap
+				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
+				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
+					println("Considering valuation " + varVal)
+
+					// check if filtered cache contains the values
+					val filteredTermVal = varVal.filter [ varName, obj | // leaves the evals that are params of the flex
+						flexArgs.contains(varName)
 					]
-					
-					// put values of clauses into formula (e.g. aggregate expressions in model params) 
-					newFlexExpr = (new ClauseValueTransformer).replaceClausesWithValues(
-						newFlexExpr, clauseValUpd, clauseTypeUpd) as ModelExpr
-	
-					// put rigid values into formula (including model parameters and property values)
-					newFlexExpr = (new VarValueTransformer).replaceVarsWithValues(
-						newFlexExpr,
-						varVal,
-						freeVarDecls,//oldScopeDecls,
-						smtViewGenerator.propTypeMap,
-						smtViewGenerator.propValueMap
-					) as ModelExpr
-	
-					// set up prism data
-					val prop = pp.print(newFlexExpr)
-					val paramVals = newFlexExpr.params.vals.map[pp.print(it)]
-					// prop = prop.substring(1, prop.length-1) // remove $
-	
-					// don't need the copied formula anymore
-					newFlexExpr.delete(true)
-	
-					println('''Invoking PRISM: model «md.name», prop «prop», params «md.params», param vals «paramVals», ''')
-	
-					// call model checker and save the result
-					TimeRec::startTimer("prismCheck")
-					val Object flexVal = switch (flexType) {
-						RealType: {
-							prism.runPrismQuery(prop, md.params, paramVals, filename)
-						}
-						BoolType: {
-							prism.verifyPrismBooleanProp(prop, md.params, paramVals, filename)
-						}
-						default:
-							throw new UnexpectedException("Expected type of flexible expression: " + flexType)
-					}
-					TimeRec::stopTimer("prismCheck")
-	
-					// add to evaluation
-					flexVals.put(flexName, flexVal)
-					
-					// add to cache
-					if(flexCache === null) {
-						flexCache = new HashMap
-						flexsValueCache.put(flexName, flexCache)
-					}
-					flexCache.put(filteredTermVal, flexVal)
-					
-				} // end if
+					val cachedValue = flexFilteredCache.get(filteredTermVal)
+					if (cachedValue !== null) { // cache contains, use the value 
+						print('Cached, skipping this valuation')
+						flexVals.put(varVal, cachedValue)
 
-			} // done for all flex vars 
-			flexsVals.put(varVal, flexVals)
+					} else { // failed to find a cached value, have to run MC
+						// find a flexible subformula; original in the formula
+						val ModelExpr origFlexExpr = flexClauses.get(flexName)
 
-		}
-		flexsVals		
+						// make a copy to feed to prism, to not spoil the original formula it for further iterations
+						// to preserve clause pointers, use a copier which stores a map old->new for eobjects
+						// var newFlexExpr = origFlexExpr.copy
+						val Copier copier = new Copier();
+						var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
+
+						println('Flexible formula before replacement: ' + pp.print(newFlexExpr) + ", params: " +
+							newFlexExpr.params.vals.map[pp.print(it)])
+
+						// construct clauseVal and clauseType with updated references to newFlexExpr
+						val Map<Formula, Object> clauseValUpd = new HashMap
+						val clauseVal = transferClauseVals.get(varVal)
+						if (clauseVal !== null)
+							clauseVal.forEach [ clause, value |
+								clauseValUpd.put(copier.get(clause) as Formula, value)
+							]
+
+						val Map<Formula, IPLType> clauseTypeUpd = new HashMap
+						transferClausesTypes.forEach [ clause, type |
+							clauseTypeUpd.put(copier.get(clause) as Formula, type)
+						]
+
+						// put values of clauses into formula (e.g. aggregate expressions in model params) 
+						newFlexExpr = (new ClauseValueTransformer).replaceClausesWithValues(newFlexExpr, clauseValUpd,
+							clauseTypeUpd) as ModelExpr
+
+						// put rigid values into formula (including model parameters and property values)
+						newFlexExpr = (new VarValueTransformer).replaceVarsWithValues(
+							newFlexExpr,
+							varVal,
+							freeVarDecls, // oldScopeDecls,
+							smtViewGenerator.propTypeMap,
+							smtViewGenerator.propValueMap
+						) as ModelExpr
+
+						// set up prism data
+						val prop = pp.print(newFlexExpr)
+						val paramVals = newFlexExpr.params.vals.map[pp.print(it)]
+						// prop = prop.substring(1, prop.length-1) // remove $
+						// don't need the copied formula anymore
+						newFlexExpr.delete(true)
+
+						println('''Invoking PRISM: model «md.name», prop «prop», params «md.params», param vals «paramVals», ''')
+
+						// call model checker and save the result
+						TimeRec::startTimer("prismCheck")
+						val Object flexVal = switch (flexType) {
+							RealType: {
+								prism.runPrismQuery(prop, md.params, paramVals, filename)
+							}
+							BoolType: {
+								prism.verifyPrismBooleanProp(prop, md.params, paramVals, filename)
+							}
+							default:
+								throw new UnexpectedException("Expected type of flexible expression: " + flexType)
+						}
+						TimeRec::stopTimer("prismCheck")
+
+						flexVals.put(varVal, flexVal)
+						flexFilteredCache.put(filteredTermVal, flexVal)
+					} // end of non-cached version
+					flexsVals.put(flexName, flexVals)
+				} // end of considering a valuation
+			} // end of potentially skipping a flex 
+		} // end of considering a flex 
+		flexsVals
 	}
 
 	// get (additional) variable evaluations from the model (z3 output)
@@ -373,7 +359,6 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private def Boolean populateEvals(String[] z3ResAfterFirst) {
 		// find the string with value with regex
 		var modelFound = true // assume so until proven otherwise
-
 		// parse evaluations for vars
 		val newVarEval = new HashMap
 		freeVarVals.add(newVarEval)
@@ -384,39 +369,36 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 			if (m.find) {
 				/*println('Match found in: ' + seq)
-				println('Groups: ')
-				for (i : 0 ..< m.groupCount + 1)
-					println(i + ':' + m.group(i))*/
-
+				 * println('Groups: ')
+				 * for (i : 0 ..< m.groupCount + 1)
+				 println(i + ':' + m.group(i))*/
 				val termName = m.group(1) // see modelParsingPattern
 				val valueSmt = m.group(2)
-				 
-				if(name != termName)
+
+				if (name != termName)
 					throw new UnexpectedException('''Naming error: term «name» is not «termName»''')
-				
+
 				addValueToEval(newVarEval, termName, valueSmt, termType)
 			} else {
 				println('Match not found in: ' + seq)
 				throw new UnexpectedException("Match not found")
 			}
 		]
-		
+
 		// parse evaluations for clauses
 		val Map<Formula, Object> newClauseEval = new HashMap
 		transferClauseVals.put(newVarEval, newClauseEval)
 		val Pattern p2 = Pattern.compile(clauseValueParsingPattern)
-		transferClausesSmt.forEach[ clause, smtCode, count | 
+		transferClausesSmt.forEach [ clause, smtCode, count |
 			val seq = z3ResAfterFirst.get(freeVarDecls.size + count)
 			var Matcher m = p2.matcher(seq)
-			
+
 			if (m.find) {
 				val valueSmt = m.group(1) // see the pattern
-				
 				/*println('Match found in: ' + seq)
-				println('Groups: ')
-				for (i : 0 ..< m.groupCount + 1)
-					println(i + ':' + m.group(i))*/
-				
+				 * println('Groups: ')
+				 * for (i : 0 ..< m.groupCount + 1)
+				 println(i + ':' + m.group(i))*/
 				addValueToEval(newClauseEval, clause, valueSmt, transferClausesTypes.get(clause))
 			}
 		]
@@ -437,7 +419,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		'''\A\(\(([\p{Alnum}_]*)\s([\p{Alnum}\.]*)\)\)\z'''
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
-	
+
 	// returns a regex parsing pattern for value transfer clauses (complex enough that deserves its own function) 
 	private def String clauseValueParsingPattern() {
 		// decoding: beginning of input, two escaped parentheses, then anything 
@@ -452,13 +434,11 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// the map is from the Object type (String, Formula, ...) to Object (Value)
 	private def addValueToEval(Map eval, Object key, String valueSmt, IPLType termType) {
 		// if evals don't have a var, add a list
-		//if (!eval.containsKey(varName))
-			//eval.put(varName, new LinkedList)
-
+		// if (!eval.containsKey(varName))
+		// eval.put(varName, new LinkedList)
 		/*if (smtType != IPLUtils::typesIPL2Smt(termType))
-			if (!(smtType == 'Int' && termType instanceof ComponentType)) // special case
-				println('''Type error: variable «varName»:«termType» gets value «valueSmt» of type «smtType»''');*/
-
+		 * 	if (!(smtType == 'Int' && termType instanceof ComponentType)) // special case
+		 println('''Type error: variable «varName»:«termType» gets value «valueSmt» of type «smtType»''');*/
 		switch (termType) { // variable type from scope
 			IntType:
 				eval.put(key, Integer.parseInt(valueSmt))
@@ -473,5 +453,5 @@ public class SmtVerifierQrem implements SmtVerifier {
 				println('''Type error: undefined type «termType» of variable «key»''')
 		}
 	}
-	
+
 }
