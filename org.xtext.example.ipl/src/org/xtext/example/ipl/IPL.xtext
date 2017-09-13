@@ -243,19 +243,19 @@ RewardQuery:
 
 //-----------------------------------------------------------------------------
 terminal AND:
-	('&' | '^')
+	('&' | '^' | 'and')
 ;
 
 terminal OR:
-	('||' | 'V')
+	('||' | 'V' | 'or')
 ;
 
 terminal NOT:
-	('!' | '-')
+	('!' | '-' | 'not')
 ;
 
 terminal IMP:
-	'->'
+	'->' | '=>'
 ;
 
 terminal LT:
@@ -308,5 +308,9 @@ terminal EXISTS:
 
 terminal QUOTED_STRING	: 
 			'"' ( '\\' . /* 'b'|'t'|'n'|'f'|'r'|'u'|'"'|"'"|'\\' */ | !('\\'|'"') )* '"'
+;
+
+enum Quantifier: 
+	e= 'exists'  | a = 'forall'
 ;
 

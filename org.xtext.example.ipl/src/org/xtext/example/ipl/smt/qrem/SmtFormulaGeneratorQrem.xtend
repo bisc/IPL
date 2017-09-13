@@ -230,11 +230,11 @@ class SmtFormulaGeneratorQrem {
 	// === RIGID GENERATION FUNCTIONS ===
 	private def dispatch String generateFormula(FormulaOperation fop) {
 
-		val op = if (fop.op == '&' || fop.op == '^') {
+		val op = if (fop.op == '&' || fop.op == '^' || fop.op == 'and') {
 				'and'
-			} else if (fop.op == '||' || fop.op == 'V') {
+			} else if (fop.op == '||' || fop.op == 'V' || fop.op == 'or') {
 				'or'
-			} else if (fop.op == '->') {
+			} else if (fop.op == '->' || fop.op == '=>') {
 				'=>'
 			} else {
 				throw new RuntimeException
