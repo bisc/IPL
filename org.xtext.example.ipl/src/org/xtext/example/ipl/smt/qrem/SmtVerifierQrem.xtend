@@ -351,6 +351,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				} // end of considering a valuation
 			} // end of potentially skipping a flex 
 		} // end of considering a flex 
+		prism.close
 		flexsVals
 	}
 

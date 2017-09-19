@@ -278,6 +278,10 @@ public class PrismConnectorAPI {
         sc.close();		
         exportTextToFile(stratFileName, mergedStrat);
     }
+    
+    public static void close() { 
+    	m_prism.closeDown();
+    }
 
 
     /**

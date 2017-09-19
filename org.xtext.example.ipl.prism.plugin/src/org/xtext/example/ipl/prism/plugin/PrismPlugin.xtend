@@ -39,6 +39,11 @@ class PrismPlugin {
 		Double.parseDouble(res)
 	}
 	
+	public def close() {
+		// really meaning to call the object, but it's a static method prevented by xtend
+		PrismConnectorAPI::close  
+	}
+	
 	private def String modelCheck(String property, List<String> paramsDecl, List<String> paramVals, String attemptName) {
 		
 		if (paramsDecl.size != paramVals.size)
