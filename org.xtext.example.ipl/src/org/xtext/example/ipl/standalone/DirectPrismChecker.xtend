@@ -13,9 +13,9 @@ class DirectPrismChecker {
 		
 		println('Starting direct check')
 		var checkRes = true
-		val pp = new PrismPlugin('prism_probs', fsa) 
 		for (locStart: 0..<7)
 			for (locEnd: 0..<7) {
+				val pp = new PrismPlugin('prism_probs', fsa) 
 				val res = pp.runPrismQuery('R{"time"}min=? [F l = ' + locEnd + ']', newArrayList('INITIAL_LOCATION', 'TARGET_LOCATION', 'INITIAL_BATTERY'),
 					newArrayList(String.valueOf(locStart), String.valueOf(locEnd), String.valueOf(30000)), "directCheck")
 				 
