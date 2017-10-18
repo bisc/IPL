@@ -47,12 +47,14 @@ public class PrismConnectorAPI {
         m_log = new PrismFileLog("stdout");
         m_prism = new Prism(m_log);
         m_propertiesToCheck = new ArrayList<Property>();
-        m_prism.setGenStrat(true);
-        try{
+        
+        // disabled generation/export of optimal strategy
+        m_prism.setGenStrat(false);
+        /*try{
             m_prism.setExportAdv(Prism.EXPORT_ADV_MDP);
         } catch (PrismException e){
             System.out.println("Could not change strategy export mode to MDP");
-        }
+        }*/
 
         m_constSwitch = "INITIAL_LOCATION=4,TARGET_LOCATION=0,INITIAL_BATTERY=10000,INITIAL_HEADING=1";
 
@@ -61,7 +63,7 @@ public class PrismConnectorAPI {
             m_prism.initialise();
             System.out.println("Initialized");
             System.out.println("ENGINE: "+ String.valueOf(m_prism.getEngine()));
-            m_prism.setEngine(Prism.EXPLICIT); 
+            m_prism.setEngine(Prism.EXPLICIT);
             System.out.println("ENGINE CHANGED TO: "+ String.valueOf(m_prism.getEngine()));
         }catch (PrismException e) {
             System.out.println("Error: " + e.getMessage());
@@ -198,8 +200,9 @@ public class PrismConnectorAPI {
             throw e;
         }
 
-        // Export strategy if generated
-        if (m_result.getStrategy() != null) {
+        
+        // DISABLED: Export strategy if generated
+        /*if (m_result.getStrategy() != null) {
             try {
                 m_prism.exportStrategy(m_result.getStrategy(), Prism.StrategyExportType.ACTIONS, strategyFileName.equals("stdout") ? null : new File(strategyFileName+".act"));
                 m_prism.exportStrategy(m_result.getStrategy(), Prism.StrategyExportType.INDUCED_MODEL, strategyFileName.equals("stdout") ? null : new File(strategyFileName+".ind"));
@@ -214,7 +217,7 @@ public class PrismConnectorAPI {
         } 		
         else {
             exportTextToFile (strategyFileName + ".adv", "");
-        }
+        }*/
         //m_prism.closeDown();
         return res;
     }	
@@ -277,6 +280,10 @@ public class PrismConnectorAPI {
         }	
         sc.close();		
         exportTextToFile(stratFileName, mergedStrat);
+    }
+    
+    public static void close() { 
+    	m_prism.closeDown();
     }
 
 

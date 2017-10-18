@@ -15,11 +15,19 @@ import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Real
+import org.xtext.example.ipl.iPL.Type
+import org.xtext.example.ipl.iPL.TypeBool
+import org.xtext.example.ipl.iPL.TypeInt
+import org.xtext.example.ipl.iPL.TypeLst
+import org.xtext.example.ipl.iPL.TypeReal
+import org.xtext.example.ipl.iPL.TypeSet
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 import org.xtext.example.ipl.validation.IntType
+import org.xtext.example.ipl.validation.ListType
 import org.xtext.example.ipl.validation.RealType
+import org.xtext.example.ipl.validation.SetType
 
 class IPLUtils { 
 	/** 
@@ -89,6 +97,17 @@ class IPLUtils {
 			default: null
 		}
 	}
+	
+	public static def IPLType typesDecl2IPL(Type t) {
+		switch (t) {
+			TypeInt: new IntType
+			TypeReal: new RealType
+			TypeBool: new BoolType
+			TypeSet: new SetType(org.xtext.example.ipl.util.IPLUtils.typesDecl2IPL((t as TypeSet).elem))
+			TypeLst: new ListType(org.xtext.example.ipl.util.IPLUtils.typesDecl2IPL((t as TypeLst).elem))
+		}
+	}
+	
 	
 	// type conversion IPL -> SMT
 	public def static String typesIPL2Smt(IPLType t) {

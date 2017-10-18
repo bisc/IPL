@@ -146,10 +146,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 		} else if (z3ResFirstLine == "sat") {
 			println("sat, formula is invalid")
 			false
-		} else {
-			println("error: " + z3ResLines.join('\n'))
-			false
-		}
+		} else 
+			throw new UnexpectedException("z3 error: " + z3ResLines.join('\n'))
 	}
 
 	// finds all variable assignments that satisfy a QF formula
@@ -351,6 +349,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				} // end of considering a valuation
 			} // end of potentially skipping a flex 
 		} // end of considering a flex 
+		prism.close
 		flexsVals
 	}
 

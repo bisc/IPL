@@ -7,6 +7,7 @@ import java.util.LinkedList
 import java.util.List
 import java.util.Map
 import org.xtext.example.ipl.iPL.Bool
+import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
 import org.xtext.example.ipl.iPL.Expression
 import org.xtext.example.ipl.iPL.Formula
@@ -18,15 +19,15 @@ import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Lst
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.Negation
-import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
-import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.transform.PropAbstTransformer
 import org.xtext.example.ipl.transform.VarFreeVarTransformer
+import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
@@ -36,16 +37,19 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
+import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
-import org.xtext.example.ipl.util.IPLPrettyPrinter
 
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
 // expected flow: genCheck -> remove quant -> genFind -> genCheck 
 // (no quant reset between quant and genFind)
 class SmtFormulaGeneratorQrem {
-	private var IPLTypeProviderSpec tp // initialized in oc
+	// initialized in constructor
+	private var IPLSpec spec
+	private var IPLTypeProviderSpec tp 
+	
 	// QUANT STATE: variables tracking quantifiers
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
@@ -58,7 +62,7 @@ class SmtFormulaGeneratorQrem {
 	private var Map<String, IPLType> quantVarDecls = new HashMap
 
 	// for anonymous sets encoded as functions; does not face externally 
-	private var anonSetDecls = ""
+	private var setMemberFnDecls = ""
 	private var anonSetCount = 0
 
 	// DEEP STATE: variables tracking abstractions & transfer clauses
@@ -80,7 +84,8 @@ class SmtFormulaGeneratorQrem {
 	// flex name -> <(varname, value) -> flex value>; 
 	private var Map<String, Map<Map<String, Object>, Object>> flexsVals = null
 
-	new(IPLSpec spec) {
+	new(IPLSpec _spec) {
+		spec = _spec
 		tp = new IPLTypeProviderSpec(spec)
 	}
 
@@ -106,9 +111,9 @@ class SmtFormulaGeneratorQrem {
 		val formulaSmt = generateFormula(fQF)
 
 		'''
-		«if (anonSetDecls.length > 0)
-	'''; Anonymous sets
-«anonSetDecls» '''»
+		«if (setMemberFnDecls.length > 0)
+	'''; Set membership functions
+«setMemberFnDecls» '''»
 		
 		; Term defs & type restrictions
 		«generateSmtTermDecl»
@@ -133,9 +138,9 @@ class SmtFormulaGeneratorQrem {
 		val formulaStr = generateFormula(f)
 
 		'''
-		«if (anonSetDecls.length > 0)
+		«if (setMemberFnDecls.length > 0)
 			'''; Anonymous sets
-«anonSetDecls» '''» 
+«setMemberFnDecls» '''» 
 		
 		; Flex decls
 		«generateSmtFlexDecl»
@@ -177,7 +182,7 @@ class SmtFormulaGeneratorQrem {
 				IntType,
 				RealType,
 				BoolType: {
-					val setMbFunName = generateAnonSet(q.set);
+					val setMbFunName = generateSetMemberFn(q.set);
 
 					freeVarTypeRests += '''(assert («setMbFunName» «varName»))
 					'''
@@ -248,7 +253,7 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	private def dispatch String generateFormula(Set f) {
-		generateAnonSet(f) // TODO: this will need to be augmented for membership-check functions
+		generateSetMemberFn(f) // TODO: this will need to be augmented for membership-check functions
 	}
 
 	private def dispatch String generateFormula(Lst f) {
@@ -276,7 +281,7 @@ class SmtFormulaGeneratorQrem {
 			IntType,
 			RealType,
 			BoolType: { // these types require an anon set
-				val setMbFunName = generateAnonSet(q.set);
+				val setMbFunName = generateSetMemberFn(q.set);
 
 				// actual quantified expression
 				'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
@@ -482,7 +487,7 @@ class SmtFormulaGeneratorQrem {
 		freeVarTypeRests = ''
 		quantVarDecls = new HashMap
 
-		anonSetDecls = ""
+		setMemberFnDecls = ""
 		anonSetCount = 0
 	}
 
@@ -499,17 +504,30 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// helper function to generate anonymous sets, returning membership f-n name
-	private def String generateAnonSet(Expression set) {
+	private def String generateSetMemberFn(Expression set) {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
-
-		val funName = '''anonSetMb«anonSetCount++»''';
-
-		// declaring an anonymous set	 
-		anonSetDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
-		(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
-		) ) 
-		''';
-		funName
+		switch(set) { 
+			Const: { // an explicitly specified set constant, create an anon set
+				val funName = '''anonSetMb«anonSetCount++»''';
+				
+				// declaring an anonymous set	 
+				setMemberFnDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
+				(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
+				) ) 
+				''';
+				funName
+			}
+			ID : { // must be a set variable, fetch its declaration
+				val funName = set.id
+				setMemberFnDecls += '''(declare-fun «funName» ((«elemType.typesIPL2Smt»)) Bool)''' + '\n'
+				// declaration not necessary - the type provider already did that 
+				// val decl = spec.decls.findFirst[it.name == funName] as VarDecl
+				// typesDecl2IPL(decl.type)
+				funName
+			}
+			default:
+				throw new UnexpectedException("Error: unexpected quantification domain " + set)
+		}
 	}
 
 }

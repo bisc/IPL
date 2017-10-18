@@ -41,17 +41,12 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
-import org.xtext.example.ipl.iPL.Type
-import org.xtext.example.ipl.iPL.TypeBool
-import org.xtext.example.ipl.iPL.TypeInt
-import org.xtext.example.ipl.iPL.TypeLst
-import org.xtext.example.ipl.iPL.TypeReal
-import org.xtext.example.ipl.iPL.TypeSet
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.iPL.ViewDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
+import static extension org.xtext.example.ipl.util.IPLUtils.*
 
 // a version of the type provider working for a given spec
 class IPLTypeProviderSpec {
@@ -71,16 +66,6 @@ class IPLTypeProviderSpec {
 	
 	def setFreeVarTypes(Map<String, IPLType> _freeVarTypes) {
 		freeVarTypes = _freeVarTypes
-	}
-	
-	private def IPLType fromType(Type t) {
-		switch (t) {
-			TypeInt: new IntType
-			TypeReal: new RealType
-			TypeBool: new BoolType
-			TypeSet: new SetType(fromType((t as TypeSet).elem))
-			TypeLst: new ListType(fromType((t as TypeLst).elem))
-		}
 	}
 
 	private def IPLType fromComponentImpl(ComponentImplementation ref) {
@@ -207,8 +192,8 @@ class IPLTypeProviderSpec {
 		// try finding a declaration of the variable
 		if (decl !== null) {
 			return switch (decl) {
-				VarDecl: fromType(decl.type)
-				STVarDecl: fromType(decl.type)
+				VarDecl: decl.type.typesDecl2IPL
+				STVarDecl: decl.type.typesDecl2IPL
 				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
 				ViewDecl: fromComponentImpl(decl.ref)
 			}
@@ -288,7 +273,7 @@ class IPLTypeProviderSpec {
 	}*/
 	
 	public def dispatch IPLType typeOf(Fun f) {
-		fromType(f.decl.retType)
+		f.decl.retType.typesDecl2IPL
 	}
 	
 	public def dispatch IPLType typeOf(ExprOperation e) {
@@ -319,7 +304,7 @@ class IPLTypeProviderSpec {
 	}
 	
 	public def getParamTypes(Fun fun) {		
-		fun.decl.paramTypes.map[fromType]
+		fun.decl.paramTypes.map[it.typesDecl2IPL]
 	}
 	
 	public def isDef(ID e) {

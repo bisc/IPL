@@ -22,6 +22,7 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.Formula
 
 class IPLPrettyPrinter {
 	/*dispatch def print(Formula f) { 
@@ -33,7 +34,10 @@ class IPLPrettyPrinter {
 	}
 		
 	dispatch def String print(FormulaOperation f){ 
-		'''«print(f.left)» «f.op» «print(f.right)»'''
+		val left = if (f.left instanceof Formula) '(' + print(f.left) + ')' else print(f.left)
+		val right = if (f.right instanceof Formula) '(' + print(f.right) + ')' else print(f.right)
+			
+		'''«left» «f.op» «right»'''
 	}
 	
 	dispatch def String print(Negation f){
