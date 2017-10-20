@@ -9,11 +9,9 @@ import java.util.Map
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 
-class TimeRec {
+class TimeRecWall {
 	
-	private static Map<String, Pair<Long, Long>> timers = new HashMap
-	//private static Map<String, Pair<Long, Long>> timersTotal = new HashMap
-	private static String timerLog = ''
+	private static Map<String, Long> timers = new HashMap
 	private static Map<String, String> log = newHashMap
 
 
@@ -23,7 +21,7 @@ class TimeRec {
 			dumpTimerToLog(timerName)
 		}
 		
-		timers.put(timerName, getThreadUserTime -> getThreadTotalTime)
+		timers.put(timerName, getThreadWallTime)
 	}
 	
 	public def static stopTimer(String timerName) {
@@ -35,17 +33,11 @@ class TimeRec {
 	}
 	
 	private def static void dumpTimerToLog(String timer) { 
-		val Pair<Long, Long> p = timers.get(timer)
-		val out = '''«timer»,«(getThreadUserTime -  p.key)/(1000000000L as float)»,''' + 
-		'''«(getThreadTotalTime - p.value)/(1000000000L as float)»
-		'''
-		timerLog += out 
-		
 		// better log
 		if(!log.containsKey(timer))
 			log.put(timer, timer) // initialize with the timer name
 			
-		log.put(timer, log.get(timer) + ',' + (getThreadTotalTime -  p.value)/(1000000000L as float))
+		log.put(timer, log.get(timer) + ',' + (getThreadWallTime - timers.get(timer))/(1000L as float))
 	}
 
 	public def static void exportAllTimers(String attemptName, IFileSystemAccess2 fsa) {
@@ -61,18 +53,12 @@ class TimeRec {
 	}
 
 	public def static reset(){
-		 timerLog = 'Timer name,user time,total time\n'
 		 log.clear
 		 timers.clear
 	}
 
-	// user + system
-	public def static long getThreadTotalTime() {
-		ManagementFactory.getThreadMXBean().currentThreadCpuTime
+	public def static long getThreadWallTime() {
+		 System.currentTimeMillis();
 	}
 
-	// user
-	public def static long getThreadUserTime() {
-		ManagementFactory.getThreadMXBean().currentThreadUserTime
-	}
 }

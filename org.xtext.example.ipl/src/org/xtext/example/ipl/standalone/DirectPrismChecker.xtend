@@ -2,13 +2,13 @@ package org.xtext.example.ipl.standalone
 
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
-import org.xtext.example.ipl.util.TimeRec
+import org.xtext.example.ipl.util.TimeRecWall
 
 // uses prism directly to check properties
 class DirectPrismChecker {
 	
 	def directCheck(IFileSystemAccess2 fsa){ 
-		TimeRec::startTimer("directCheck")
+		TimeRecWall::startTimer("directCheck")
 		
 		
 		println('Starting direct check')
@@ -33,7 +33,7 @@ class DirectPrismChecker {
 		else 
 			println('Direct check: false')
 					
-		TimeRec::stopTimer("directCheck")
+		TimeRecWall::stopTimer("directCheck")
 	}
 	
 	def static void main(String[] args) {

@@ -24,13 +24,13 @@ import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtViewGenerator
 import org.xtext.example.ipl.util.IPLUtils
-import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
 
 import static java.lang.Math.toIntExact
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
+import org.xtext.example.ipl.util.TimeRecCPU
 
 class SmtViewGeneratorQrem implements SmtViewGenerator {
 
@@ -44,7 +44,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
 	override public def String generateViewSmt(IPLSpec spec) {
-		TimeRec::startTimer("generateBackgroundSmt")
+		TimeRecCPU::startTimer("generateBackgroundSmt")
 
 		val preamble = '''
 (set-logic ALL)
@@ -101,7 +101,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		println("Done generating AADL SMT")
 
-		TimeRec::stopTimer("generateBackgroundSmt")
+		TimeRecCPU::stopTimer("generateBackgroundSmt")
 		// background generation output
 		'''; Preamble
 «preamble»

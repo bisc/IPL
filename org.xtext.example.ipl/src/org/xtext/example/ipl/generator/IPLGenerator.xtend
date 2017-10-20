@@ -25,8 +25,8 @@ import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
-import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.IPLRigidityProvider
+import org.xtext.example.ipl.util.TimeRecWall
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -52,7 +52,7 @@ class IPLGenerator extends AbstractGenerator {
 		println('CPU time support enabled:' + mxb.isThreadCpuTimeEnabled)
 		println('Contention monitoring:' + mxb.isThreadContentionMonitoringEnabled)
 		
-		TimeRec::reset 
+		TimeRecWall::reset 
 		
 		deleteMarkers(resource)
 	}
@@ -73,9 +73,9 @@ class IPLGenerator extends AbstractGenerator {
 						if (mdls.size == 0) {
 							throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
 						} else {  
-							TimeRec::startTimer("verifyNonRigidFormula")
+							TimeRecWall::startTimer("verifyNonRigidFormula")
 							val boolean res = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
-							TimeRec::stopTimer("verifyNonRigidFormula")
+							TimeRecWall::stopTimer("verifyNonRigidFormula")
 							
 							println("IPL non-rigid formula verified, result: " + res)
 							if (res)
@@ -103,7 +103,7 @@ class IPLGenerator extends AbstractGenerator {
 		//(new DirectPrismChecker).directCheck(fsa)
 		
 		// output timing results
-		TimeRec::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
+		TimeRecWall::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
 	}
 	
 	// creates a marker with a verification result

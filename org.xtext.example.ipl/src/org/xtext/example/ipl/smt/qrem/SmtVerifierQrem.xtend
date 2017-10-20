@@ -23,7 +23,6 @@ import org.xtext.example.ipl.transform.PrenexTransformer
 import org.xtext.example.ipl.transform.VarValueTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
-import org.xtext.example.ipl.util.TimeRec
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -31,6 +30,7 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
+import org.xtext.example.ipl.util.TimeRecWall
 
 // implementation of generation by removing quants and mapping ArchElem -> Int
 // makes copies of formula and manages mappings between them
@@ -80,10 +80,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// find models: candidate valuations for sat of negformula
 		// populate transfer clauses 
-		TimeRec::startTimer("findModels")
+		TimeRecWall::startTimer("findModels")
 		if (!findModels(fQF, spec, filename, fsa))
 			throw new UnexpectedException("Failed to find models, check the formula")
-		TimeRec::stopTimer("findModels")
+		TimeRecWall::stopTimer("findModels")
 
 		// freeVarDecls populated, if in existence
 		// flex decls are also set
@@ -106,7 +106,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// simple verification of negated formula
 	// touches: scopeDecls  (but not flexDecls)
 	override public def boolean verifyRigidFormula(Formula f, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
-		TimeRec::startTimer("verifyRigidFormula")
+		TimeRecWall::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if (!smtViewGenerator.isViewGenerated)
 			viewSmt = smtViewGenerator.generateViewSmt(spec)
@@ -132,14 +132,14 @@ public class SmtVerifierQrem implements SmtVerifier {
 		var z3Filename = fsa.getURI(filenameWithExt)
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
-		TimeRec::startTimer("z3")
+		TimeRecWall::startTimer("z3")
 		var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
-		TimeRec::stopTimer("z3")
+		TimeRecWall::stopTimer("z3")
 		// z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		var z3ResLines = z3Res.split('\n')
 		val z3ResFirstLine = z3ResLines.get(0)
 
-		TimeRec::stopTimer("verifyRigidFormula")
+		TimeRecWall::stopTimer("verifyRigidFormula")
 		if (z3ResFirstLine == "unsat") {
 			println("unsat, formula is valid")
 			true
@@ -200,9 +200,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 			// call smt 
 			val z3Filename = fsa.getURI(filenameWithExt)
 			val z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
-			TimeRec::startTimer("z3")
+			TimeRecWall::startTimer("z3")
 			val z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
-			TimeRec::stopTimer("z3")
+			TimeRecWall::stopTimer("z3")
 			val z3ResLines = z3Res.split('\n')
 			val z3ResFirstLine = z3ResLines.get(0)
 			val String[] z3ResAfterFirst = Arrays.copyOfRange(z3ResLines, 1, z3ResLines.size)
@@ -244,9 +244,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		// flex name ->  (proj val -> flex value) 
 		// val Map<String, Map< Map<String, Object>, Object>> flexsFilteredValueCache = new HashMap
 		// init the checker
-		TimeRec::startTimer("new PrismPlugin")
+		TimeRecWall::startTimer("new PrismPlugin")
 		val PrismPlugin prism = new PrismPlugin(md.name, fsa)
-		TimeRec::stopTimer("new PrismPlugin")
+		TimeRecWall::stopTimer("new PrismPlugin")
 
 		// go through flex variables one by one, obtaining MC results for each valuation
 		// need to go by flex because of their different args (may be a constant or values don't matter) 
@@ -329,7 +329,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 						println('''Invoking PRISM: model «md.name», prop «prop», params «md.params», param vals «paramVals», ''')
 
 						// call model checker and save the result
-						TimeRec::startTimer("prismCheck")
+						TimeRecWall::startTimer("prismCheck")
 						val Object flexVal = switch (flexType) {
 							RealType: {
 								prism.runPrismQuery(prop, md.params, paramVals, filename)
@@ -340,7 +340,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 							default:
 								throw new UnexpectedException("Expected type of flexible expression: " + flexType)
 						}
-						TimeRec::stopTimer("prismCheck")
+						TimeRecWall::stopTimer("prismCheck")
 
 						flexVals.put(varVal, flexVal)
 						flexFilteredCache.put(filteredTermVal, flexVal)

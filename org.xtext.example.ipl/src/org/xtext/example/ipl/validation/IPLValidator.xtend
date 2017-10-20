@@ -164,8 +164,8 @@ class IPLValidator extends AbstractIPLValidator {
 		val paramTypesIt = typeProvider.getParamTypes(f).iterator()
 
 		for (a : f.args) {
-
 			if (!paramTypesIt.hasNext) {
+				// FIXME detects mismatch correctly if args > formal params, but not if formal params > args 
 				error("wrong number of arguments to function", IPLPackage.Literals.FUN__ARGS, WRONG_TYPE)
 			} else {
 				val expType = paramTypesIt.next
