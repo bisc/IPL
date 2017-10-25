@@ -5,6 +5,7 @@ import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import java.util.Map
+import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
@@ -24,6 +25,7 @@ import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
+import org.xtext.example.ipl.iPL.Expression
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
@@ -41,6 +43,10 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
+import org.xtext.example.ipl.iPL.TypeBool
+import org.xtext.example.ipl.iPL.TypeElem
+import org.xtext.example.ipl.iPL.TypeInt
+import org.xtext.example.ipl.iPL.TypeReal
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.iPL.ViewDecl
@@ -207,7 +213,7 @@ class IPLTypeProviderSpec {
 				val q = c as QAtom
 				if (q !== null && q.^var == name) {
 //					System::out.println("****<" + q.set + ">****")
-					val type = typeOf(q.set)
+					val type = getQdomType(q.dom)
 					if (type instanceof SetType)
 						return (type as SetType).elemType
 					else
@@ -301,6 +307,21 @@ class IPLTypeProviderSpec {
 			new RealType
 		else 
 			new BoolType
+	}
+	
+	public def IPLType getQdomType(EObject qdom){ 
+		switch(qdom) { 
+			Expression:
+				typeOf(qdom)
+			TypeInt:
+				new IntType
+			TypeReal: 
+				new RealType
+			TypeBool:
+				new BoolType
+			TypeElem: 
+			  	new ElementType
+		}
 	}
 	
 	public def getParamTypes(Fun fun) {		

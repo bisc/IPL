@@ -167,7 +167,8 @@ class SmtFormulaGeneratorQrem {
 
 			val varName = IPLUtils::freeVar(q.^var)
 			oldVar2New.put(q.^var, varName)
-			val varType = (tp.typeOf(q.set) as SetType).elemType; // goes up to IPLSpec
+			val qdomType = tp.getQdomType(q.dom)
+			val varType = if (qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
 			freeVarDecls.put(varName, varType)
 
 			// generate type restrictions
@@ -182,10 +183,14 @@ class SmtFormulaGeneratorQrem {
 				IntType,
 				RealType,
 				BoolType: {
-					val setMbFunName = generateSetMemberFn(q.set);
+					if (qdomType instanceof SetType) { //need an anon set here
+						val setMbFunName = generateSetMemberFn(q.dom as Expression);
 
-					freeVarTypeRests += '''(assert («setMbFunName» «varName»))
-					'''
+						freeVarTypeRests += '''(assert («setMbFunName» «varName»))
+						'''
+					} else {
+						// do nothing here because no extra restrictions are needed
+					}
 				}
 				default:
 					throw new IllegalArgumentException('Unimplemented set member type')
@@ -261,8 +266,9 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	private def dispatch String generateFormula(QAtom q) {
-
-		val varType = (tp.typeOf(q.set) as SetType).elemType;
+		val qdomType = tp.getQdomType(q.dom)
+		val varType = if (qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
+		//val varType = (tp.typeOf(q.set) as SetType).elemType;
 		// termDecls.put(q.^var, varType) -- vars don't go into term decls
 		quantVarDecls.put(q.^var, varType) // if in this clause, then operating variables -- not terms
 		val quant = if(q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
@@ -280,12 +286,19 @@ class SmtFormulaGeneratorQrem {
 			}
 			IntType,
 			RealType,
-			BoolType: { // these types require an anon set
-				val setMbFunName = generateSetMemberFn(q.set);
-
-				// actual quantified expression
-				'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
+			BoolType: { 
+				if (qdomType instanceof SetType) { // these types require an anon set
+					val setMbFunName = generateSetMemberFn(q.dom as Expression);
+	
+					// actual quantified expression
+					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
 	«generateFormula(q.exp)»))'''
+					
+				} else { // here we just have an int without an anon set
+					// actual quantified expression
+					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
+	«generateFormula(q.exp)»)'''
+				}
 			}
 			default:
 				'; Unimplemented set member type'
@@ -392,6 +405,11 @@ class SmtFormulaGeneratorQrem {
 				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
 			].join(' ') + '))'
 		].join('\n') + '\n'
+	}
+	
+	// infers the type of a quantified variable -- depending on whether it's a set or an explicit type (e.g. int)
+	private def IPLType getQuantVarType(QAtom q){ 
+		
 	}
 
 	// creates a new symbol for an abstraction of a flexible clause

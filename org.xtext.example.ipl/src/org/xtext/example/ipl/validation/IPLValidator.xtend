@@ -78,10 +78,12 @@ class IPLValidator extends AbstractIPLValidator {
 			error("expected bool type, but was " + expType, IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
 		}
 
-		val setType = getType(q.set);
+		val domType = typeProvider.getQdomType(q.dom);
 
-		if (!(setType instanceof SetType)) {
-			error("expected set type, but was " + setType, IPLPackage.Literals.QATOM__SET, WRONG_TYPE)
+		if (!(domType instanceof SetType || domType instanceof IntType || 
+			domType instanceof BoolType || domType instanceof RealType || domType instanceof ElementType
+		)) {
+			error("expected set or base type, but was " + domType, IPLPackage.Literals.QATOM__DOM, WRONG_TYPE)
 		}
 
 	}
@@ -208,8 +210,8 @@ class IPLValidator extends AbstractIPLValidator {
 			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__EXP, INV_FLEXIBLE)
 		}
 
-		if (inModality && !t.set.rigid) {
-			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__SET, INV_FLEXIBLE)
+		if (inModality && !t.dom.rigid) {
+			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__DOM, INV_FLEXIBLE)
 		}
 	}
 

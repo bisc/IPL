@@ -143,7 +143,7 @@ Formula returns Formula: /* => is to direct TAtom that may start with formula op
 ;
 
 QAtom returns Formula:
-	{QAtom} op=(FORALL | EXISTS) var=ID ':' set=PrimaryExpression '|' exp=Formula 
+	{QAtom} op=(FORALL | EXISTS) var=ID ':' dom=(PrimaryExpression|BaseType) '|' exp=Formula 
 ;
 
 TAtom returns Formula: // has to stay modularized

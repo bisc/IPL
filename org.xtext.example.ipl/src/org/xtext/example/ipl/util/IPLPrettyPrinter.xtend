@@ -3,6 +3,7 @@ package org.xtext.example.ipl.util
 import org.eclipse.emf.ecore.EObject
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.ExprOperation
+import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
@@ -22,7 +23,10 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.Formula
+import org.xtext.example.ipl.iPL.TypeBool
+import org.xtext.example.ipl.iPL.TypeElem
+import org.xtext.example.ipl.iPL.TypeInt
+import org.xtext.example.ipl.iPL.TypeReal
 
 class IPLPrettyPrinter {
 	/*dispatch def print(Formula f) { 
@@ -45,7 +49,7 @@ class IPLPrettyPrinter {
 	}
 	
 	dispatch def String print(QAtom f){ 
-		'''«f.op» «f.^var»: «print(f.set)» | «print(f.exp)»'''
+		'''«f.op» «f.^var»: «print(f.dom)» | «print(f.exp)»'''
 	}
 	
 	dispatch def String print(TAtomUnary f){ 
@@ -76,6 +80,22 @@ class IPLPrettyPrinter {
 	
 	dispatch def String print(Bool f){
 		f.getValue.toString
+	}
+	
+	dispatch def String print(TypeInt f){
+		'int'
+	}
+	
+	dispatch def String print(TypeReal f){
+		'real'
+	}
+	
+	dispatch def String print(TypeBool f){
+		'bool'
+	}
+	
+	dispatch def String print(TypeElem f){
+		'elem'
 	}
 	
 	dispatch def String print(ExprOperation f){

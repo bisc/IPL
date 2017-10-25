@@ -13,6 +13,7 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
+import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 
@@ -21,7 +22,7 @@ import static extension org.eclipse.xtext.EcoreUtil2.*
 class IPLRigidityProvider {
 	
 	static def dispatch boolean isRigid(QAtom q) {
-		q.set.rigid && q.exp.rigid
+		q.dom.rigid && q.exp.rigid
 	}
 	
 	static def dispatch boolean isRigid(TAtomUnary t) {
@@ -41,6 +42,10 @@ class IPLRigidityProvider {
 	}	
 	
 	static def dispatch boolean isRigid(Const c) {
+		true
+	}
+	
+	static def dispatch boolean isRigid(Type t) { // for when e.g. int inside quantification
 		true
 	}
 	
