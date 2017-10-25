@@ -17,6 +17,7 @@ import parser.ast.Property;
 import prism.Prism;
 import prism.PrismException;
 import prism.PrismFileLog;
+import prism.PrismSettings;
 import prism.Result;
 import prism.UndefinedConstants;
 
@@ -50,6 +51,11 @@ public class PrismConnectorAPI {
         
         // disabled generation/export of optimal strategy
         m_prism.setGenStrat(false);
+        PrismSettings settings = m_prism.getSettings();
+        settings.set(PrismSettings.PRISM_LTL2DA_TOOL, 
+        		"/home/ivan/apps/prism-4.4.beta-linux64/etc/scripts/hoa/hoa-rabinizer3.1-dgra-for-prism");
+        settings.set(PrismSettings.PRISM_LTL2DA_SYNTAX, "Rabinizer");
+        m_prism.setSettings(settings);
         /*try{
             m_prism.setExportAdv(Prism.EXPORT_ADV_MDP);
         } catch (PrismException e){
