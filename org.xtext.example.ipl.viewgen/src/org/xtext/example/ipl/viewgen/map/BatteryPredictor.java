@@ -2,7 +2,7 @@ package org.xtext.example.ipl.viewgen.map;
 
 import java.util.Objects;
 
-import org.xtext.example.ipl.viewgen.map.MapTranslator;
+import org.xtext.example.ipl.viewgen.map.MapTranslatorPrism;
 
 // To be relocated
 
@@ -16,17 +16,17 @@ public class BatteryPredictor {
 	
 	public static double batteryConsumption (String speed, String sensing, double time){
 		
-		boolean kinectEnabled = MapTranslator.ROBOT_LOC_MODE_HI_KINECT;
-		double cpuAvgUsage= MapTranslator.ROBOT_LOC_MODE_HI_CPU_VAL;
+		boolean kinectEnabled = MapTranslatorPrism.ROBOT_LOC_MODE_HI_KINECT;
+		double cpuAvgUsage= MapTranslatorPrism.ROBOT_LOC_MODE_HI_CPU_VAL;
 		
-		if (Objects.equals(sensing, MapTranslator.ROBOT_LOC_MODE_MED_CONST)){
-			kinectEnabled = MapTranslator.ROBOT_LOC_MODE_MED_KINECT;
-			cpuAvgUsage = MapTranslator.ROBOT_LOC_MODE_MED_CPU_VAL;
+		if (Objects.equals(sensing, MapTranslatorPrism.ROBOT_LOC_MODE_MED_CONST)){
+			kinectEnabled = MapTranslatorPrism.ROBOT_LOC_MODE_MED_KINECT;
+			cpuAvgUsage = MapTranslatorPrism.ROBOT_LOC_MODE_MED_CPU_VAL;
 		}
 
-		if (Objects.equals(sensing, MapTranslator.ROBOT_LOC_MODE_LO_CONST)){
-			kinectEnabled = MapTranslator.ROBOT_LOC_MODE_MED_KINECT;
-			cpuAvgUsage = MapTranslator.ROBOT_LOC_MODE_MED_CPU_VAL;
+		if (Objects.equals(sensing, MapTranslatorPrism.ROBOT_LOC_MODE_LO_CONST)){
+			kinectEnabled = MapTranslatorPrism.ROBOT_LOC_MODE_MED_KINECT;
+			cpuAvgUsage = MapTranslatorPrism.ROBOT_LOC_MODE_MED_CPU_VAL;
 		}
 		
 		return batteryConsumption (speed, false, kinectEnabled, cpuAvgUsage, time);
@@ -43,9 +43,9 @@ public class BatteryPredictor {
         double kinect_consumption=0;
         double nuc_consumption=0;
         
-        if (Objects.equals(speed, MapTranslator.ROBOT_HALF_SPEED_CONST))
+        if (Objects.equals(speed, MapTranslatorPrism.ROBOT_HALF_SPEED_CONST))
             base_consumption = 1.674f * time+287.5f;
-        if (Objects.equals(speed, MapTranslator.ROBOT_FULL_SPEED_CONST)) 
+        if (Objects.equals(speed, MapTranslatorPrism.ROBOT_FULL_SPEED_CONST)) 
         	base_consumption = 3.89f * time+582.6f;
         if (rotating)
         	base_consumption = 4.9f * time + 699f;

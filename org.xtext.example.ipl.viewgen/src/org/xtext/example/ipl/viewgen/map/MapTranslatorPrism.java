@@ -27,7 +27,7 @@ import org.xtext.example.ipl.viewgen.map.dijkstra.Vertex;
  */
 
 
-public class MapTranslator {
+public class MapTranslatorPrism extends MapTranslatorUtil {
 
     public static final String VERSION_STR = "V0.4 - Oct 2017";
 
@@ -61,24 +61,13 @@ public class MapTranslator {
     public static final String INITIAL_ROBOT_LOCATION_CONST = "INITIAL_LOCATION";
     public static final String TARGET_ROBOT_LOCATION_CONST = "TARGET_LOCATION";
     public static final String ROBOT_BATTERY_VAR = "b";
-    public static final String ROBOT_BATTERY_RANGE_MIN = "0";
-    public static final String ROBOT_BATTERY_RANGE_MAX = "32560";
     public static final String ROBOT_BATTERY_RANGE_MAX_CONST = "MAX_BATTERY";
     public static final String INITIAL_ROBOT_BATTERY_CONST = "INITIAL_BATTERY";
-    public static final String ROBOT_BATTERY_DELTA = "10"; // Constant for the time being, this should be transition+context dependent
     public static final String BATTERY_GUARD_STR="& ("+ROBOT_BATTERY_VAR+">="+ROBOT_BATTERY_DELTA+")"; // Not used for the time being (battery depletion condition covered by STOP_GUARD_STR)
     public static final String BATTERY_UPDATE_STR = ROBOT_BATTERY_VAR+UPDATE_POSTFIX;
-    public static final float ROBOT_CHARGING_TIME = 15.0f;
 
-    public static final float ROBOT_FULL_SPEED_VALUE = 0.68f; // m/s
-    public static final float ROBOT_HALF_SPEED_VALUE = 0.35f;
-    public static final float ROBOT_DR_SPEED_VALUE = 0.25f; // Dead reckoning ` value .. this is implicit in ROBOT_LOC_MODE_LO
-    public static final String ROBOT_FULL_SPEED_CONST = "FULL_SPEED"; // These are just symbolic constants for PRISM
-    public static final String ROBOT_HALF_SPEED_CONST = "HALF_SPEED";
-    public static final String ROBOT_DR_SPEED_CONST = "DR_SPEED";
     public static final String ROBOT_SPEED_VAR = "s";
 
-    public static final float  ROBOT_ROTATIONAL_SPEED_VALUE = 1.5f;             // rad/s
     public static final String ROBOT_HEADING_VAR = "r";
     public static final String INITIAL_ROBOT_HEADING_CONST = "INITIAL_HEADING";
 
@@ -89,20 +78,11 @@ public class MapTranslator {
     public static final String ROBOT_LOC_MODE_MED_VAL = "1";
     public static final String ROBOT_LOC_MODE_HI_CONST = "LOC_HI";
     public static final String ROBOT_LOC_MODE_HI_VAL = "2";
-    public static final double ROBOT_LOC_MODE_LO_CPU_VAL = 20; //96.3875;
-    public static final double ROBOT_LOC_MODE_MED_CPU_VAL = 95; // TODO: Change by actual value
-    public static final double ROBOT_LOC_MODE_HI_CPU_VAL = 95; // TODO: Change by actual value
     public static final boolean ROBOT_LOC_MODE_HI_KINECT = true;
     public static final boolean ROBOT_LOC_MODE_MED_KINECT = true;
     public static final boolean ROBOT_LOC_MODE_LO_KINECT = false;
     public static final String ROBOT_LOC_MODE_MAX_RECONF_CONST = "LOC_MODE_RECONF_MAX";
     public static final String ROBOT_LOC_MODE_RECONF_VAR = "kr";
-    public static final String ROBOT_LOC_MODE_MAX_RECONF_VAL = "2";
-
-
-    public static final float  MAXIMUM_KINECT_OFF_DISTANCE_VAL = 6.0f; // Maximum driving distance with kinect off in m.
-
-
 
     // Goal and stop condition configuration constants
 
@@ -113,23 +93,11 @@ public class MapTranslator {
     public static final String	STOP_PRED_DEF = STOP_PRED + " = "+GOAL_PRED+" | "+ROBOT_BATTERY_VAR+"<"+ROBOT_BATTERY_DELTA+";";
     public static final String	STOP_GUARD_STR = "& (!"+STOP_PRED+")";
 
-    public static final double MAX_DISTANCE = 999.0; // Distance assigned to disabled edges (for distance reward computation)
-    public static final double DEFAULT_TIME_TACTIC_TIME=1; // Tactics are not instantaneous;
     public static final String TACTIC_PREFIX="t";
 
     // Properties' indices
     public static final int TIME_PROPERTY = 0;
     public static final int ACCURACY_PROPERTY = 1;
-
-    private static EnvMap m_map;
-
-    /**
-     * Sets the map to translate into a PRISM specification
-     * @param map an EnvMap encoding the graph that captures the physical space
-     */
-    public static void setMap(EnvMap map){
-        m_map = map;
-    }
 
     /**
      * Generates PRISM model game structure - Alternating Robot/Environment turns
@@ -238,15 +206,6 @@ public class MapTranslator {
         buf+="endmodule\n\n";
         return buf;
 
-    }
-
-    /**
-     * Generates battery update formulas employed in updates of movement commands in robot module
-     * @return String PRISM encoding for possible battery updates (corresponding to movements between map locations)
-     */
-
-    private static String getDeltaEnergy(String speed, double distance, String sensing){
-        return String.valueOf (Math.round (BatteryPredictor.batteryConsumption (speed, sensing, SpeedPredictor.moveForwardTimeSimple(distance, speed))));
     }
 
     public static String generateBatteryUpdates(){
@@ -458,92 +417,6 @@ public class MapTranslator {
         return buf;
     }
 
-
-    /**
-     * Returns the rotation time in seconds from a given robot orientation to the right angle before it
-     * starts moving towards a given location (target of arc a)
-     * @param robotOrientation orientation of the robot (angle in Radians)
-     * @param a Map arc 
-     * @return Rotation time in seconds
-     */
-    public static double getRotationTime(double robotOrientation, EnvMapArc a){    	
-        double theta = Math.abs(robotOrientation-findArcOrientation(a));
-        double min_theta = (theta > Math.PI) ? 2*Math.PI - theta : theta;
-        return (min_theta/ROBOT_ROTATIONAL_SPEED_VALUE); 
-    }
-
-
-    /**
-     * Determines the angle (in Radians) between two endpoints of an arc, taking the source node of the arc
-     * as the reference of coordinates in the plane. Used to determine the part of the time reward structure 
-     * associated with in-node robot rotations.
-     * @param a Map arc
-     * @return angle in radians between a.m_source and a.m_target
-     */
-    public static double findArcOrientation(EnvMapArc a){
-        synchronized (m_map) {
-            double nodeX = m_map.getNodeX(a.getSource());
-            double nodeY = m_map.getNodeY(a.getSource());
-            double nodeX2 = m_map.getNodeX(a.getTarget());
-            double nodeY2 = m_map.getNodeY(a.getTarget());
-            if (nodeX == Double.NEGATIVE_INFINITY || nodeX2 == Double.NEGATIVE_INFINITY) return 0;
-            return findArcOrientation( nodeX, nodeY, nodeX2, nodeY2);
-        }
-    }
-
-
-    public static double findArcOrientation(double src_x, double src_y, double tgt_x, double tgt_y){
-        return Math.atan2( tgt_y - src_y, tgt_x - src_x);
-    }
-
-
-    /**
-     * Determines the heading between two endpoints of an arc (snaps result of findArcOrientation to one of the predetermined headings)
-     * @param a Map arc
-     * @return heading enum arc heading
-     */
-    public static Heading findArcHeading (EnvMapArc a) {
-        return Heading.convertFromRadians(findArcOrientation(a));
-    }
-
-
-    public static Stack<String> connectionPath = null; // Aux data structures for finding all paths between arbitrary locations
-    public static List<Stack> connectionPaths = null;
-
-
-    /**
-     * Generates all non-cyclic paths between two locations in map
-     * @param node1
-     * @param node2
-     */
-    public static List<Stack> goFindAllPaths(String node1, String node2){
-        connectionPath = new Stack<String>();
-        connectionPath.push(node1);
-        connectionPaths = new ArrayList<>();
-        findAllPaths (node1, node2);
-        for (int i=0; i<connectionPaths.size();i++) {
-            connectionPaths.get(i).add(node2);
-        }
-        return connectionPaths;
-    }
-
-    public static synchronized void findAllPaths(String src, String tgt) {
-        for (String nextNode : m_map.getNeighbors(src)){		  
-            if (nextNode.equals(tgt)){
-                Stack temp = new Stack<String>();
-                for (String node1 : connectionPath) {
-                    temp.add(node1);
-                }
-                connectionPaths.add(temp);
-            } else if (!connectionPath.contains(nextNode)) {
-                connectionPath.push(nextNode);
-                findAllPaths(nextNode, tgt);
-                connectionPath.pop();
-            }
-        }
-
-    }
-
     /**
      * Translates a path into a PRISM module constraining the movements of the robot to that path
      * @param path List of strings with the locations of the path from source to target (e.g., ["ls", ..., "l1"])
@@ -586,7 +459,7 @@ public class MapTranslator {
         for (int i=0; i< plan.size(); i++){
             String action = plan.get(i);
             String[] e = action.split("_");
-            if (!Objects.equals(MapTranslator.TACTIC_PREFIX, e[0])) {
+            if (!Objects.equals(MapTranslatorPrism.TACTIC_PREFIX, e[0])) {
                 allowed.add(plan.get(i));
             } 
         }
@@ -611,54 +484,6 @@ public class MapTranslator {
 
         buf += "endmodule\n";
         return buf;
-    }
-
-
-
-    /**
-     * Returns shortest distance between two nodes computed using Dijkstra's Algorithm
-     * @param node1 String label of source node (associated with an EnvMapNode in the map to translate)
-     * @param node2 String label of target node (associated with an EnvMapNode in the map to translate)
-     * @return float shortest distance between node1 and node2
-     */
-    public static double shortestPathDistance (String node1, String node2) {
-        synchronized (m_map) {
-            Graph graph = new Graph();
-            Vertex[] vertices = new Vertex[m_map.getNodeCount()];
-
-            Map<String, Integer> node_indexes = new HashMap<> ();
-
-            int i=0;
-            for (Map.Entry<String,EnvMapNode> entry : m_map.getNodes().entrySet() ){
-                vertices[i] = new Vertex(entry.getKey());
-                graph.addVertex(vertices[i], true);
-                node_indexes.put (entry.getKey (), i);
-                i++;
-            }
-
-            Edge[] edges = new Edge[m_map.getArcCount()];
-
-
-            for (i=0;i<m_map.getArcs().size();i++){
-                EnvMapArc a = m_map.getArcs().get(i);
-                Vertex source = vertices[(node_indexes.get (a.getSource ()))];
-                Vertex target = vertices[(node_indexes.get (a.getTarget ()))];
-                if (a.isEnabled()){
-                    edges[i] = new Edge(source, target, a.getDistance());
-                } else {
-                    edges[i] = new Edge(source, target, MAX_DISTANCE); // If edge is disabled, assign max possible distance                   	
-                }
-            }
-
-            for(Edge e: edges){
-                if (e.getWeight() < MAX_DISTANCE){
-                    graph.addEdge(e.getOne(), e.getTwo(), e.getWeight());
-                }
-            }
-
-            Dijkstra dijkstra = new Dijkstra(graph, node1);
-            return (dijkstra.getDistanceTo(node2));
-        }
     }
 
 
@@ -717,197 +542,6 @@ public class MapTranslator {
     }
 
     /**
-     * Creates an AADL name for a motion task representing a given arc. 
-     */
-    public static String getMotTaskName(EnvMapArc a) { 
-    	return "m_" + a.getSource() + "_to_" + a.getTarget();
-    }
-
-    /**
-     * Generates a declaration for a task representing a given arc. 
-     */
-    public static String generateMotTaskDeclForArc(EnvMapArc a){
-    	return getMotTaskName(a) + ": process Task;";
-    }
-
-    /**
-     * Generates a task description for a given arc, assigning it a given ID.
-     */
-    public static String generateMotTaskForArc(EnvMapArc a, int id){
-    	String res = ""; 
-    	String appliesToArcName = " applies to " + getMotTaskName(a) + ";\n";
-    	res += "Robot_Task_Types::task_id => " + id + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::start_loc => " + m_map.getNodeId(a.getSource()) + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::end_loc => " + m_map.getNodeId(a.getTarget()) + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::required_heading => " + findArcHeading(a).convertToInt() + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::resulting_heading => " + findArcHeading(a).convertToInt() + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::energy => " + getDeltaEnergy(ROBOT_FULL_SPEED_CONST, a.getDistance(), null) + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::task_type_enum => Forward" + 
-    			appliesToArcName;
-    	res += "Robot_Task_Types::task_type => 0" +
-    			appliesToArcName; 
-    	
-    	return res;
-    }
-    
-    /**
-     * Creates an AADL name for a rotation task in a given node between two arcs: arrival and departure. 
-     */
-    public static String getRotTaskName(EnvMapNode n, EnvMapArc arr, EnvMapArc dep) { 
-    	return "r_in_" + n.getLabel() + "_from_" + arr.getSource() + "_to_" + dep.getTarget();
-    }
-    
-    public static void verifyValidRot(EnvMapNode n, EnvMapArc arr, EnvMapArc dep) {
-    	if (!Objects.equals(n.getLabel(), arr.getTarget()) || 
-    			!Objects.equals(n.getLabel(), dep.getSource()))
-    		throw new IllegalArgumentException("Rotation invalid: node " + n.getLabel() +
-    				" arrival to " + arr.getTarget() + " departure from " + dep.getSource());
-    }
-
-
-
-    public static String generateRotTaskDecl(EnvMapNode n, EnvMapArc arr, EnvMapArc dep){
-    	verifyValidRot(n, arr, dep);
-    	
-    	return getRotTaskName(n, arr, dep) + ": process Task;";
-    }
-
-    public static String generateRotTask(EnvMapNode n, EnvMapArc arr, EnvMapArc dep, int id){
-    	verifyValidRot(n, arr, dep);
-    	String appliesToRotTask = " applies to " + getRotTaskName(n, arr, dep)  + ";\n";
-    	NumberFormat f = new DecimalFormat ("#0");
-    	
-    	Heading arrHeading = findArcHeading(arr); 
-    	Heading depHeading = findArcHeading(dep);
-    	
-    	String res = "";
-    	res += "Robot_Task_Types::task_id => " + id + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::start_loc => " + n.getId() + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::end_loc => " + n.getId() + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::required_heading => " + arrHeading.convertToInt() + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::resulting_heading => " + depHeading.convertToInt() + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::energy => " + f.format (BatteryPredictor.batteryConsumption(ROBOT_HALF_SPEED_CONST, 
-    			true, ROBOT_LOC_MODE_MED_KINECT, ROBOT_LOC_MODE_HI_CPU_VAL, getRotationTime(Heading.convertToRadians(arrHeading),dep))) + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::task_type_enum => Rotate" + 
-    			appliesToRotTask;
-    	res += "Robot_Task_Types::task_type => 1" +
-    			appliesToRotTask; 
-    	
-    	return res;
-    } 
-  
-    /**
-     * Creates an AADL name for a empty motion task in a given node. 
-     */
-    public static String getEmptyTaskNameForNode(EnvMapNode n) { 
-    	return "e_" + n.getLabel();
-    }
-
-    /**
-     * Generates a declaration for an empty task in a given node. 
-     */
-    public static String generateEmptyTaskDeclForNode(EnvMapNode n){
-    	return getEmptyTaskNameForNode(n) + ": process Task;";
-    }
-
-    /**
-     * Generates a task description for a given arc, assigning it a given ID.
-     */
-    public static String generateEmptyTaskForNode(EnvMapNode n, int id){
-    	String res = ""; 
-    	String appliesToTaskName = " applies to " + getEmptyTaskNameForNode(n) + ";\n";
-    	res += "Robot_Task_Types::task_id => " + id + 
-    			appliesToTaskName;
-    	res += "Robot_Task_Types::start_loc => " + n.getId() + 
-    			appliesToTaskName;
-    	res += "Robot_Task_Types::end_loc => " + n.getId() + 
-    			appliesToTaskName;
-//    	res += "Robot_Task_Types::required_heading => " + findArcHeading(a).convertToInt() + 
-//    			appliesToTaskName;
-//    	res += "Robot_Task_Types::resulting_heading => " + findArcHeading(a).convertToInt() + 
-//    			appliesToTaskName;
-    	res += "Robot_Task_Types::energy => 0" + 
-    			appliesToTaskName;
-    	res += "Robot_Task_Types::task_type_enum => Forward" + 
-    			appliesToTaskName;
-    	res += "Robot_Task_Types::task_type => 0" +
-    			appliesToTaskName; 
-    	
-    	return res;
-    }
-    
-    public static String getMapAadlTranslation() { 
-    	String preamble = "package tasks_view\n" +
-    	"public\n" + 
-    		"with Robot_Task_Types;\n\n" + 
-    		"system TaskLibrary\n" + 
-    		"end TaskLibrary;\n" + 
-    		"process Task\n"  + 
-    		"end Task;\n" +
-    		"system implementation TaskLibrary.fullspeed\n\n" +
-    		"subcomponents\n\n"; 
-    	
-    	String postamble = "end TaskLibrary.fullspeed;\n"+
-    					   "end tasks_simple;\n";
-    	
-    	String motionTaskDecls = "-- Motion task decls\n";
-		String motionTasks = "\nproperties\n\n-- Forward motion tasks\n";
-		String rotTaskDecls = "-- Rotation task decls\n";
-		String rotTasks = "\n-- Rotation tasks\n";
-		String emptyTaskDecls = "\n-- Empty task decls\n";
-		String emptyTasks = "\n-- Empty tasks\n";
-		
-		int taskIdCount = 0;
-		
-		synchronized (m_map) {
-			// motion tasks
-			for (int i = 0; i < m_map.getArcs().size(); i++) {
-				EnvMapArc a = m_map.getArcs().get(i);
-				if (a.isEnabled()) {
-					motionTaskDecls += generateMotTaskDeclForArc(a) + '\n'; 
-					motionTasks += generateMotTaskForArc(a, taskIdCount++) + '\n';
-				}
-			}
-			
-			//rotation tasks: consider in each node
-			for (String nodeLabel : m_map.getNodes().keySet()) {
-				EnvMapNode n = m_map.getNodes().get(nodeLabel); 
-				// pairs of arcs that are incoming and outgoing from this node, with non-empty rotation 
-				// ok to be the same coming and going to the same node (a u-turn) 
-				for (int i = 0; i < m_map.getArcs().size(); i++) { 
-					for (int j = 0; j < m_map.getArcs().size(); j++) {
-						EnvMapArc arr = m_map.getArcs().get(i);
-						EnvMapArc dep = m_map.getArcs().get(j);
-						if (arr.getTarget().equals(nodeLabel) && dep.getSource().equals(nodeLabel) && 
-								findArcHeading(arr) != findArcHeading(dep)) { 
-							rotTaskDecls += generateRotTaskDecl(n, arr, dep) + '\n';
-							rotTasks += generateRotTask(n, arr, dep, taskIdCount++) + '\n';
-						}
-					}
-				}
-				// empty tasks
-				emptyTaskDecls += generateEmptyTaskDeclForNode(n) + '\n';
-				emptyTasks += generateEmptyTaskForNode(n, taskIdCount++) + '\n';
-			}
-			
-		}
-		return preamble + motionTaskDecls + '\n' + rotTaskDecls + '\n' + emptyTaskDecls + '\n' + 
-				motionTasks + '\n' + rotTasks + '\n' + emptyTasks + '\n' + postamble;
-    }
-
-    /**
      * Generates the PRISM specification for an adaptation scenario, constrained to a specific path of robot movements
      * @param path List of strings containing the sequence of locations in the path, e.g., ["l1", ..., "l8"]
      * @return String PRISM encoding for constrained adaptation scenario
@@ -963,24 +597,6 @@ public class MapTranslator {
         exportTranslation(f, getMapTranslation(inhibitTactics));
     }
 
-
-    /**
-     * Exports a piece of code to a text file
-     * @param f String filename
-     * @param code String code to be exported
-     */
-    public static void exportTranslation(String f, String code){
-        try {
-            BufferedWriter out = new BufferedWriter (new FileWriter(f));
-            out.write(code);
-            out.close();
-        }
-        catch (IOException e){
-            System.out.println("Error exporting PRISM map translation");
-        }
-    }
-
-
     /**
      * Generates PRISM encoding variants constrained by all non-cyclic paths between two locations
      * @param f_base String base for PRISM models filenames (e.g., target folder)
@@ -1015,14 +631,8 @@ public class MapTranslator {
         //setMap(dummyMap);
         
         // PRISM generation
-        //System.out.println(getMapTranslation()); // Class test
-        //exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
-        
-        // AADL generation
-        String aadlCode = getMapAadlTranslation();
-        System.out.println(aadlCode); // Class test
-        exportTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl/tasks_view.aadl", aadlCode);
-        //exportMapTranslation(, false);
+        System.out.println(getMapTranslation()); // Class test
+        exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
         
         // String export_path="/Users/jcamara/Dropbox/Documents/Work/Projects/BRASS/rainbow-prototype/trunk/rainbow-brass/prismtmp/";
 
