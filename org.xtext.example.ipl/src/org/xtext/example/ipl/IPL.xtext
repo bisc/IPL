@@ -154,19 +154,27 @@ TAtom returns Formula: // has to stay modularized
 ;
 
 TAtomUnary returns Formula: 
-	{TAtomUnary} op=(ALWAYS | NEXT | EVENTUALLY) exp=FormulaOperation 
+	{TAtomUnary} op=(ALWAYS | NEXT | EVENTUALLY) exp=FormulaOperationImp 
 ;
 
 TAtomBinary returns Formula: 
-	FormulaOperation ({TAtomBinary.left=current} op=UNTIL right=FormulaOperation)* 
+	FormulaOperationImp ({TAtomBinary.left=current} op=UNTIL right=FormulaOperationImp)* 
 ;
 
-FormulaOperation returns Formula:
-	NegFormula ({FormulaOperation.left=current} op=(AND | OR | IMP) right=NegFormula)* 
+FormulaOperationImp returns Formula:
+	FormulaOperationDisj ({FormulaOperation.left=current} op=IMP right=FormulaOperationDisj)* 
 ;
 
-NegFormula returns Formula:
-	{Negation} NOT child=NegFormula | FormulaBase
+FormulaOperationDisj returns Formula:
+	FormulaOperationConj ({FormulaOperation.left=current} op=OR right=FormulaOperationConj)* 
+;
+
+FormulaOperationConj returns Formula:
+	FormulaOperationNeg ({FormulaOperation.left=current} op=AND right=FormulaOperationNeg)* 
+;
+
+FormulaOperationNeg returns Formula:
+	{Negation} NOT child=FormulaBase | FormulaBase
 ;
 
 FormulaBase returns Formula:/* => is to direct ModelExpr */

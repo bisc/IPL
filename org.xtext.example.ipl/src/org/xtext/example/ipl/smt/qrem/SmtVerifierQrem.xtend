@@ -287,11 +287,13 @@ public class SmtVerifierQrem implements SmtVerifier {
 						// make a copy to feed to prism, to not spoil the original formula it for further iterations
 						// to preserve clause pointers, use a copier which stores a map old->new for eobjects
 						// var newFlexExpr = origFlexExpr.copy
-						val Copier copier = new Copier();
+						val Copier copier = new Copier(false/*resolve proxies*/, true /*use original references*/ );
+						// potential issue here: the b/v functions lose their references to declarations
 						var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
 
-						println('Flexible formula before replacement: ' + pp.print(newFlexExpr) + ", params: " +
-							newFlexExpr.params.vals.map[pp.print(it)])
+						// printing from old formula
+						println('Flexible formula before replacement: ' + pp.print(origFlexExpr) + ", params: " +
+							origFlexExpr.params.vals.map[pp.print(it)])
 
 						// construct clauseVal and clauseType with updated references to newFlexExpr
 						val Map<Formula, Object> clauseValUpd = new HashMap

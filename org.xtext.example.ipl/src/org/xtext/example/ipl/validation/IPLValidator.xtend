@@ -19,7 +19,7 @@ import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
+import static extension org.xtext.example.ipl.validation.IPLRigidityProviderLookup.*
 
 /**
  * This class contains custom validation rules. 

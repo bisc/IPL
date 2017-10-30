@@ -1,11 +1,14 @@
 package org.xtext.example.ipl.validation
 
-import org.eclipse.emf.ecore.EObject
 import org.xtext.example.ipl.iPL.Const
+import org.xtext.example.ipl.iPL.ExprOperation
+import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.MFunDecl
+import org.xtext.example.ipl.iPL.ModelExpr
+import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.ProbQuery
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
@@ -13,13 +16,14 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
+import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-class IPLRigidityProvider {
+class IPLRigidityProviderLookup {
 	
 	static def dispatch boolean isRigid(QAtom q) {
 		q.dom.rigid && q.exp.rigid
@@ -32,6 +36,10 @@ class IPLRigidityProvider {
 	static def dispatch boolean isRigid(TAtomBinary t) {
 		false
 	}
+	
+	static def dispatch boolean isRigid(ModelExpr r) {
+		false
+	}	
 	
 	static def dispatch boolean isRigid(ProbQuery p) {
 		false
@@ -69,9 +77,27 @@ class IPLRigidityProvider {
 		else 
 			return true
 	}
-
-	static def dispatch boolean isRigid(EObject o) {
-		o.eAllContentsAsList.forall[rigid]
+	
+	static def dispatch boolean isRigid(FormulaOperation op) {
+		op.left.rigid && op.right.rigid
 	}
 	
+	
+	static def dispatch boolean isRigid(ExprOperation op){
+		 op.left.rigid && op.right.rigid
+	}
+	
+	static def dispatch boolean isRigid(Negation op){
+		 op.child.rigid
+	}
+	
+	static def dispatch boolean isRigid(TermOperation op){
+	 	op.left.rigid && op.right.rigid
+	}
+	
+	// a questionable function that expands each eobject
+//	static def dispatch boolean isRigid(EObject o) {
+//		o.eAllContentsAsList.forall[rigid]
+//	}
+//	
 }

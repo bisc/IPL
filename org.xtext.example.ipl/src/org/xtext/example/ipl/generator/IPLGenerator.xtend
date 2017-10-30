@@ -25,8 +25,8 @@ import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
-import org.xtext.example.ipl.validation.IPLRigidityProvider
 import org.xtext.example.ipl.util.TimeRecWall
+import org.xtext.example.ipl.validation.IPLRigidityProviderLookup
 
 //import org.xtext.example.ipl.iPL.EDouble
 
@@ -67,7 +67,7 @@ class IPLGenerator extends AbstractGenerator {
 				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
 				val node = NodeModelUtils::getNode(f) // for marker creation
 				try { 
-					if(!IPLRigidityProvider::isRigid(f)) { // non-rigid, full-scale IPL
+					if(!IPLRigidityProviderLookup::isRigid(f)) { // non-rigid, full-scale IPL
 						// find a model declaration
 						val mdls = spec.decls.filter[it instanceof ModelDecl]
 						if (mdls.size == 0) {

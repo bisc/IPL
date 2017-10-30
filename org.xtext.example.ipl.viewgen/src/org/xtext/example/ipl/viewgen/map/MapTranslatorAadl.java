@@ -46,9 +46,9 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
     	res += m_taskTypeLibName + "::end_loc => " + m_map.getNodeId(a.getTarget()) + 
     			appliesToArcName;
     	if (m_includeRotation) {
-	    	res += m_taskTypeLibName + "::required_heading => " + findArcHeading(a).convertToInt() + 
+	    	res += m_taskTypeLibName + "::start_head => " + findArcHeading(a).convertToInt() + 
 	    			appliesToArcName;
-	    	res += m_taskTypeLibName + "::resulting_heading => " + findArcHeading(a).convertToInt() + 
+	    	res += m_taskTypeLibName + "::end_head => " + findArcHeading(a).convertToInt() + 
 	    			appliesToArcName;
     	}
     	res += m_taskTypeLibName + "::energy => " + getDeltaEnergy(ROBOT_FULL_SPEED_CONST, a.getDistance(), null) + 
@@ -98,9 +98,9 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
     			appliesToRotTask;
     	res += m_taskTypeLibName + "::end_loc => " + n.getId() + 
     			appliesToRotTask;
-    	res += m_taskTypeLibName + "::required_heading => " + arrHeading.convertToInt() + 
+    	res += m_taskTypeLibName + "::start_head => " + arrHeading.convertToInt() + 
     			appliesToRotTask;
-    	res += m_taskTypeLibName + "::resulting_heading => " + depHeading.convertToInt() + 
+    	res += m_taskTypeLibName + "::end_head => " + depHeading.convertToInt() + 
     			appliesToRotTask;
     	res += m_taskTypeLibName + "::energy => " + f.format (BatteryPredictor.batteryConsumption(ROBOT_HALF_SPEED_CONST, 
     			true, ROBOT_LOC_MODE_MED_KINECT, ROBOT_LOC_MODE_HI_CPU_VAL, getRotationTime(Heading.convertToRadians(arrHeading),dep))) + 
@@ -139,15 +139,15 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
     			appliesToTaskName;
     	res += m_taskTypeLibName + "::end_loc => " + n.getId() + 
     			appliesToTaskName;
-//    	res += m_taskTypeLibName + "::required_heading => " + findArcHeading(a).convertToInt() + 
+//    	res += m_taskTypeLibName + "::start_head => " + findArcHeading(a).convertToInt() + 
 //    			appliesToTaskName;
-//    	res += m_taskTypeLibName + "::resulting_heading => " + findArcHeading(a).convertToInt() + 
+//    	res += m_taskTypeLibName + "::end_head => " + findArcHeading(a).convertToInt() + 
 //    			appliesToTaskName;
     	res += m_taskTypeLibName + "::energy => 0" + 
     			appliesToTaskName;
-    	res += m_taskTypeLibName + "::task_type_enum => Forward" + 
+    	res += m_taskTypeLibName + "::task_type_enum => Empty" + 
     			appliesToTaskName;
-    	res += m_taskTypeLibName + "::task_type => 0" +
+    	res += m_taskTypeLibName + "::task_type => 2" +
     			appliesToTaskName; 
     	
     	return res;
@@ -216,14 +216,16 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 						}
 					}
 				}
-				
+			}
+			
+			// empty tasks; separate loop for contiguous IDs (for convenience of reading)
+			for (String nodeLabel : m_map.getNodes().keySet()) {
+				EnvMapNode n = m_map.getNodes().get(nodeLabel);
 				if (m_includeEmpty) {
-					// empty tasks
 					emptyTaskDecls += generateEmptyTaskDeclForNode(n) + '\n';
 					emptyTasks += generateEmptyTaskForNode(n, taskIdCount++) + '\n';
 				}
 			}
-			
 		}
 		return preamble + motionTaskDecls + '\n' + rotTaskDecls + '\n' + emptyTaskDecls + '\n' + 
 				motionTasks + '\n' + rotTasks + '\n' + emptyTasks + '\n' + postamble;

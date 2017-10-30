@@ -57,7 +57,10 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		val pluginTerms = '''
 (define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
 (define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
-
+(define-fun max_int ((x Int) (y Int)) Int (ite (< x y) y x))
+(define-fun max_real ((x Real) (y Real)) Real (ite (< x y) y x))
+(define-fun min_int ((x Int) (y Int)) Int (ite (< x y) x y))
+(define-fun min_real((x Real) (y Real)) Real (ite (< x y) x y))
 '''
 
 		// gather view declarations
