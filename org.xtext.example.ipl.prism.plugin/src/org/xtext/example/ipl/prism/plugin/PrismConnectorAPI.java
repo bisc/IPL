@@ -52,6 +52,7 @@ public class PrismConnectorAPI {
         // disabled generation/export of optimal strategy
         m_prism.setGenStrat(false);
         PrismSettings settings = m_prism.getSettings();
+        // TODO deliver this script and Rabinizer as part of IPL 
         settings.set(PrismSettings.PRISM_LTL2DA_TOOL, 
         		"/home/ivan/apps/prism-4.4.beta-linux64/etc/scripts/hoa/hoa-rabinizer3.1-dgra-for-prism");
         settings.set(PrismSettings.PRISM_LTL2DA_SYNTAX, "Rabinizer");
