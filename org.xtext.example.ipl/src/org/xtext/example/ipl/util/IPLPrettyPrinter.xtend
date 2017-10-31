@@ -103,7 +103,7 @@ class IPLPrettyPrinter {
 	}
 	
 	dispatch def String print(Fun f){ 
-		'''«f.decl.name»(«f.args.map[print(it)].join(' ')»)'''
+		'''«f.decl.name»(«f.args.map[print(it)].join(', ')»)'''
 	}
 	
 	dispatch def String print(ID f){ 

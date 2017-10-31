@@ -209,7 +209,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 			// interpret smt results
 			if (z3ResFirstLine == "unsat") {
-				println("unsat; all models found")
+				println("unsat; all " + freeVarVals.size + " models found")
 				// interpret: if the scope is empty, then the formula has been shown to be invalid
 				// if the scope is not empty, then we might have blocked the values - thus finding all models 				
 				return true
@@ -288,10 +288,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 						// to preserve clause pointers, use a copier which stores a map old->new for eobjects
 						// var newFlexExpr = origFlexExpr.copy
 						val Copier copier = new Copier(false/*resolve proxies*/, true /*use original references*/ );
-						// potential issue here: the b/v functions lose their references to declarations
 						var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
 
-						// printing from old formula
+						// potential issue here: the b/v functions lose their references to declarations
+						// so printing from old formula
 						println('Flexible formula before replacement: ' + pp.print(origFlexExpr) + ", params: " +
 							origFlexExpr.params.vals.map[pp.print(it)])
 
