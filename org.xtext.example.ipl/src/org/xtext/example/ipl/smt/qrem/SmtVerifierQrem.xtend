@@ -195,7 +195,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				«transferClausesSmt.values.map['(get-value (' + it + '))'].join('\n') + '\n'»
 			''')
 
-			System::out.println("Done generating SMT, see file " + filenameWithExt)
+			System::out.println("Done generating SMT #" + (freeVarVals.size+1) + ", see file " + filenameWithExt)
 
 			// call smt 
 			val z3Filename = fsa.getURI(filenameWithExt)
@@ -268,8 +268,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 				// (varname, varvalue) -> flex value
 				val Map<Map<String, Object>, Object> flexVals = new HashMap
 				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
+				var int count = 1;
 				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
-					println("Considering valuation " + varVal)
+					println("Considering valuation #" + count + " of " + flexName + ":" + varVal)
 
 					// check if filtered cache contains the values
 					val filteredTermVal = varVal.filter [ varName, obj | // leaves the evals that are params of the flex
