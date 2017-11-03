@@ -386,6 +386,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				throw new UnexpectedException("Match not found")
 			}
 		]
+		println('Var values found:' + newVarEval)
 
 		// parse evaluations for clauses
 		val Map<Formula, Object> newClauseEval = new HashMap
@@ -404,9 +405,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 				addValueToEval(newClauseEval, clause, valueSmt, transferClausesTypes.get(clause))
 			}
 		]
+		println('Clause values found:' + newClauseEval)
 
-		println('Var values found:' + freeVarVals)
-		println('Clause values found:' + transferClauseVals)
 		modelFound
 	}
 

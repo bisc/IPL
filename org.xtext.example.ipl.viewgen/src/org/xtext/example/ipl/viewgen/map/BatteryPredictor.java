@@ -12,10 +12,12 @@ import org.xtext.example.ipl.viewgen.map.MapTranslatorPrism;
  */
 public class BatteryPredictor {
 
-	public static final double m_battery_scaling_factor = 5.0;
+	public static /*final*/ double m_battery_scaling_factor = 1.0; // = 5.0;
 	
+	// battery consumption for moving straight
 	public static double batteryConsumption (String speed, String sensing, double time){
 		
+		// default values if sensing is not set
 		boolean kinectEnabled = MapTranslatorPrism.ROBOT_LOC_MODE_HI_KINECT;
 		double cpuAvgUsage= MapTranslatorPrism.ROBOT_LOC_MODE_HI_CPU_VAL;
 		
