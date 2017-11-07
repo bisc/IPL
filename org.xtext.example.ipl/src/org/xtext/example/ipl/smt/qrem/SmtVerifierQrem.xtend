@@ -18,9 +18,7 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
-import org.xtext.example.ipl.transform.ClauseValueTransformer
 import org.xtext.example.ipl.transform.PrenexTransformer
-import org.xtext.example.ipl.transform.VarValueTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
@@ -31,6 +29,8 @@ import org.xtext.example.ipl.validation.RealType
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import org.xtext.example.ipl.util.TimeRecWall
+import org.xtext.example.ipl.transform.Clause2ValueTransformer
+import org.xtext.example.ipl.transform.Var2ValueTransformer
 
 // implementation of generation by removing quants and mapping ArchElem -> Int
 // makes copies of formula and manages mappings between them
@@ -132,9 +132,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		var z3Filename = fsa.getURI(filenameWithExt)
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
-		TimeRecWall::startTimer("z3")
+		TimeRecWall::startTimer("z3-check")
 		var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
-		TimeRecWall::stopTimer("z3")
+		TimeRecWall::stopTimer("z3-check")
 		// z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		var z3ResLines = z3Res.split('\n')
 		val z3ResFirstLine = z3ResLines.get(0)
@@ -200,9 +200,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 			// call smt 
 			val z3Filename = fsa.getURI(filenameWithExt)
 			val z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
-			TimeRecWall::startTimer("z3")
+			TimeRecWall::startTimer("z3-modelfind")
 			val z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
-			TimeRecWall::stopTimer("z3")
+			TimeRecWall::stopTimer("z3-modelfind")
 			val z3ResLines = z3Res.split('\n')
 			val z3ResFirstLine = z3ResLines.get(0)
 			val String[] z3ResAfterFirst = Arrays.copyOfRange(z3ResLines, 1, z3ResLines.size)
@@ -270,7 +270,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
 				var int count = 1;
 				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
-					println("Considering valuation #" + count + " of " + flexName + ":" + varVal)
+					println("Considering valuation #" + count++ + " of " + flexName + ":" + varVal)
 
 					// check if filtered cache contains the values
 					val filteredTermVal = varVal.filter [ varName, obj | // leaves the evals that are params of the flex
@@ -291,7 +291,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 						val Copier copier = new Copier(false/*resolve proxies*/, true /*use original references*/ );
 						var newFlexExpr = copier.copy(origFlexExpr) as ModelExpr
 
-						// potential issue here: the b/v functions lose their references to declarations
+						// potential issue here: the background/view functions lose their references to declarations
 						// so printing from old formula
 						println('Flexible formula before replacement: ' + pp.print(origFlexExpr) + ", params: " +
 							origFlexExpr.params.vals.map[pp.print(it)])
@@ -310,11 +310,11 @@ public class SmtVerifierQrem implements SmtVerifier {
 						]
 
 						// put values of clauses into formula (e.g. aggregate expressions in model params) 
-						newFlexExpr = (new ClauseValueTransformer).replaceClausesWithValues(newFlexExpr, clauseValUpd,
+						newFlexExpr = (new Clause2ValueTransformer).replaceClausesWithValues(newFlexExpr, clauseValUpd,
 							clauseTypeUpd) as ModelExpr
 
 						// put rigid values into formula (including model parameters and property values)
-						newFlexExpr = (new VarValueTransformer).replaceVarsWithValues(
+						newFlexExpr = (new Var2ValueTransformer).replaceVarsWithValues(
 							newFlexExpr,
 							varVal,
 							freeVarDecls, // oldScopeDecls,

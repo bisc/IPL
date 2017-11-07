@@ -23,15 +23,14 @@ import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.validation.IPLType
 
-// replaces vars with free constants
-class VarFreeVarTransformer {
+// replaces indicated vars with free constants
+// eliminates their quantifiers, leaving others intact
+class Var2FreeVarPartialTransformer {
 	
-	private var Map<String, String> var2Term  
-	private var Map<String, IPLType> termTypes 
+	private var Map<String, String> var2FreeVar  
 	
-	def EObject replaceVarsWithTerms(Formula f, Map _var2Term, Map _termTypes) { 
-		var2Term =  _var2Term
-		termTypes = _termTypes // FIXME not needed? 
+	def EObject replaceVarsWithTerms(Formula f, Map _var2FreeVar) { 
+		var2FreeVar =  _var2FreeVar
 		
 		replaceVars(f)
 	}
@@ -58,15 +57,25 @@ class VarFreeVarTransformer {
 	}
 	
 	private dispatch def EObject replaceVars(QAtom f){ 
-		
 		val exp = f.exp
+		val parent = f.eContainer
 
-		// eliminate quantification
-		if (var2Term.containsKey(f.^var))
-			EcoreUtil::replace(f, f.exp)
-		
-		// TODO not sure whether to delete f
-		return replaceVars(exp)
+		// eliminate quantification, slightly nuanced than in the full case
+		if (var2FreeVar.containsKey(f.^var)) { // removing quantification
+			EcoreUtil::replace(f, exp)
+			// TODO not sure whether to delete f
+			EcoreUtil::delete(f)
+			return replaceVars(exp)
+//			if (parent !== null) { // deeper into the tree, returning parent
+//				replaceVars(exp)
+//				return parent 
+//			} else { // if top of the tree, then returning itself 
+//				return replaceVars(exp)
+//			}
+		} else { // not removing quantification, returning itself
+			replaceVars(exp)
+			return f
+		}
 	}
 	
 	private dispatch def EObject replaceVars(Const f){ 
@@ -86,11 +95,11 @@ class VarFreeVarTransformer {
 	
 	private dispatch def EObject replaceVars(ID f){ 
 		// replace var with a free const
-		if(var2Term.containsKey(f.id)) {
+		if(var2FreeVar.containsKey(f.id)) {
 			
 			val EClass ei = IPLPackage.eINSTANCE.ID
 			val ID i = EcoreUtil::create(ei) as ID
-			i.id = var2Term.get(f.id)
+			i.id = var2FreeVar.get(f.id)
 			EcoreUtil::replace(f, i)
 			EcoreUtil::delete(f)
 			return i

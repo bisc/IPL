@@ -24,7 +24,8 @@ import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
 // replaces values of rigid variables/constants in IPL formulas
-class VarValueTransformer {
+// useful inside flexible subformulas
+class Var2ValueTransformer {
 
 	var Map<String, Object> vals
 	var Map<String, IPLType> decls

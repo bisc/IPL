@@ -24,9 +24,8 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.transform.PropAbstTransformer
-import org.xtext.example.ipl.transform.VarFreeVarTransformer
+import org.xtext.example.ipl.transform.Var2FreeVarPartialTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
@@ -48,8 +47,8 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 class SmtFormulaGeneratorQrem {
 	// initialized in constructor
 	private var IPLSpec spec
-	private var IPLTypeProviderSpec tp 
-	
+	private var IPLTypeProviderSpec tp
+
 	// QUANT STATE: variables tracking quantifiers
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
@@ -97,7 +96,7 @@ class SmtFormulaGeneratorQrem {
 		// set free var types for the provider  
 		tp.freeVarTypes = freeVarDecls
 
-		// create a probabilistic abstraction
+		// create a propositional abstraction
 		val trans = new PropAbstTransformer
 		val fPropAbst = trans.performPropAbst(fQF.copy, tp)
 		println('Prop abst: ' + IPLPrettyPrinter::print_formula(fPropAbst))
@@ -149,7 +148,8 @@ class SmtFormulaGeneratorQrem {
 		(assert (not «formulaStr»))'''
 	}
 
-	// removes quantifiers from a prenexed formula (assumes that all QATOMS are in the front)
+	// removes quantifiers from a prenexed formula 
+	// (assumes that all QATOMS are in the front)
 	// replaces quantified variables with free constant terms
 	// populates freeVarDecls and freeVarTypeRests
 	// does not resolve terms -- they are all IDs
@@ -157,49 +157,72 @@ class SmtFormulaGeneratorQrem {
 		resetDeepState
 		resetQuantState
 
-		val Map<String, String> oldVar2New = new HashMap
+		// get all quant variable declarations in the formula 
+		val varDecls = newHashMap 
+		f.eAll.filter(QAtom).forEach[ 
+			val qdomType = tp.getQdomType(it.dom)
+			// TODO factor out qdom type -> var type inference? 
+			val varType = if(qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
+			varDecls.put(it.^var, varType)
+		]
 
+		// get a list of quant vars that are args of any flex clause 
+		// to remove only their quants
+		val List<String> varsToRemove = new ArrayList
+		f.eAll.filter(ModelExpr).forEach [ mdex |
+			createArgListForFlexAbst(mdex, varDecls).forEach [ arg |
+				varsToRemove.add(arg)
+			]
+		]
+		// mapping var names from formula to free var names
+		val Map<String, String> oldVar2New = new HashMap
+		
 		// TODO have to be careful to not touch QRATOMS
 		// first unwrap qatoms and populate sets as needed
-		val i = f.eAll.filter(QAtom)
+		val i = f.eAll.filter(QAtom) 
 		while (i.hasNext) {
 			val QAtom q = i.next
 
-			val varName = IPLUtils::freeVar(q.^var)
-			oldVar2New.put(q.^var, varName)
-			val qdomType = tp.getQdomType(q.dom)
-			val varType = if (qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
-			freeVarDecls.put(varName, varType)
+			// TODO insert a check if we want to remove this quant var
+			// other vars remain quantified
+			if (varsToRemove.contains(q.^var)) {
+				val varName = IPLUtils::freeVar(q.^var)
+				oldVar2New.put(q.^var, varName)
+				val qdomType = tp.getQdomType(q.dom)
+				val varType = if(qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
+				freeVarDecls.put(varName, varType)
 
-			// generate type restrictions
-			// switching on the set member type
-			switch (varType) {
-				ComponentType: {
-					val archElemMbFun = getArchElemMbFun(varType as ComponentType)
+				// generate type restrictions
+				// switching on the set member type
+				switch (varType) {
+					ComponentType: {
+						val archElemMbFun = getArchElemMbFun(varType as ComponentType)
 
-					freeVarTypeRests += '''(assert («archElemMbFun» «varName»))
-					'''
-				}
-				IntType,
-				RealType,
-				BoolType: {
-					if (qdomType instanceof SetType) { //need an anon set here
-						val setMbFunName = generateSetMemberFn(q.dom as Expression);
-
-						freeVarTypeRests += '''(assert («setMbFunName» «varName»))
+						freeVarTypeRests += '''(assert («archElemMbFun» «varName»))
 						'''
-					} else {
-						// do nothing here because no extra restrictions are needed
 					}
+					IntType,
+					RealType,
+					BoolType: {
+						if (qdomType instanceof SetType) { // need an anon set here
+							val setMbFunName = generateSetMemberFn(q.dom as Expression);
+
+							freeVarTypeRests += '''(assert («setMbFunName» «varName»))
+							'''
+						} else {
+							// do nothing here because no extra restrictions are needed
+						}
+					}
+					default:
+						throw new IllegalArgumentException('Unimplemented set member type')
 				}
-				default:
-					throw new IllegalArgumentException('Unimplemented set member type')
 			}
+
 		}
 
 		// replace variables in the rest of the formula		
-		// FIXME is this cast safe? 
-		(new VarFreeVarTransformer).replaceVarsWithTerms(f, oldVar2New, freeVarDecls) as Formula
+		// TODO use a partial replacer for variables
+		(new Var2FreeVarPartialTransformer).replaceVarsWithTerms(f, oldVar2New) as Formula
 
 	}
 
@@ -267,9 +290,9 @@ class SmtFormulaGeneratorQrem {
 
 	private def dispatch String generateFormula(QAtom q) {
 		val qdomType = tp.getQdomType(q.dom)
-		val varType = if (qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
-		//val varType = (tp.typeOf(q.set) as SetType).elemType;
-		// termDecls.put(q.^var, varType) -- vars don't go into term decls
+		val varType = if(qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
+			// val varType = (tp.typeOf(q.set) as SetType).elemType;
+			// termDecls.put(q.^var, varType) -- vars don't go into term decls
 		quantVarDecls.put(q.^var, varType) // if in this clause, then operating variables -- not terms
 		val quant = if(q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		// forall comes with implication, exists with conjunction
@@ -286,16 +309,16 @@ class SmtFormulaGeneratorQrem {
 			}
 			IntType,
 			RealType,
-			BoolType: { 
+			BoolType: {
 				if (qdomType instanceof SetType) { // these types require an anon set
 					val setMbFunName = generateSetMemberFn(q.dom as Expression);
-	
+
 					// actual quantified expression
 					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
 	«generateFormula(q.exp)»))'''
-					
+
 				} else { // here we just have an int without an anon set
-					// actual quantified expression
+				// actual quantified expression
 					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
 	«generateFormula(q.exp)»)'''
 				}
@@ -354,13 +377,12 @@ class SmtFormulaGeneratorQrem {
 
 		// normal flow: 
 		// poll downstream for type & generate an abstraction
-		val String abst =  createFlexAbstraction(mdex, tp.typeOf(mdex)) 
+		val String abst = createFlexAbstraction(mdex, tp.typeOf(mdex))
 		/*switch (mdex.expr) {
-			ProbQuery: createFlexAbstraction(mdex, new BoolType)
-			RewardQuery: createFlexAbstraction(mdex, new RealType)
-			default: throw new UnexpectedException('Unknown model formula')
-		}*/
-
+		 * 	ProbQuery: createFlexAbstraction(mdex, new BoolType)
+		 * 	RewardQuery: createFlexAbstraction(mdex, new RealType)
+		 * 	default: throw new UnexpectedException('Unknown model formula')
+		 }*/
 		// save the clause, get args
 		flexClauses.put(abst, mdex)
 		val args = flexArgs.get(abst)
@@ -406,42 +428,45 @@ class SmtFormulaGeneratorQrem {
 			].join(' ') + '))'
 		].join('\n') + '\n'
 	}
-	
+
 	// infers the type of a quantified variable -- depending on whether it's a set or an explicit type (e.g. int)
-	private def IPLType getQuantVarType(QAtom q){ 
-		
+	private def IPLType getQuantVarType(QAtom q) {
 	}
 
 	// creates a new symbol for an abstraction of a flexible clause
 	private def String createFlexAbstraction(ModelExpr mdex, IPLType type) {
 
-		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex
-
-		val String abstrName = '''_flex«flexNum++»'''
+		val String abstrName = '''_flex«flexNum++»''' 
 		flexDecls.put(abstrName, type)
+		flexArgs.put(abstrName, createArgListForFlexAbst(mdex, determineParamDeclsForFlex))
 
-		flexArgs.put(abstrName, new ArrayList)
+		abstrName
+	}
 
-		// decide the parameter list: 
-		// find all contents of expression that are also terms/vars
-		mdex.eAllContents.filter(ID).forEach [
-			if (paramDecls.containsKey(it.id)) {
-				val argList = flexArgs.get(abstrName)
+	// generates the var parameter list (not model params) of a given flexible abstraction  
+	// by finding all contents of expression that are also terms/vars
+	// has to be called once the quant/free var data is populated already
+	private def List<String> createArgListForFlexAbst(ModelExpr mdex, Map<String, IPLType> varDecls) {
+		val List argList = new ArrayList<String>
+		mdex.eAll.filter(ID).forEach [ 
+			if (varDecls.containsKey(it.id)) {
 				if (!argList.contains(it.id))
 					argList.add(it.id)
 			}
 		]
-		/*paramDecls.forEach [ varName, varType |
-		 * 	flexArgs.get(abstrName).add(varName)
-		 ]*/
-		abstrName
+		argList
+	// old, brute force way: 	
+	/*paramDecls.forEach [ varName, varType |
+	 * 	flexArgs.get(abstrName).add(varName)
+	 */
 	}
 
-	// creates smt declarations of flexible abstractions
-	// needs to be populated with proper abstractions already, after generating for formula
+	// creates smt declarations & constraints for flexible abstractions
+	// precondition: the class needs to be populated with proper abstractions 
+	// (so call after generating for formula)
 	private def String generateSmtFlexDecl() {
 
-		val Map<String, IPLType> paramDecls = decideParamDeclsForFlex
+		val Map<String, IPLType> paramDecls = determineParamDeclsForFlex
 
 		// generate declarations
 		val funDecls = flexDecls.keySet.map [
@@ -485,17 +510,24 @@ class SmtFormulaGeneratorQrem {
 		funDecls + asserts
 	}
 
-	// decide which declarations to use - terms or vars (depending on use case) 
-	private def Map<String, IPLType> decideParamDeclsForFlex() {
-		if (!freeVarDecls.empty && !quantVarDecls.empty)
-			throw new UnexpectedException("Error: both terms and quant vars are considered")
+	// decides which parameter declarations to use in flexible abstractions 
+	// options: 
+	// - free vars -- if those are available (which means we're in model finding mode) 
+	// - quant vars -- if we are in checking mode (which is when free vars have to be empty)
+	private def Map<String, IPLType> determineParamDeclsForFlex() {
+		// TODO fix this, perhaps return a union? 
+//		if (!freeVarDecls.empty && !quantVarDecls.empty)
+//			throw new UnexpectedException("Error: both free vars and quant vars are considered")
 
 		if (!freeVarDecls.empty)
 			freeVarDecls
-		else if (!quantVarDecls.empty)
-			quantVarDecls
-		else
-			new HashMap // neither: then no parameters for the abstraction
+		else 
+			quantVarDecls // if both are empty, this returns an empty one
+			
+//		else if (!quantVarDecls.empty)
+//			quantVarDecls
+//		else
+//			new HashMap // neither: then no parameters for the abstraction
 	}
 
 	// reset the parsing state of the quantifiers/free variables
@@ -522,12 +554,15 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// helper function to generate anonymous sets, returning membership f-n name
+	// TODO issue with current impl: during rigid verif, using quant vars is impossible here 
+	// since set f-n declaration is outside of their scope 
+	// potential change: introduce a flag that enables returning of the whole expression, without declaration 
 	private def String generateSetMemberFn(Expression set) {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
-		switch(set) { 
+		switch (set) {
 			Const: { // an explicitly specified set constant, create an anon set
 				val funName = '''anonSetMb«anonSetCount++»''';
-				
+
 				// declaring an anonymous set	 
 				setMemberFnDecls += '''(define-fun «funName» ((_x «elemType.typesIPL2Smt»)) Bool
 				(or «(set as Set).members.map[ '''(= _x «generateFormula(it)»)'''].join(" ")»   
@@ -535,7 +570,7 @@ class SmtFormulaGeneratorQrem {
 				''';
 				funName
 			}
-			ID : { // must be a set variable, fetch its declaration
+			ID: { // must be a set variable, fetch its declaration
 				val funName = set.id
 				setMemberFnDecls += '''(declare-fun «funName» ((«elemType.typesIPL2Smt»)) Bool)''' + '\n'
 				// declaration not necessary - the type provider already did that 

@@ -30,7 +30,7 @@ import org.xtext.example.ipl.validation.IPLTypeProviderSpec
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
-// replaces the closest formula of each flex var with a propositional constant
+// replaces the topmost flexible formula with a propositional constant
 class PropAbstTransformer {
 	
 	private var IPLTypeProviderSpec tp

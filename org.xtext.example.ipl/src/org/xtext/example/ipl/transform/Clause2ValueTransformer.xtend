@@ -21,8 +21,8 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
-// transforms a formula into its prenex normal form
-class ClauseValueTransformer {
+// transforms arbitrary clauses (subformulas) into their provided values 
+class Clause2ValueTransformer {
 
 	private Map<Formula, IPLType> formulaTypes
 	private Map<Formula, Object> formulaValues
