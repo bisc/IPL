@@ -10,7 +10,8 @@ import org.eclipse.emf.ecore.util.EcoreUtil
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
 import org.osate.aadl2.AadlReal
-import org.osate.aadl2.Property
+import org.osate.aadl2.PropertyType
+import org.osate.aadl2.ReferenceType
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.IPLPackage
 import org.xtext.example.ipl.iPL.Int
@@ -88,28 +89,32 @@ class IPLUtils {
 		}
 	}
 	
-	// type conversion AADL -> IPL
-	public def static IPLType typeFromPropType(Property property) {
-		switch (property.propertyType) {
+	// type conversion: AADL -> IPL
+	public def static IPLType typeFromPropType(PropertyType propertyType) {
+		switch (propertyType) {
 			AadlBoolean: new BoolType
 			AadlInteger: new IntType 
 			AadlReal: new RealType
+			ReferenceType: new ComponentType('') // a reference to an AADL architectural element, 
+												// could encode it as integers but this seems less broken
+			org.osate.aadl2.ListType: new ListType(typeFromPropType(propertyType.elementType))
 			default: null
 		}
 	}
 	
+	// type conversion: type declaration -> IPL
 	public static def IPLType typesDecl2IPL(Type t) {
 		switch (t) {
 			TypeInt: new IntType
 			TypeReal: new RealType
 			TypeBool: new BoolType
-			TypeSet: new SetType(org.xtext.example.ipl.util.IPLUtils.typesDecl2IPL((t as TypeSet).elem))
-			TypeLst: new ListType(org.xtext.example.ipl.util.IPLUtils.typesDecl2IPL((t as TypeLst).elem))
+			TypeSet: new SetType(IPLUtils.typesDecl2IPL((t as TypeSet).elem))
+			TypeLst: new ListType(IPLUtils.typesDecl2IPL((t as TypeLst).elem))
 		}
 	}
 	
 	
-	// type conversion IPL -> SMT
+	// type conversion: IPL -> SMT
 	public def static String typesIPL2Smt(IPLType t) {
 		switch (t) {
 			BoolType: 'Bool'

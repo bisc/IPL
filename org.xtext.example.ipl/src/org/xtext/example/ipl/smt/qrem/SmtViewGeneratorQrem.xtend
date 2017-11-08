@@ -4,39 +4,42 @@ import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
 import java.util.Map
-import org.eclipse.xtext.resource.IEObjectDescription
+import java.util.Map.Entry
 import org.osate.aadl2.AadlPackage
 import org.osate.aadl2.BooleanLiteral
 import org.osate.aadl2.ComponentImplementation
 import org.osate.aadl2.IntegerLiteral
+import org.osate.aadl2.ListValue
+import org.osate.aadl2.PropertyExpression
 import org.osate.aadl2.PropertySet
 import org.osate.aadl2.RealLiteral
 import org.osate.aadl2.SubprogramGroupImplementation
 import org.osate.aadl2.SubprogramImplementation
 import org.osate.aadl2.instance.ComponentInstance
+import org.osate.aadl2.instance.InstanceReferenceValue
 import org.osate.aadl2.instance.util.InstanceUtil
 import org.osate.aadl2.instantiation.InstantiateModel
-import org.osate.aadl2.modelsupport.resources.OsateResourceUtil
 import org.osate.aadl2.properties.PropertyNotPresentException
-import org.osate.xtext.aadl2.properties.util.EMFIndexRetrieval
 import org.osate.xtext.aadl2.properties.util.PropertyUtils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.interfaces.SmtViewGenerator
 import org.xtext.example.ipl.util.IPLUtils
+import org.xtext.example.ipl.util.TimeRecCPU
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
+import org.xtext.example.ipl.validation.ListType
 
 import static java.lang.Math.toIntExact
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import org.xtext.example.ipl.util.TimeRecCPU
 
 class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 	// to not run background generation every time when looking for models
 	private var viewGenerated = false
 
+	private val cic = new ComponentIndexCache
 	// storage for component properties and their types; <prop name , prop type> -> (archelem index -> prop value)
 	// faces externally  
 	private var Map<String, Map<Integer, Object>> propValueMap = new HashMap
@@ -91,11 +94,40 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
-		val props = propTypeMap.keySet.map [
-			'(declare-fun ' + it + ' (ArchElem) ' + IPLUtils::typesIPL2Smt(propTypeMap.get(it)) + ')\n'
-		].join + '\n' + propValueMap.keySet.map [ name |
-			propValueMap.get(name).entrySet.map['(assert (= (' + name + ' ' + key + ') ' + value + '))\n'].join
-		].join
+		// properties: declarations & assertions
+		// the code below is quite complex due to different types of values that properties might take
+		val props = propTypeMap.keySet.map [ propName |
+			val type = propTypeMap.get(propName)
+			val Map propValues = propValueMap.get(propName) // propValues: map compIndex -> object 
+			if (type instanceof ListType) { // list of something
+			// lists are tricky to represent in SMT. Using 0-based arrays with an explicit length function for each array.
+			// Implementing using an axiomatic recursive datatype proved to perform very poorly when trying to find if X in a list element
+				val listSortName = propName + '_sort'
+				val listLengthFn = propName + '_length'
+				// declaration of list type 
+				'''(define-sort ' «listSortName» () (Array Int «IPLUtils::typesIPL2Smt(type.elemType)» ))\n''' +
+				// declaration of the property 
+				'(declare-fun ' + propName + ' (ArchElem) ' + listSortName + ')\n' +
+				// declaration of the length function
+				'(declare-fun ' + listLengthFn + ' (ArchElem) (Int))\n' +
+				// assertions for each list (one per arch elem)
+				propValues.entrySet.map[ Entry<Object, Object> indexListPair |/* key - compIndex, value - list of values */
+					val int compIndex = indexListPair.key as Integer
+					val List valueList = indexListPair.value as List<Object>
+					// assertions for each list element's position and value
+					valueList.map[ listElem |
+						'(assert (= (select (' + propName + ' ' + compIndex + ') ' +
+						 valueList.indexOf(listElem) +') ' + listElem + '))\n'].join +
+					// assertions of length for each list 
+					'(assert (= (' + listLengthFn + ' ' + compIndex + ') ' + valueList.length + '))\n' 
+				].join + '\n'
+			} else { // simple type
+				'(declare-fun ' + propName + ' (ArchElem) ' + IPLUtils::typesIPL2Smt(type) + ')\n' + 
+				propValues.entrySet.map[ Entry<Object, Object> pair | // key - compIndex, value - simple object
+					'(assert (= (' + propName + ' ' + pair.key + ') ' + pair.value + '))\n'
+				].join
+			} // TODO implement set type? 
+		].join + '\n'
 
 		var subComps = '(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)\n'
 		subComps += subCompMap.entrySet.map [
@@ -115,7 +147,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 «decls»
 
 «defns»
-		
+
 ; Properties and subcomponents
 «props»
 
@@ -149,28 +181,28 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		// instantiate aadl model
 		val inst = InstantiateModel::buildInstanceModelFile(comp)
-		val cic = new ComponentIndexCache
+		
 		// find a package and get all property set imports 
 		val AadlPackage cont = comp.getContainerOfType(AadlPackage)
 		val pss = cont.ownedPublicSection.importedUnits.filter [
 			it instanceof PropertySet
 		].toList as List // up-casting to make the function swallow this list
-		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, cic, subCompMap, pss)]
+		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
 	}
 
-	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map, ComponentIndexCache cic,
+	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map,
 		Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
 
-		val index = cic.indexForComp(comp)
+		val compIndex = cic.indexForComp(comp)
 
-		// System::out.println(index + ") " + comp.category.toString + ': ' + InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended + ' ' + comp.name)
-		map.add('isArchElem', index)
-		map.add('is' + comp.category.toString.toFirstUpper, index)
-		InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended.forEach[map.add('is' + name, index)]
+//		println(compIndex + ") " + comp.category.toString + ': ' + InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended + ' ' + comp.name)
+		map.add('isArchElem', compIndex)
+		map.add('is' + comp.category.toString.toFirstUpper, compIndex)
+		InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended.forEach[map.add('is' + name, compIndex)]
 
 		val ci = InstanceUtil::getComponentImplementation(comp, 0, null)
 		if (ci !== null) {
-			map.add('is' + ci.name.replace('.', '_'), index)
+			map.add('is' + ci.name.replace('.', '_'), compIndex)
 		}
 
 		// handling subcomponents
@@ -183,11 +215,11 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 					if (propValueMap.get(name) === null)
 						propValueMap.put(name, new HashMap)
 
-					propValueMap.get(name).put(index, scIndex)
+					propValueMap.get(name).put(compIndex, scIndex)
 
 					// propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
 					// index, scIndex.toString
-					subCompMap.add(index, scIndex)
+					subCompMap.add(compIndex, scIndex)
 				}
 			}
 		]
@@ -196,28 +228,41 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		for (ps : propsets)
 			for (prop : ps.ownedProperties) { // each property
 				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
-					val type = IPLUtils::typeFromPropType(prop)
-					if (type !== null) {
-						val propExp = try {
-								PropertyUtils::getSimplePropertyValue(comp, prop)
-							} catch (PropertyNotPresentException e) {
-								null
-							}
+					val type = IPLUtils::typeFromPropType(prop.propertyType)
+					if (type !== null) { // only considering the types we know 
+						val value = if (type instanceof ListType) { // a list property type
+								val ListValue listVal = try {
+										val propExp = PropertyUtils::getSimplePropertyListValue(comp, prop)
+										if(propExp instanceof ListValue) propExp else null
+									} catch (PropertyNotPresentException e) {
+										null
+									}
+								// TODO need to control that we don't add lots of nulls to lists
+								if (listVal !== null) {
+									val outputList = new ArrayList
+									listVal.ownedListElements.forEach [
+										outputList.add(aadlSimpleValue2Object(it))
+									]
+									outputList
+								} else 
+									null
 
-						// have to go through this dance because otherwise does not get cast
-						val value = switch propExp {
-							BooleanLiteral: propExp.getValue()
-							IntegerLiteral: toIntExact(propExp.getValue()) // it returns long
-							RealLiteral: propExp.getValue()
-							default: null
-						}
+							} else { // a simple, non-list property 
+								val PropertyExpression propExp = try {
+										PropertyUtils::getSimplePropertyValue(comp, prop)
+									} catch (PropertyNotPresentException e) {
+										null
+									}
+
+								aadlSimpleValue2Object(propExp)
+							}
 
 						if (value !== null) {
 							propTypeMap.put(prop.name, type)
 							if (propValueMap.get(prop.name) === null)
 								propValueMap.put(prop.name, new HashMap)
 
-							propValueMap.get(prop.name).put(index, value)
+							propValueMap.get(prop.name).put(compIndex, value)
 						}
 					}
 				}
@@ -238,6 +283,26 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 			}
 		}
 
+	}
+
+	// converts an AADL simple value into a Java object
+	// assumes a populated component index cache for instance reference values
+	private def aadlSimpleValue2Object(PropertyExpression propExp) {
+		// have to go through this dance because otherwise does not get cast
+		switch propExp {
+			BooleanLiteral: propExp.getValue()
+			IntegerLiteral: toIntExact(propExp.getValue()) // it returns long
+			RealLiteral: propExp.getValue()
+			InstanceReferenceValue: {
+				// only deal with component instances
+				val refObject = propExp.referencedInstanceObject
+				if (refObject instanceof ComponentInstance) 
+					cic.indexForComp(refObject)// more concrete than just ReferenceValue
+				else 
+					null 
+				}
+			default: null
+		}
 	}
 
 	private def <K, V> add(Map<K, List<V>> map, K key, V item) {

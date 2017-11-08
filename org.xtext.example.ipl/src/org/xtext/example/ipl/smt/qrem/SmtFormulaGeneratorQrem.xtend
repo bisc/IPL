@@ -169,7 +169,7 @@ class SmtFormulaGeneratorQrem {
 		// get a list of quant vars that are args of any flex clause 
 		// to remove only their quants
 		val List<String> varsToRemove = new ArrayList
-		f.eAll.filter(ModelExpr).forEach [ mdex |
+		f.eAllOfType(ModelExpr).forEach [ mdex |
 			createArgListForFlexAbst(mdex, varDecls).forEach [ arg |
 				varsToRemove.add(arg)
 			]
@@ -179,11 +179,10 @@ class SmtFormulaGeneratorQrem {
 		
 		// TODO have to be careful to not touch QRATOMS
 		// first unwrap qatoms and populate sets as needed
-		val i = f.eAll.filter(QAtom) 
+		val i = f.eAllOfType(QAtom).iterator
 		while (i.hasNext) {
 			val QAtom q = i.next
 
-			// TODO insert a check if we want to remove this quant var
 			// other vars remain quantified
 			if (varsToRemove.contains(q.^var)) {
 				val varName = IPLUtils::freeVar(q.^var)
@@ -221,7 +220,6 @@ class SmtFormulaGeneratorQrem {
 		}
 
 		// replace variables in the rest of the formula		
-		// TODO use a partial replacer for variables
 		(new Var2FreeVarPartialTransformer).replaceVarsWithTerms(f, oldVar2New) as Formula
 
 	}
