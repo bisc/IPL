@@ -23,52 +23,64 @@ import org.xtext.example.ipl.iPL.VarDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-class IPLRigidityProviderLookup {
+class IPLRigidityProvider {
 	
-	static def dispatch boolean isRigid(QAtom q) {
+	private IPLSpec spec = null 
+	
+	new() { // spec lookup happens later
+	}
+	
+	new(IPLSpec _spec){
+		spec = _spec
+	}
+	
+	 def dispatch boolean isRigid(QAtom q) {
 		q.dom.rigid && q.exp.rigid
 	}
 	
-	static def dispatch boolean isRigid(TAtomUnary t) {
+	 def dispatch boolean isRigid(TAtomUnary t) {
 		false
 	}
 	
-	static def dispatch boolean isRigid(TAtomBinary t) {
+	 def dispatch boolean isRigid(TAtomBinary t) {
 		false
 	}
 	
-	static def dispatch boolean isRigid(ModelExpr r) {
-		false
-	}	
-	
-	static def dispatch boolean isRigid(ProbQuery p) {
-		false
-	}
-	
-	static def dispatch boolean isRigid(RewardQuery r) {
+	 def dispatch boolean isRigid(ModelExpr r) {
 		false
 	}	
 	
-	static def dispatch boolean isRigid(Const c) {
+	 def dispatch boolean isRigid(ProbQuery p) {
+		false
+	}
+	
+	 def dispatch boolean isRigid(RewardQuery r) {
+		false
+	}	
+	
+	 def dispatch boolean isRigid(Const c) {
 		true
 	}
 	
-	static def dispatch boolean isRigid(Type t) { // for when e.g. int inside quantification
+	 def dispatch boolean isRigid(Type t) { // for when e.g. int inside quantification
 		true
 	}
 	
-	static def dispatch boolean isRigid(PropertyExpression p) {
+	 def dispatch boolean isRigid(PropertyExpression p) {
 		true
 	}
 	
-	static def dispatch boolean isRigid(Fun f) {
+	 def dispatch boolean isRigid(Fun f) {
 		!(f.decl instanceof MFunDecl)
 	}
 
-	static def dispatch boolean isRigid(ID e) {
+	 def dispatch boolean isRigid(ID e) {
 		val name = e.id
 		
-		val decls = e.getContainerOfType(IPLSpec).decls
+		if (spec === null)
+			spec = e.getContainerOfType(IPLSpec)
+		
+		val decls = spec.decls
 		
 		val decl = decls.filter[it instanceof TypedDecl].findLast[(it as TypedDecl).name == name]
 		
@@ -78,25 +90,25 @@ class IPLRigidityProviderLookup {
 			return true
 	}
 	
-	static def dispatch boolean isRigid(FormulaOperation op) {
+	 def dispatch boolean isRigid(FormulaOperation op) {
 		op.left.rigid && op.right.rigid
 	}
 	
 	
-	static def dispatch boolean isRigid(ExprOperation op){
+	 def dispatch boolean isRigid(ExprOperation op){
 		 op.left.rigid && op.right.rigid
 	}
 	
-	static def dispatch boolean isRigid(Negation op){
+	 def dispatch boolean isRigid(Negation op){
 		 op.child.rigid
 	}
 	
-	static def dispatch boolean isRigid(TermOperation op){
+	 def dispatch boolean isRigid(TermOperation op){
 	 	op.left.rigid && op.right.rigid
 	}
 	
 	// a questionable function that expands each eobject
-//	static def dispatch boolean isRigid(EObject o) {
+//	 def dispatch boolean isRigid(EObject o) {
 //		o.eAllContentsAsList.forall[rigid]
 //	}
 //	

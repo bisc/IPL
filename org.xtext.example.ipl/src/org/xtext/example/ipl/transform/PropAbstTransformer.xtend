@@ -15,7 +15,6 @@ import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLPackage
-import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.Negation
 import org.xtext.example.ipl.iPL.PropertyExpression
@@ -25,21 +24,20 @@ import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
-import org.xtext.example.ipl.validation.IPLTypeProviderSpec
-
+import org.xtext.example.ipl.validation.IPLTypeProvider
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
 // replaces the topmost flexible formula with a propositional constant
 class PropAbstTransformer {
 	
-	private var IPLTypeProviderSpec tp
+	private var IPLTypeProvider tp
 	
 	private List<String> propAbsts = new ArrayList 
 	private int propAbstCt = 0 
 	private Map<Formula, Formula> replacedFormulas = new HashMap 
 	
-	public def Formula performPropAbst(Formula f, IPLTypeProviderSpec _tp) {
+	public def Formula performPropAbst(Formula f, IPLTypeProvider _tp) {
 		tp = _tp 
 		visit(f)
 	}

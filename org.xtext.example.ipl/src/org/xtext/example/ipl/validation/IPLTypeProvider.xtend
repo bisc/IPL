@@ -4,6 +4,7 @@ import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
+import java.util.Map
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.resource.IEObjectDescription
 import org.osate.aadl2.AadlBoolean
@@ -42,32 +43,43 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.SortDecl
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
-import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypeBool
 import org.xtext.example.ipl.iPL.TypeElem
 import org.xtext.example.ipl.iPL.TypeInt
-import org.xtext.example.ipl.iPL.TypeLst
 import org.xtext.example.ipl.iPL.TypeReal
-import org.xtext.example.ipl.iPL.TypeSet
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.iPL.ViewDecl
+import org.xtext.example.ipl.util.IPLUtils
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-// a version of the type provider that looks up a spec every time it needs it
-class IPLTypeProviderLookup {
+// a version of the type provider combines looking up and setting IPL spec up front
+// creates IPL types: 
+// - from component instance
+// - from component classifier (used for aadl mdls)
+// - from component implementation (deprecated)
+class IPLTypeProvider {
 	
 	HashMap<ComponentClassifier, List<Property>> classifierPropCache = new HashMap
+	IPLSpec spec = null
+	Map<String, IPLType> freeVarTypes = null
 	
-	def IPLType fromType(Type t) {
-		switch (t) {
-			TypeInt: new IntType
-			TypeReal: new RealType
-			TypeBool: new BoolType
-			TypeSet: new SetType(fromType((t as TypeSet).elem))
-			TypeLst: new ListType(fromType((t as TypeLst).elem))
-		}
+	
+	new(){ // spec lookup happens later
+	}
+
+	new(IPLSpec _spec){
+		spec = _spec
+	}
+	
+	new(IPLSpec _spec, Map<String, IPLType> _freeVarTypes){
+		spec = _spec
+		freeVarTypes = _freeVarTypes
+	}
+	
+	def setFreeVarTypes(Map<String, IPLType> _freeVarTypes) {
+		freeVarTypes = _freeVarTypes
 	}
 
 	// accepts a reference to the topmost element 
@@ -75,7 +87,7 @@ class IPLTypeProviderLookup {
 		// TODO: do for all components and all properties at once? 
 	}
 	
-	def IPLType fromComponentImpl(ComponentImplementation ref) {
+	def IPLType createTypeFromComponentImpl(ComponentImplementation ref) {
 		if (true)
 			throw new UnexpectedException("This function is not supposed to be called")
 			 
@@ -98,16 +110,16 @@ class IPLTypeProviderLookup {
 		for (IEObjectDescription ieo: EMFIndexRetrieval::getAllPropertySetsInWorkspace(inst.getComponentClassifier())) { 
 			val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
 			for (prop : ps.ownedProperties) {
-				if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
+				if (inst.acceptsProperty(prop) && IPLUtils::typeFromPropType(prop.propertyType) !== null) {
 					prop_cache.add(prop);
 				}
 			}
 		}
 		
-		fromComponentInst(inst, prop_cache)
+		createTypeFromComponentInst(inst, prop_cache)
 	}
 	
-	def IPLType fromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
+	def IPLType createTypeFromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
 //		System::out.println(inst.children.map[switch (it) {
 //			ComponentInstance: it.name
 //			PropertyAssociationInstance: it.property.name
@@ -118,20 +130,26 @@ class IPLTypeProviderLookup {
 		val ct = new ComponentType(if (impl === null) inst.name else impl.name)
 		
 		// add subcomponent instances as members
-		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, fromComponentInst(it, prop_cache))}]
+		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, createTypeFromComponentInst(it, prop_cache))}]
 
 		for (prop : prop_cache) {
-			if (inst.acceptsProperty(prop) && fromPropType(prop) !== null) {
-				ct.addMember(prop.name, fromPropType(prop));
+			val propType = IPLUtils::typeFromPropType(prop.propertyType)
+			if (inst.acceptsProperty(prop) && propType !== null) {
+				ct.addMember(prop.name, propType);
 			}
 		}
 		 
 		ct
 	}
 	
-	def IPLType fromComponentClassifier(ComponentClassifier ref) {
+	def IPLType createTypeFromComponentClassifier(ComponentClassifier ref) {
 		
-		val ct = new ComponentType(ref.name) 
+		val ct = new ComponentType(
+			if (ref.name === null) 
+				'NOTFOUND' 
+			else 
+				ref.name
+		) 
 		
 		// populate the cache if needed
 		if (classifierPropCache.get(ref) === null) {
@@ -143,9 +161,8 @@ class IPLTypeProviderLookup {
 			for (PropertySet ps : propsets) { 
 			//for (IEObjectDescription ieo : EMFIndexRetrieval::getAllPropertySetsInWorkspace(ref)) {
 				//val ps = OsateResourceUtil.getResourceSet().getEObject(ieo.getEObjectURI(), true) as PropertySet;
-				for (prop : ps.ownedProperties) {
-
-					val propType = fromPropType(prop)
+				for (prop : ps.ownedProperties) { // iterate through owned properties
+					val propType = IPLUtils::typeFromPropType(prop.propertyType)
 					if (propType !== null) {
 						val metaclasses = prop.appliesToMetaclasses
 						metaclasses.forEach [
@@ -154,7 +171,6 @@ class IPLTypeProviderLookup {
 							if (it.metaclass.name.equalsIgnoreCase(ref.category.getName())) // if (ref.isDescendentOf(owningClassifier))
 								classifierPropCache.get(ref).add(prop) 
 								//ct.addMember(prop.name, propType);
-								
 						]
 					/*val classifiers = prop.appliesToClassifiers
 
@@ -171,19 +187,10 @@ class IPLTypeProviderLookup {
 		}
 		
 		// use cache
-		classifierPropCache.get(ref).forEach[ct.addMember(it.name, fromPropType(it))]
+		classifierPropCache.get(ref).forEach[ct.addMember(it.name, 
+			IPLUtils::typeFromPropType(it.propertyType))]
 		
 		ct
-
-	}
-	
-	def IPLType fromPropType(Property property) {
-		switch (property.propertyType) {
-			AadlBoolean: new BoolType
-			AadlInteger: new IntType
-			AadlReal: new RealType
-			default: null
-		}
 	}
 	
 		
@@ -194,24 +201,26 @@ class IPLTypeProviderLookup {
 		
 //		System::out.println("####<" + e.id + ">####")
 		
-		val decls = e.getContainerOfType(IPLSpec).decls
+		if (spec === null )
+			spec = e.getContainerOfType(IPLSpec)
+		val decls = spec.decls
 		
 		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
-		if (decl !== null) {
+		if (decl !== null) { // first check in declarations
 			return switch (decl) {
-				VarDecl: fromType(decl.type)
-				STVarDecl: fromType(decl.type)
-				SortDecl: new SetType(fromComponentClassifier(decl.ref)) //used to be from ComponentImpl
-				ViewDecl: fromComponentImpl(decl.ref)
+				VarDecl: IPLUtils::typesDecl2IPL(decl.type)
+				STVarDecl: IPLUtils::typesDecl2IPL(decl.type)
+				SortDecl: new SetType(createTypeFromComponentClassifier(decl.ref)) //used to be from ComponentImpl
+				ViewDecl: createTypeFromComponentImpl(decl.ref)
 			}
-		} else {
+		} else { // then check in quantified variables
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
 				if (q !== null && q.^var == name) {
 //					System::out.println("****<" + q.set + ">****")
 					val type = getQdomType(q.dom)
-					if (type instanceof SetType)
+					if (type instanceof SetType) // if it's a set of components, return component type
 						return (type as SetType).elemType
 					else
 					// This is an error, but assume this is what the user meant
@@ -272,7 +281,7 @@ class IPLTypeProviderLookup {
 	}*/
 	
 	def dispatch IPLType typeOf(Fun f) {
-		fromType(f.decl.retType)
+		IPLUtils::typesDecl2IPL(f.decl.retType)
 	}
 	
 	def dispatch IPLType typeOf(ExprOperation e) {
@@ -302,6 +311,7 @@ class IPLTypeProviderLookup {
 			new BoolType
 	}
 	
+	// returns a type of a given quantification domain
 	public def IPLType getQdomType(EObject qdom){ 
 		switch(qdom) { 
 			Expression:
@@ -318,14 +328,16 @@ class IPLTypeProviderLookup {
 	}
 	
 	def getParamTypes(Fun fun) {		
-		fun.decl.paramTypes.map[fromType]
+		fun.decl.paramTypes.map[IPLUtils::typesDecl2IPL(it)]
 	}
 	
 	def isDef(ID e) {
 		// Resolve id here
 		val name = e.id
 		
-		val decls = e.getContainerOfType(IPLSpec).decls
+		if (spec === null )
+			spec = e.getContainerOfType(IPLSpec)
+		val decls = spec.decls
 		
 		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
 		
@@ -341,6 +353,6 @@ class IPLTypeProviderLookup {
 			return false
 		}
 	}
-	
+
 	
 }

@@ -19,7 +19,7 @@ import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import static extension org.xtext.example.ipl.validation.IPLRigidityProviderLookup.*
+import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
 
 /**
  * This class contains custom validation rules. 
@@ -28,7 +28,7 @@ import static extension org.xtext.example.ipl.validation.IPLRigidityProviderLook
  */
 class IPLValidator extends AbstractIPLValidator {
 
-	val typeProvider = new IPLTypeProviderLookup
+	val typeProvider = new IPLTypeProvider
 
 	public static val WRONG_TYPE = 'wrongType'
 	public static val UNDEFINED = 'undefined'
@@ -184,7 +184,7 @@ class IPLValidator extends AbstractIPLValidator {
 	def checkTypes(PropertyExpression p) {
 		val type = getType(p.left)
 
-		switch (type) {
+		switch (type) { 
 			ComponentType:
 				if (type.getMemberType(p.right.id) === null) {
 					error("Not a property: " + p.right.id, IPLPackage.Literals.PROPERTY_EXPRESSION__RIGHT, UNDEFINED)
@@ -205,12 +205,13 @@ class IPLValidator extends AbstractIPLValidator {
 	def checkFlexibleQuant(QAtom t) {
 		val inModality = t.getContainerOfType(TAtomUnary) !== null ||
 			 t.getContainerOfType(TAtomBinary) !== null
-
-		if (inModality && !t.exp.rigid) {
+		val rp = new IPLRigidityProvider
+	
+		if (inModality && !rp.isRigid(t.exp)) {
 			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__EXP, INV_FLEXIBLE)
 		}
 
-		if (inModality && !t.dom.rigid) {
+		if (inModality && !rp.isRigid(t.dom)) {
 			error("Flexible quantification used inside modality", IPLPackage.Literals.QATOM__DOM, INV_FLEXIBLE)
 		}
 	}

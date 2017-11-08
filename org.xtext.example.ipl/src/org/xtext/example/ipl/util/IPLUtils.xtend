@@ -31,7 +31,7 @@ import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
 
 class IPLUtils { 
-	/** 
+	/**  
 	 * Run a shell command in the specified directory.  
 	 * @param command command to be run
 	 * @param dir the directory to run the command in. If dir is null, runs it in the current directory of the process.
@@ -95,7 +95,7 @@ class IPLUtils {
 			AadlBoolean: new BoolType
 			AadlInteger: new IntType 
 			AadlReal: new RealType
-			ReferenceType: new ComponentType('') // a reference to an AADL architectural element, 
+			ReferenceType: new ComponentType('REFERENCE') // a reference to an AADL architectural element, 
 												// could encode it as integers but this seems less broken
 			org.osate.aadl2.ListType: new ListType(typeFromPropType(propertyType.elementType))
 			default: null

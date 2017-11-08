@@ -31,7 +31,7 @@ import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
-import org.xtext.example.ipl.validation.IPLTypeProviderSpec
+import org.xtext.example.ipl.validation.IPLTypeProvider
 import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
@@ -47,7 +47,7 @@ import static extension org.xtext.example.ipl.util.IPLUtils.*
 class SmtFormulaGeneratorQrem {
 	// initialized in constructor
 	private var IPLSpec spec
-	private var IPLTypeProviderSpec tp
+	private var IPLTypeProvider tp
 
 	// QUANT STATE: variables tracking quantifiers
 	// free constants replacing quantified variables: name, type
@@ -85,7 +85,7 @@ class SmtFormulaGeneratorQrem {
 
 	new(IPLSpec _spec) {
 		spec = _spec
-		tp = new IPLTypeProviderSpec(spec)
+		tp = new IPLTypeProvider(spec)
 	}
 
 	// generate a formula for finding models, with given types of free variables

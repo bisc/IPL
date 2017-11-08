@@ -55,16 +55,6 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 (set-option :model_evaluator.completion true)
 
 '''
-//(assert (= (abs_int (- 1)) 1)) - how to write it for cvc4
-//(assert (= (abs_int -1) 1)) - how to write it for z3
-		val pluginTerms = '''
-(define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
-(define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
-(define-fun max_int ((x Int) (y Int)) Int (ite (< x y) y x))
-(define-fun max_real ((x Real) (y Real)) Real (ite (< x y) y x))
-(define-fun min_int ((x Int) (y Int)) Int (ite (< x y) x y))
-(define-fun min_real((x Real) (y Real)) Real (ite (< x y) x y))
-'''
 
 		// gather view declarations
 		val viewDecs = spec.eAllOfType(ViewDecl)
@@ -87,7 +77,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		// generate aadl->smt 
 		var decls = "(define-sort ArchElem () Int)\n"
-		decls += compMap.keySet.map['(declare-fun ' + it + '(ArchElem) Bool)'].join('\n')
+		decls += compMap.keySet.map['''(declare-fun «it» (ArchElem) Bool)'''].join('\n')
 
 		val defns = compMap.entrySet.map [
 			if (value.
@@ -101,31 +91,37 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 			val Map propValues = propValueMap.get(propName) // propValues: map compIndex -> object 
 			if (type instanceof ListType) { // list of something
 			// lists are tricky to represent in SMT. Using 0-based arrays with an explicit length function for each array.
-			// Implementing using an axiomatic recursive datatype proved to perform very poorly when trying to find if X in a list element
+			// the length function needs to be universal, otherwise the containment function does not know what to call 
+			// Alternative: implementing using an axiomatic recursive datatype proved to perform very poorly when trying to find if X in a list element
 				val listSortName = propName + '_sort'
-				val listLengthFn = propName + '_length'
+				val listLengthFn = 'length'
+//				val listLengthFn = propName + '_length'
 				// declaration of list type 
-				'''(define-sort ' «listSortName» () (Array Int «IPLUtils::typesIPL2Smt(type.elemType)» ))\n''' +
+				'''(define-sort «listSortName» () (Array Int «IPLUtils::typesIPL2Smt(type.elemType)» ))''' + '\n' + 
 				// declaration of the property 
-				'(declare-fun ' + propName + ' (ArchElem) ' + listSortName + ')\n' +
-				// declaration of the length function
-				'(declare-fun ' + listLengthFn + ' (ArchElem) (Int))\n' +
+				'''(declare-fun «propName» (ArchElem) «listSortName»)'''+ '\n' +
+				// declaration of the length function: using not archelem, but directly the array -- 
+				// TODO if this doesn't work, try the old one and put archelem in 
+				'''(declare-fun «listLengthFn» ((Array Int «IPLUtils::typesIPL2Smt(type.elemType)»)) (Int))''' + '\n' +
+//				'''(declare-fun «listLengthFn» (ArchElem) (Int))''' + '\n' +
 				// assertions for each list (one per arch elem)
-				propValues.entrySet.map[ Entry<Object, Object> indexListPair |/* key - compIndex, value - list of values */
+				propValues.entrySet.map [ Entry<Object, Object> indexListPair | /* key - compIndex, value - list of values */
 					val int compIndex = indexListPair.key as Integer
 					val List valueList = indexListPair.value as List<Object>
 					// assertions for each list element's position and value
-					valueList.map[ listElem |
-						'(assert (= (select (' + propName + ' ' + compIndex + ') ' +
-						 valueList.indexOf(listElem) +') ' + listElem + '))\n'].join +
+					valueList.map [ listElem |
+						'''(assert (= (select («propName» «compIndex») «
+							valueList.indexOf(listElem)») «listElem»))''' + '\n'
+					].join + 
 					// assertions of length for each list 
-					'(assert (= (' + listLengthFn + ' ' + compIndex + ') ' + valueList.length + '))\n' 
+					'''(assert (= («listLengthFn» («propName» «compIndex»)) «valueList.size»))''' + '\n'
+//					'''(assert (= («listLengthFn» «compIndex») «valueList.size»))''' + '\n'
 				].join + '\n'
 			} else { // simple type
-				'(declare-fun ' + propName + ' (ArchElem) ' + IPLUtils::typesIPL2Smt(type) + ')\n' + 
-				propValues.entrySet.map[ Entry<Object, Object> pair | // key - compIndex, value - simple object
-					'(assert (= (' + propName + ' ' + pair.key + ') ' + pair.value + '))\n'
-				].join
+				'''(declare-fun «propName» (ArchElem) «IPLUtils::typesIPL2Smt(type)»)''' + '\n' +
+					propValues.entrySet.map [ Entry<Object, Object> pair | // key - compIndex, value - simple object
+						'''(assert (= («propName» «pair.key») «pair.value»))''' + '\n' 
+					].join
 			} // TODO implement set type? 
 		].join + '\n'
 
@@ -134,14 +130,25 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 			'''(assert (forall ((x ArchElem)) (= (isSubcomponentOf «key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR»))))'''
 		].join('\n')
 
+		// (assert (= (abs_int (- 1)) 1)) - how to write it for cvc4
+		// (assert (= (abs_int -1) 1)) - how to write it for z3
+		val pluginTerms = '''
+(define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
+(define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
+(define-fun max_int ((x Int) (y Int)) Int (ite (< x y) y x))
+(define-fun max_real ((x Real) (y Real)) Real (ite (< x y) y x))
+(define-fun min_int ((x Int) (y Int)) Int (ite (< x y) x y))
+(define-fun min_real((x Real) (y Real)) Real (ite (< x y) x y))
+(define-fun list_contains_elem ((l (Array Int ArchElem)) (e ArchElem)) Bool 
+	(exists ((i Int)) (and (>= i 0) (< i (length l)) (= (select l i) e))))
+'''
+
 		println("Done generating AADL SMT")
 
 		TimeRecCPU::stopTimer("generateBackgroundSmt")
 		// background generation output
 		'''; Preamble
 «preamble»
-; Plugin terms
-«pluginTerms»
 
 ; Arch elements
 «decls»
@@ -154,6 +161,8 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 ; Subcomponents
 «subComps»
 
+; Plugin terms
+«pluginTerms»
 		'''
 	}
 
@@ -181,7 +190,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 
 		// instantiate aadl model
 		val inst = InstantiateModel::buildInstanceModelFile(comp)
-		
+
 		// find a package and get all property set imports 
 		val AadlPackage cont = comp.getContainerOfType(AadlPackage)
 		val pss = cont.ownedPublicSection.importedUnits.filter [
@@ -210,7 +219,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 			switch (it) {
 				ComponentInstance: {
 					val scIndex = cic.indexForComp(it)
-					propTypeMap.put(name, new ComponentType('EMPTY'))
+					propTypeMap.put(name, new ComponentType('SUBCOMP'))
 
 					if (propValueMap.get(name) === null)
 						propValueMap.put(name, new HashMap)
@@ -244,7 +253,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 										outputList.add(aadlSimpleValue2Object(it))
 									]
 									outputList
-								} else 
+								} else
 									null
 
 							} else { // a simple, non-list property 
@@ -290,18 +299,22 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 	private def aadlSimpleValue2Object(PropertyExpression propExp) {
 		// have to go through this dance because otherwise does not get cast
 		switch propExp {
-			BooleanLiteral: propExp.getValue()
-			IntegerLiteral: toIntExact(propExp.getValue()) // it returns long
-			RealLiteral: propExp.getValue()
+			BooleanLiteral:
+				propExp.getValue()
+			IntegerLiteral:
+				toIntExact(propExp.getValue()) // it returns long
+			RealLiteral:
+				propExp.getValue()
 			InstanceReferenceValue: {
 				// only deal with component instances
 				val refObject = propExp.referencedInstanceObject
-				if (refObject instanceof ComponentInstance) 
-					cic.indexForComp(refObject)// more concrete than just ReferenceValue
-				else 
-					null 
-				}
-			default: null
+				if (refObject instanceof ComponentInstance)
+					cic.indexForComp(refObject) // more concrete than just ReferenceValue
+				else
+					null
+			}
+			default:
+				null
 		}
 	}
 
