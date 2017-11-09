@@ -199,6 +199,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
 	}
 
+	// populates the cache of components and properties 
 	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map,
 		Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
 

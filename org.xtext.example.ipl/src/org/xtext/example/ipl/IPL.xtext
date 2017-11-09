@@ -162,7 +162,7 @@ TAtomBinary returns Formula:
 ;
 
 FormulaOperationImp returns Formula:
-	FormulaOperationDisj ({FormulaOperation.left=current} op=IMP right=FormulaOperationDisj)* 
+	FormulaOperationDisj ({FormulaOperation.left=current} op=(IMP|EQV) right=FormulaOperationDisj)* 
 ;
 
 FormulaOperationDisj returns Formula:
@@ -264,6 +264,10 @@ terminal NOT:
 
 terminal IMP:
 	'->' | '=>'
+;
+
+terminal EQV:
+	'<->' | '<=>'
 ;
 
 terminal LT:

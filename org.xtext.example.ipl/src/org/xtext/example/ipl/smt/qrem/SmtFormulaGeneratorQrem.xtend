@@ -267,6 +267,8 @@ class SmtFormulaGeneratorQrem {
 				'or'
 			} else if (fop.op == '->' || fop.op == '=>') {
 				'=>'
+			} else if (fop.op == '<->' || fop.op == '<=>') {
+				'='
 			} else {
 				throw new RuntimeException
 			}

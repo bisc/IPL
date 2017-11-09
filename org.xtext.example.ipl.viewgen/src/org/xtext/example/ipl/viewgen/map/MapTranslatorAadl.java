@@ -145,7 +145,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		String postamble = "end TaskLibrary.fullspeed;\n" + "end " + m_viewFullName + ";\n";
 
 		String motionTaskDecls = "-- Motion task decls\n";
-		String motionTasks = "\nproperties\n\n-- Forward motion tasks\n";
+		String motionTasks = "\nproperties\n\n-- Forward motion tasks\n-- Assumption:start/end locs are IDs of locations, not refs to them\n";
 		String rotTaskDecls = "";
 		String rotTasks = "";
 		String emptyTaskDecls = "";
