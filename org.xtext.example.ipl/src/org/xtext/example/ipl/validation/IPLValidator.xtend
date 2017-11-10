@@ -119,7 +119,7 @@ class IPLValidator extends AbstractIPLValidator {
 	def checkTypes(TermOperation op) {
 
 		val leftType = getType(op.left)
-		val rightType = getType(op.left)
+		val rightType = getType(op.right)
 
 		switch (op.op) {
 			case "<",
