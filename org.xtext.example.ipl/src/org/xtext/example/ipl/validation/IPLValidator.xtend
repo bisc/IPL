@@ -24,11 +24,11 @@ import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
 /**
  * This class contains custom validation rules. 
  * 
+ * Be careful with using class variables: this validator is run on many programs. 
+ * 
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#validation
  */
 class IPLValidator extends AbstractIPLValidator {
-
-	val typeProvider = new IPLTypeProvider
 
 	public static val WRONG_TYPE = 'wrongType'
 	public static val UNDEFINED = 'undefined'
@@ -41,7 +41,7 @@ class IPLValidator extends AbstractIPLValidator {
 		var type = cache.get(f)
 
 		if (type === null) {
-			type = typeProvider.typeOf(f)
+			type = (new IPLTypeProvider).typeOf(f)
 			cache.put(f, type);
 		}
 
@@ -78,7 +78,7 @@ class IPLValidator extends AbstractIPLValidator {
 			error("expected bool type, but was " + expType, IPLPackage.Literals.QATOM__EXP, WRONG_TYPE)
 		}
 
-		val domType = typeProvider.getQdomType(q.dom);
+		val domType = (new IPLTypeProvider).getQdomType(q.dom);
 
 		if (!(domType instanceof SetType || domType instanceof IntType || 
 			domType instanceof BoolType || domType instanceof RealType || domType instanceof ElementType
@@ -138,10 +138,14 @@ class IPLValidator extends AbstractIPLValidator {
 			}
 			case "=",
 			case "!=": {
-				if (leftType != rightType) {
-					error("expected equal types, but left was " + leftType + " and right was " + rightType,
-						IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
-				}
+				// if not numeric
+				if (! ((leftType instanceof IntType || leftType instanceof RealType) &&
+						(rightType instanceof IntType || rightType instanceof RealType)	))
+					// then types have to be equal
+					if (leftType != rightType) {
+						error("expected equal types, but left was " + leftType + " and right was " + rightType,
+							IPLPackage.Literals.TERM_OPERATION__RIGHT, WRONG_TYPE)
+					}
 			}
 		}
 	}
@@ -163,7 +167,7 @@ class IPLValidator extends AbstractIPLValidator {
 
 	@Check
 	def checkTypes(Fun f) {
-		val paramTypesIt = typeProvider.getParamTypes(f).iterator()
+		val paramTypesIt = (new IPLTypeProvider).getParamTypes(f).iterator()
 
 		for (a : f.args) {
 			if (!paramTypesIt.hasNext) {
@@ -196,7 +200,7 @@ class IPLValidator extends AbstractIPLValidator {
 
 	@Check
 	def checkDefined(ID id) {
-		if (!typeProvider.isDef(id)) {
+		if (!(new IPLTypeProvider).isDef(id)) {
 			error("Undefined symbol " + id.id, IPLPackage.Literals.ID__ID, UNDEFINED)
 		}
 	}

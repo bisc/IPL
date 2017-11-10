@@ -204,8 +204,10 @@ class IPLTypeProvider {
 		if (spec === null )
 			spec = e.getContainerOfType(IPLSpec)
 		val decls = spec.decls
-		
-		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
+
+		val decl = decls.findLast[
+			it instanceof TypedDecl && (it as TypedDecl).name == name
+		] as TypedDecl
 		
 		if (decl !== null) { // first check in declarations
 			return switch (decl) {
@@ -217,7 +219,11 @@ class IPLTypeProvider {
 		} else { // then check in quantified variables
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
-				if (q !== null && q.^var == name) {
+						
+				// this is a bit hacky, so maybe FIXME 
+				// sometimes this gets called with variable names, and sometimes with their free version
+				// trying for either, assuming that free vars have unique names
+				if (q !== null && (q.^var == name || IPLUtils::freeVar(q.^var) == name)) {
 //					System::out.println("****<" + q.set + ">****")
 					val type = getQdomType(q.dom)
 					if (type instanceof SetType) // if it's a set of components, return component type
@@ -331,8 +337,8 @@ class IPLTypeProvider {
 		fun.decl.paramTypes.map[IPLUtils::typesDecl2IPL(it)]
 	}
 	
+	// Resolve id here -- whether it has been defined
 	def isDef(ID e) {
-		// Resolve id here
 		val name = e.id
 		
 		if (spec === null )

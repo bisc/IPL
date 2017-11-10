@@ -390,7 +390,7 @@ class SmtFormulaGeneratorQrem {
 		// save the param terms for later evaluation
 		mdex.params.vals.forEach [
 			transferClausesSmt.put(it, generateFormula(it))
-			transferClausesType.put(it, tp.typeOf(it))
+			transferClausesType.put(it, tp.typeOf(it)) // sometimes passing free var names to type provider w/ a non-free spec
 		// println('Type of clause ' + it + ' is ' + tp.typeOf(it))
 		]
 
