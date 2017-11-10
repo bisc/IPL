@@ -55,6 +55,9 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 (set-option :model_evaluator.completion true)
 
 '''
+
+		// (assert (= (abs_int (- 1)) 1)) - how to write it for cvc4
+		// (assert (= (abs_int -1) 1)) - how to write it for z3
 		val prePluginTerms = '''
 (define-fun abs_int ((_arg Int)) Int (ite (>= _arg 0) _arg (- _arg)))
 (define-fun abs_real ((_arg Real)) Real (ite (>= _arg 0) _arg (- _arg)))
@@ -92,9 +95,58 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
-		// properties: declarations & assertions
-		// the code below is quite complex due to different types of values that properties might take
-		val props = propTypeMap.keySet.map [ propName |
+		
+		val props = generateSmtForPropertiesUsingFunctions
+
+		var subComps = generateSmtForSubcomponents(subCompMap)
+		
+		val postPluginTerms = ''''''
+
+		println("Done generating AADL SMT")
+
+		TimeRecCPU::stopTimer("generateBackgroundSmt")
+		// background generation output
+		'''; Preamble
+«preamble»
+
+; Arch elements
+«decls»
+
+«defns»
+
+; Pre plugin terms
+«prePluginTerms»
+
+; Properties and subcomponents
+«props»
+
+; Subcomponents
+«subComps»
+
+; Post plugin terms
+«postPluginTerms»
+		'''
+	}
+
+	override public def boolean isViewGenerated() {
+		viewGenerated
+	}
+
+	// product of background generation; resets it itself
+	override public def Map getPropTypeMap() {
+		propTypeMap
+	}
+
+	// same
+	override public def Map getPropValueMap() {
+		propValueMap
+	}
+	
+	// properties: SMT declarations & assertions
+	// the code below is quite complex due to different types of values that properties might take
+	// uses the array implementation of lists with length & containment functions
+	private def String generateSmtForPropertiesUsingArrays() { 
+		propTypeMap.keySet.map [ propName |
 			val type = propTypeMap.get(propName)
 			val Map propValues = propValueMap.get(propName) // propValues: map compIndex -> object 
 			if (type instanceof ListType) { // list of something
@@ -148,58 +200,91 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 					].join
 			} // TODO implement set type? 
 		].join + '\n'
+	}
+	
+	// properties: SMT declarations & assertions
+	// the code below is quite complex due to different types of values that properties might take
+	// uses a straightforward implementation of lists with an abstract sort and functions sort x int-> res
+	// limitation: cannot do lists of lists. Perhaps fixable.
+	private def String generateSmtForPropertiesUsingFunctions() { 
+		val listSortName = 'listsort'
+		val listContainsIndexFn = 'list_contains_index'
+		val listItemFnBase = 'list_item_'
+		val List<IPLType> listItemTypes = newArrayList // keeps track of what list element types occurred
 
-		var subComps = '(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)\n'
-		subComps += subCompMap.entrySet.map [
+		val propAsserts = propTypeMap.keySet.map [ propName |
+			val type = propTypeMap.get(propName)
+			val Map propValues = propValueMap.get(propName) // propValues: map compIndex -> object 
+			if (type instanceof ListType) { // list of something
+			// lists are tricky to represent in SMT. Using 0-based arrays with an explicit length function for each array.
+			// the length function needs to be universal, otherwise the containment function does not know what to call 
+			// Alternative: implementing using an axiomatic recursive datatype proved to perform very poorly when trying to find if X in a list element
+			val valueTypeSmt = IPLUtils::typesIPL2Smt(type.elemType)
+			val listItemFn = listItemFnBase + valueTypeSmt.toLowerCase
+			
+			// save the type to generate declarations for it later
+			if (!listItemTypes.contains(type.elemType))
+				listItemTypes.add(type.elemType)
+				
+				// declaration of the property 
+				'''(declare-fun «propName» (ArchElem) «listSortName»)'''+ '\n' +
+
+				// assertions for each list (one per arch elem)
+				propValues.entrySet.map [ Entry<Object, Object> indexListPair | /* key - compIndex, value - list of values */
+					val int compIndex = indexListPair.key as Integer
+					val List valueList = indexListPair.value as List<Object>
+					// assertions for each list element's position and value
+					valueList.map [ listElem |
+						'''(assert (= («listItemFn» («propName» «compIndex») «
+							valueList.indexOf(listElem)») «listElem»))''' + '\n' 
+						// assertions for containment of each element 
+//						'''(assert («listContainmentFn» («propName» «compIndex») «listElem» ))'''+ '\n'
+					].join + 
+					// assertions for containment of each element (false for empty lists)
+					'''(assert (forall ((_i Int)) (= («listContainsIndexFn» («propName» «compIndex») _i )
+						(or false «valueList.map['''(= _i  «valueList.indexOf(it)»)'''].join(' ')») )))'''+ '\n'
+				].join + '\n' + 
+				// assertion that all other lists do not contain elements
+				'''(assert (forall ((_e ArchElem)) (=> (distinct _e «propValues.entrySet.map[(it as Entry).key].join(' ')») 
+						(forall ((_i «valueTypeSmt»)) (not («listContainsIndexFn» («propName» _e) _i))))))''' + '\n'
+			} else { // simple type
+				'''(declare-fun «propName» (ArchElem) «IPLUtils::typesIPL2Smt(type)»)''' + '\n' +
+					propValues.entrySet.map [ Entry<Object, Object> pair | // key - compIndex, value - simple object
+						'''(assert (= («propName» «pair.key») «pair.value»))''' + '\n' 
+					].join
+			} // TODO implement set type? 
+		].join + '\n'
+		
+		var propDecls = ''
+		if (listItemTypes.size > 0)
+			// declaration of list sort
+			propDecls = '''(declare-sort «listSortName»  0)''' + '\n' + 
+			// declaration of containment function  
+				'''(declare-fun «listContainsIndexFn» («listSortName» Int) (Bool))''' + '\n' +
+		
+		listItemTypes.map[ IPLType type | 
+			val elemTypePostfix = IPLUtils::typesIPL2Smt(type).toLowerCase
+			// declarations of list item fns
+			'''(declare-fun «listItemFnBase+elemTypePostfix» («listSortName» Int) «IPLUtils::typesIPL2Smt(type)»)'''+ '\n' + 
+			// definitions of list_contains_<type> functions
+			'''(define-fun list_contains_«elemTypePostfix»  ((_l «listSortName») (_e ArchElem)) Bool
+					(exists ((_i Int)) (and («listContainsIndexFn» _l _i) (= («
+						listItemFnBase+elemTypePostfix» _l _i) _e))))'''+ '\n' 
+		].join + '\n' 
+		
+		propDecls + propAsserts
+	}
+	
+	
+	
+	private def String generateSmtForSubcomponents(Map<Integer, List<Integer>> subCompMap) { 
+		return '(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)\n' + 
+			subCompMap.entrySet.map [
 			'''(assert (forall ((x ArchElem)) (= (isSubcomponentOf «key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR»))))'''
 		].join('\n')
-
-		// (assert (= (abs_int (- 1)) 1)) - how to write it for cvc4
-		// (assert (= (abs_int -1) 1)) - how to write it for z3
-		val postPluginTerms = ''''''
-
-
-
-		println("Done generating AADL SMT")
-
-		TimeRecCPU::stopTimer("generateBackgroundSmt")
-		// background generation output
-		'''; Preamble
-«preamble»
-
-; Arch elements
-«decls»
-
-«defns»
-
-; Pre plugin terms
-«prePluginTerms»
-
-; Properties and subcomponents
-«props»
-
-; Subcomponents
-«subComps»
-
-; Post plugin terms
-«postPluginTerms»
-		'''
 	}
 
-	override public def boolean isViewGenerated() {
-		viewGenerated
-	}
-
-	// product of background generation; resets it itself
-	override public def Map getPropTypeMap() {
-		propTypeMap
-	}
-
-	// same
-	override public def Map getPropValueMap() {
-		propValueMap
-	}
-
+	// populates the data structures from the aadl model to generate SMT code later
 	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
 		Map<Integer, List<Integer>> subCompMap) {
 
