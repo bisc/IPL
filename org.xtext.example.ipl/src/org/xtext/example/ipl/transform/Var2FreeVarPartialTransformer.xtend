@@ -3,6 +3,7 @@ package org.xtext.example.ipl.transform
 import java.util.Map
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
+import org.eclipse.emf.ecore.EReference
 import org.eclipse.emf.ecore.util.EcoreUtil
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -21,7 +22,6 @@ import org.xtext.example.ipl.iPL.RewardQuery
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
-import org.xtext.example.ipl.validation.IPLType
 
 // replaces indicated vars with free constants
 // eliminates their quantifiers, leaving others intact
@@ -60,11 +60,19 @@ class Var2FreeVarPartialTransformer {
 		val exp = f.exp
 		val parent = f.eContainer
 
-		// eliminate quantification, slightly nuanced than in the full case
+		// eliminate quantification, slightly more nuanced than in the full case
 		if (var2FreeVar.containsKey(f.^var)) { // removing quantification
 			EcoreUtil::replace(f, exp)
-			// TODO not sure whether to delete f
-			EcoreUtil::delete(f)
+			// if the parent is null, it still needs to be assigned, which is not done by Ecore
+			if (parent === null) {
+				EcoreUtil::remove(exp) // removes the argument from its container (doesn't delete the arg)
+				// other attempts 
+//				val EReference feature = exp.eContainmentFeature //	exp.eContainingFeature
+//				EcoreUtil::remove(exp, exp.eContainingFeature, f)
+//				exp.eSet(feature, null)
+			}
+			// 
+			EcoreUtil::delete(f, false) // non-recursive, looks for usages and containments to remove refs
 			return replaceVars(exp)
 //			if (parent !== null) { // deeper into the tree, returning parent
 //				replaceVars(exp)
@@ -101,7 +109,7 @@ class Var2FreeVarPartialTransformer {
 			val ID i = EcoreUtil::create(ei) as ID
 			i.id = var2FreeVar.get(f.id)
 			EcoreUtil::replace(f, i)
-			EcoreUtil::delete(f)
+			EcoreUtil::delete(f, false) // non-recursive
 			return i
 		} else 
 			return f
