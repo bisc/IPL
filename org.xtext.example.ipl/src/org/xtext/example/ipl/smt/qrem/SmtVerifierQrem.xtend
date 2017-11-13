@@ -5,6 +5,7 @@ import java.rmi.UnexpectedException
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.HashMap
+import java.util.IllegalFormatException
 import java.util.List
 import java.util.Map
 import java.util.regex.Matcher
@@ -18,9 +19,12 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
+import org.xtext.example.ipl.transform.Clause2ValueTransformer
 import org.xtext.example.ipl.transform.PrenexTransformer
+import org.xtext.example.ipl.transform.Var2ValueTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.IPLUtils
+import org.xtext.example.ipl.util.TimeRecWall
 import org.xtext.example.ipl.validation.BoolType
 import org.xtext.example.ipl.validation.ComponentType
 import org.xtext.example.ipl.validation.IPLType
@@ -28,9 +32,6 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.RealType
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
-import org.xtext.example.ipl.util.TimeRecWall
-import org.xtext.example.ipl.transform.Clause2ValueTransformer
-import org.xtext.example.ipl.transform.Var2ValueTransformer
 
 // implementation of generation by removing quants and mapping ArchElem -> Int
 // makes copies of formula and manages mappings between them
@@ -397,11 +398,19 @@ public class SmtVerifierQrem implements SmtVerifier {
 			var Matcher m = p2.matcher(seq)
 
 			if (m.find) {
-				val valueSmt = m.group(1) // see the pattern
-				/*println('Match found in: ' + seq)
-				 * println('Groups: ')
-				 * for (i : 0 ..< m.groupCount + 1)
-				 println(i + ':' + m.group(i))*/
+				
+//				println('Match found in: ' + seq)
+//				println('Groups: ')
+//				for (i : 0 ..< m.groupCount + 1)
+//					println(i + ':' + m.group(i))
+				
+				val String valueSmt = 
+					if (m.group(4) !== null) // is the minus there? 
+						m.group(4).replace(' ', '') // has a minus 
+					else // no minus 
+						m.group(1)			 			 
+//						throw new IllegalArgumentException('Failed to parse SMT output: ' + seq) // see the pattern
+
 				addValueToEval(newClauseEval, clause, valueSmt, transferClausesTypes.get(clause))
 			}
 		]
@@ -425,11 +434,20 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// returns a regex parsing pattern for value transfer clauses (complex enough that deserves its own function) 
 	private def String clauseValueParsingPattern() {
 		// decoding: beginning of input, two escaped parentheses, then anything 
-		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
+		// then whitespace, 
+		// then the value, which can be: 
+			// alternative 1: alphanumeric, with possible dots 
+			// alternative 2: a negative number, so a minus, a space, and then an alphanumeric w/ dots
+				// (have to remove the extra space later) 
 		// then two more parentheses, then end of input 
 		// zero group - everything that matched
-		// first group - the value 
-		'''\A\(\(.*\s([\p{Alnum}\.]*)\)\)\z'''
+		// first group - the big alternative expression (not useful) 
+		// second group - the non-zero value 
+		// third group - the minus value + parens 
+		// fourth group - the minus value without parens (still with a space after minus)
+//		'''\A\(\(.*\s([\p{Alnum}\.]*|\(-\s[\p{Alnum}\.]*\))\)\)\z'''
+//		'''\A\(\(.*?(\(-\s)?([\p{Alnum}\.]*)\)?\)\)\z'''
+		'''\A\(\(.*\s(([\p{Alnum}\.]*)|(\((-\s[\p{Alnum}\.]*)\)))\)\)\z'''
 	}
 
 	// helper function: adds a value to a valuation, doing all the checks as well 

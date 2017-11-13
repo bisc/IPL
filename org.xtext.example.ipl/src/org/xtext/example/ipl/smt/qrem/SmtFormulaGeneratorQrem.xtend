@@ -386,7 +386,7 @@ class SmtFormulaGeneratorQrem {
 		// save the clause, get args
 		flexClauses.put(abst, mdex)
 		val args = flexArgs.get(abst)
-
+ 
 		// save the param terms for later evaluation
 		mdex.params.vals.forEach [
 			transferClausesSmt.put(it, generateFormula(it))
