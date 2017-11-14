@@ -200,7 +200,10 @@ class IPLValidator extends AbstractIPLValidator {
 
 	@Check
 	def checkDefined(ID id) {
-		if (!(new IPLTypeProvider).isDef(id)) {
+		// reusing the type-fetching to determine definition
+		if ((new IPLTypeProvider).typeOf(id) === null) {
+			// old version
+			//if (!(new IPLTypeProvider).isDef(id)) {
 			error("Undefined symbol " + id.id, IPLPackage.Literals.ID__ID, UNDEFINED)
 		}
 	}

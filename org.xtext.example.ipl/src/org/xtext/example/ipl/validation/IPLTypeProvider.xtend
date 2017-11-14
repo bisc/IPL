@@ -209,14 +209,19 @@ class IPLTypeProvider {
 			it instanceof TypedDecl && (it as TypedDecl).name == name
 		] as TypedDecl
 		
-		if (decl !== null) { // first check in declarations
+		// first check in declarations. Works for state vars, declared functions, and sorts
+		if (decl !== null) { 
 			return switch (decl) {
 				VarDecl: IPLUtils::typesDecl2IPL(decl.type)
 				STVarDecl: IPLUtils::typesDecl2IPL(decl.type)
 				SortDecl: new SetType(createTypeFromComponentClassifier(decl.ref)) //used to be from ComponentImpl
 				ViewDecl: createTypeFromComponentImpl(decl.ref)
 			}
-		} else { // then check in quantified variables
+		// then check in free variable declarations, works when quantifiers are removed
+		} else if (freeVarTypes !== null && freeVarTypes.containsKey(name)) { 
+			return freeVarTypes.get(name)
+		// then check in quantified variables, works for vars whose quantifiers have not been removed
+		} else { 
 			for (c : (e.allContainers.filter[it instanceof QAtom])) {
 				val q = c as QAtom
 						
@@ -337,28 +342,29 @@ class IPLTypeProvider {
 		fun.decl.paramTypes.map[IPLUtils::typesDecl2IPL(it)]
 	}
 	
+	// Duplicate code: 
 	// Resolve id here -- whether it has been defined
-	def isDef(ID e) {
-		val name = e.id
-		
-		if (spec === null )
-			spec = e.getContainerOfType(IPLSpec)
-		val decls = spec.decls
-		
-		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
-		
-		if (decl !== null) {
-			true
-		} else {
-			for (c : (e.allContainers.filter[it instanceof QAtom])) {
-				val q = c as QAtom
-				if (q !== null && q.^var == name)
-					return true
-						
-			}
-			return false
-		}
-	}
+//	def isDef(ID e) {
+//		val name = e.id
+//		
+//		if (spec === null )
+//			spec = e.getContainerOfType(IPLSpec)
+//		val decls = spec.decls
+//		
+//		val decl = decls.findLast[it instanceof TypedDecl && (it as TypedDecl).name == name] as TypedDecl
+//		
+//		if (decl !== null) {
+//			true
+//		} else {
+//			for (c : (e.allContainers.filter[it instanceof QAtom])) {
+//				val q = c as QAtom
+//				if (q !== null && q.^var == name)
+//					return true
+//						
+//			}
+//			return false
+//		}
+//	}
 
 	
 }
