@@ -6,6 +6,7 @@ import java.util.HashMap
 import java.util.LinkedList
 import java.util.List
 import java.util.Map
+import org.xtext.example.ipl.IPLConfig
 import org.xtext.example.ipl.iPL.Bool
 import org.xtext.example.ipl.iPL.Const
 import org.xtext.example.ipl.iPL.ExprOperation
@@ -24,6 +25,8 @@ import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.TypedDecl
+import org.xtext.example.ipl.iPL.VarDecl
 import org.xtext.example.ipl.transform.PropAbstTransformer
 import org.xtext.example.ipl.transform.Var2FreeVarPartialTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
@@ -39,9 +42,6 @@ import org.xtext.example.ipl.validation.SetType
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
-import org.xtext.example.ipl.validation.ListType
-import org.xtext.example.ipl.iPL.TypedDecl
-import org.xtext.example.ipl.iPL.VarDecl
 
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
@@ -169,13 +169,16 @@ class SmtFormulaGeneratorQrem {
 			varDecls.put(it.^var, varType)
 		]
 
-		// get a list of quant vars that are args of any flex clause 
-		// to remove only their quants
+		// decide which quantifiers to remove
+		// if flag is set, get a list of quant vars that are args of any flex clause 
+		// 		to remove only their quants
+		// otherwise remove them all 
 		val List<String> varsToRemove = new ArrayList
 		f.eAllOfType(ModelExpr).forEach [ mdex |
-			createArgListForFlexAbst(mdex, varDecls).forEach [ arg |
-				varsToRemove.add(arg)
-			]
+			if (IPLConfig::REMOVE_ALL_QUANTS) // remove all
+				varDecls.forEach[ name, type| varsToRemove.add(name)]
+			else // remove only those that matter for flex abst
+				createArgListForFlexAbst(mdex, varDecls).forEach[name|varsToRemove.add(name)]
 		]
 		// mapping var names from formula to free var names
 		val Map<String, String> oldVar2New = new HashMap
@@ -219,7 +222,6 @@ class SmtFormulaGeneratorQrem {
 						throw new IllegalArgumentException('Unimplemented set member type')
 				}
 			}
-
 		}
 
 		// replace variables in the rest of the formula		
