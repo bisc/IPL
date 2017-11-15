@@ -84,7 +84,7 @@ class IPLRigidityProvider {
 		
 		val decl = decls.filter[it instanceof TypedDecl].findLast[(it as TypedDecl).name == name]
 		
-		if (decl !== null) 
+		if (decl !== null) // only variables and sorts are considered rigid declarations
 			return (decl instanceof VarDecl || decl instanceof SortDecl)
 		else 
 			return true

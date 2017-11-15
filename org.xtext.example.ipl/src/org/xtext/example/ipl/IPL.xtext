@@ -18,7 +18,7 @@ Import:
 Declaration:
 	TypedDecl | FunDecl
 ;
-
+ 
 ViewDecl:
 	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID 
 ;
@@ -40,7 +40,7 @@ TypedDecl:
 ;
 
 VarDecl:
-	'var' name=ID ':' type = Type
+	'var' name=ID ':' type = Type (EQ val=Const)?
 ;
 
 STVarDecl:

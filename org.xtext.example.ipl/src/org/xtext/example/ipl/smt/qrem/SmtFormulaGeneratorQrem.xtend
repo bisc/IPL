@@ -39,6 +39,9 @@ import org.xtext.example.ipl.validation.SetType
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
+import org.xtext.example.ipl.validation.ListType
+import org.xtext.example.ipl.iPL.TypedDecl
+import org.xtext.example.ipl.iPL.VarDecl
 
 // implementation of formula generation with removal of quantifiers
 // not allowed to copy formulas
@@ -102,8 +105,8 @@ class SmtFormulaGeneratorQrem {
 		println('Prop abst: ' + IPLPrettyPrinter::print_formula(fPropAbst))
 		val String fPropAbstSmt = generateFormula(fPropAbst)
 		val String propAbstDecls = trans.getPropAbstNames.map [
-			'(declare-const ' + it + ' Bool)\n'
-		].join('\n')
+			'(declare-const ' + it + ' Bool)'
+		].join('\n') + '\n'
 		fPropAbst.delete(true)
 		resetDeepState // may have encountered flex symbols, forget them
 		// create the actual formula (this populates anonymous sets)
@@ -291,8 +294,6 @@ class SmtFormulaGeneratorQrem {
 	private def dispatch String generateFormula(QAtom q) {
 		val qdomType = tp.getQdomType(q.dom)
 		val varType = if(qdomType instanceof SetType) qdomType.elemType else qdomType // goes up to IPLSpec
-			// val varType = (tp.typeOf(q.set) as SetType).elemType;
-			// termDecls.put(q.^var, varType) -- vars don't go into term decls
 		quantVarDecls.put(q.^var, varType) // if in this clause, then operating variables -- not terms
 		val quant = if(q.op == 'forall' || q.op == 'A') 'forall' else 'exists'
 		// forall comes with implication, exists with conjunction
@@ -300,6 +301,7 @@ class SmtFormulaGeneratorQrem {
 
 		// switching on the set member type
 		val formula = switch (varType) {
+			// a reference to view sort
 			ComponentType: {
 				val archElemMbFun = getArchElemMbFun(varType as ComponentType)
 
@@ -307,22 +309,42 @@ class SmtFormulaGeneratorQrem {
 				'''(«quant» ((«q.^var» ArchElem)) («quantOp» (and («archElemMbFun» «q.^var»))
 					«generateFormula(q.exp)»))'''
 			}
-			IntType,
-			RealType,
-			BoolType: {
-				if (qdomType instanceof SetType) { // these types require an anon set
-					val setMbFunName = generateSetMemberFn(q.dom as Expression);
+			// a non-reference to view sorts
+			IntType, RealType, BoolType: {
+				// a fixed constant -- with set expansion
+				if (qdomType instanceof SetType) { // these types require an anon set or set expansion
+					val setExpansionExp = generateSetMbExpansion(q.dom as Expression, q.^var)
 
 					// actual quantified expression
-					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
+					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» «setExpansionExp» 
 	«generateFormula(q.exp)»))'''
 
-				} else { // here we just have an int without an anon set
+					// older implementation: a fixed constant -- without set expansion 
+//					val setMbFunName = generateSetMemberFn(q.dom as Expression);
+//
+//					// actual quantified expression
+//					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
+//	«generateFormula(q.exp)»))'''
+
+				} else { // here we just have a non-restrictive 'int' or 'real' without an anon set
 				// actual quantified expression
 					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
 	«generateFormula(q.exp)»)'''
 				}
 			}
+			
+			
+//			IntType, RealType, BoolType: {
+//				if (qdomType instanceof SetType) { // these types require an anon set
+
+//
+//				} else { // here we just have an int without an anon set
+//				// actual quantified expression
+//					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
+//	«generateFormula(q.exp)»)'''
+//				}
+//			}
+			
 			default:
 				'; Unimplemented set member type'
 		}
@@ -353,8 +375,21 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	private def dispatch String generateFormula(ID id) {
-		// doesn't matter if a free var or a quantified one
-		id.id
+		val decl = spec.decls.findLast[
+			it instanceof TypedDecl && (it as TypedDecl).name == id.id
+		] as TypedDecl
+		
+		// only substitute values for global variables
+		// otherwise put ID as is 		
+		// doesn't even matter if a free var or a quantified one
+		if (decl !== null && decl instanceof VarDecl){
+			val VarDecl varDecl = decl as VarDecl
+			if (varDecl.^val !== null)
+				generateFormula(varDecl.^val)
+			else
+				throw new UnexpectedException('Uninitialized global variable ' + id.id)
+		} else
+			id.id // most cases use this branch
 	}
 
 	private def dispatch String generateFormula(Int i) {
@@ -555,12 +590,13 @@ class SmtFormulaGeneratorQrem {
 
 	// helper function to generate anonymous sets, returning membership f-n name
 	// TODO issue with current impl: during rigid verif, using quant vars is impossible here 
-	// since set f-n declaration is outside of their scope 
+	// 			since set f-n declaration is outside of their scope 
 	// potential change: introduce a flag that enables returning of the whole expression, without declaration 
 	private def String generateSetMemberFn(Expression set) {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
 		switch (set) {
-			Const: { // an explicitly specified set constant, create an anon set
+			Const: { // an explicitly specified set constant,
+					// create a fully-defined anon set
 				val funName = '''anonSetMb«anonSetCount++»''';
 
 				// declaring an anonymous set	 
@@ -570,7 +606,8 @@ class SmtFormulaGeneratorQrem {
 				''';
 				funName
 			}
-			ID: { // must be a set variable, fetch its declaration
+			ID: { // must be a sort/set variable, fetch its declaration and declare an appropriate function
+				// the rest of the facts will be filled in by the view SMT 
 				val funName = set.id
 				setMemberFnDecls += '''(declare-fun «funName» ((«elemType.typesIPL2Smt»)) Bool)''' + '\n'
 				// declaration not necessary - the type provider already did that 
@@ -582,5 +619,16 @@ class SmtFormulaGeneratorQrem {
 				throw new UnexpectedException("Error: unexpected quantification domain " + set)
 		}
 	}
+	
+	// a helper function to generate a statement equivalent to set membership of varName in set
+	// explicitly unrolls each element of the set, comparing it to varName
+	// only works on explicitly sets, not on view sorts (which are defined implicitly from views)
+	private def String generateSetMbExpansion(Expression set, String varName) {
+		if (! (set instanceof Set))	
+			throw new IllegalArgumentException('SMT generation error: cannot expand non-explicit sets')
+				
+		return '(or ' + (set as Set).members.map[ '''(= «varName» «generateFormula(it)»)'''].join(' ') + ')'
+		
+	}	
 
 }

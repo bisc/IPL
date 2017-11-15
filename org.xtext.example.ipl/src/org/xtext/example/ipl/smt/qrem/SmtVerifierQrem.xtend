@@ -2,10 +2,13 @@ package org.xtext.example.ipl.smt.qrem;
 
 import java.net.URL
 import java.rmi.UnexpectedException
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.HashMap
-import java.util.IllegalFormatException
 import java.util.List
 import java.util.Map
 import java.util.regex.Matcher
@@ -57,6 +60,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// private var Map<Formula, Formula> transferClausesPNF2QF
 	// caching view smt
 	private var String viewSmt = ''
+	
+	// storing for convenience
+	val DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
 	val IPLPrettyPrinter pp = new IPLPrettyPrinter
 
@@ -127,7 +133,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 			(get-model)
 		''')
 
-		System::out.println("Done generating SMT, see file " + filenameWithExt)
+		System::out.println("Done generating SMT, see file " + filenameWithExt +
+			" at " + LocalDateTime.now())
 
 		// call smt 
 		var z3Filename = fsa.getURI(filenameWithExt)
@@ -196,8 +203,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 				«transferClausesSmt.values.map['(get-value (' + it + '))'].join('\n') + '\n'»
 			''')
 
-			System::out.println("Done generating SMT #" + (freeVarVals.size+1) + ", see file " + filenameWithExt)
-
+			System::out.println("Done generating SMT #" + (freeVarVals.size+1) + ", see file " + filenameWithExt +
+				" at " + LocalDateTime.now())
 			// call smt 
 			val z3Filename = fsa.getURI(filenameWithExt)
 			val z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
@@ -251,6 +258,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// go through flex variables one by one, obtaining MC results for each valuation
 		// need to go by flex because of their different args (may be a constant or values don't matter) 
+		
 		for (e : flexDecls.entrySet) {
 			val flexName = e.key
 			val flexType = e.value
@@ -271,7 +279,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
 				var int count = 1;
 				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
-					println("Considering valuation #" + count++ + " of " + flexName + ":" + varVal)
+					println("Considering valuation #" + count++ + " of " + flexName + ":" + varVal +
+						" at " + LocalDateTime.now())
 
 					// check if filtered cache contains the values
 					val filteredTermVal = varVal.filter [ varName, obj | // leaves the evals that are params of the flex
