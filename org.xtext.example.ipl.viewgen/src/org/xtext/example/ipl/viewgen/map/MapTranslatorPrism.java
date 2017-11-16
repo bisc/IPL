@@ -626,13 +626,35 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
      * @param args
      */
     public static void main(String[] args) {
-        setMap(new EnvMap (/*null,*/ null));
+//        setMap(new EnvMap (/*null,*/ null));
         //dummyMap.insertNode("newnode", "l1", "l2", 17.0, 69.0);
         //setMap(dummyMap);
-        
-        // PRISM generation
-        System.out.println(getMapTranslation()); // Class test
-        exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
+    	// PRISM generation
+//        System.out.println(getMapTranslation()); // Class test
+//        exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
+    	
+    	
+		String mapPath = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map/";
+		String prismPath = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/";
+		// map names -> scaling factors
+		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
+		maps2Scaling.put("map1", 1.0);
+		maps2Scaling.put("map2", 1.0);
+		maps2Scaling.put("map3b", 5.0);
+		
+		for (String mapName : maps2Scaling.keySet()) {
+			// awkward historic scaling factors: map0 & map1 & map2 with 1, map3a/b with 5. 
+			// cannot generate for map0 or map3a because missing input data
+			BatteryPredictor.m_battery_scaling_factor = maps2Scaling.get(mapName); 
+			
+			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_PROPKEY,
+					mapPath + mapName + ".json");
+			setMap(new EnvMap(/* null, */ null));
+
+			String fileFullName = "prism_gen_" + mapName;
+			exportTranslation(prismPath + fileFullName + ".prism", getMapTranslation());
+
+		}
         
         // String export_path="/Users/jcamara/Dropbox/Documents/Work/Projects/BRASS/rainbow-prototype/trunk/rainbow-brass/prismtmp/";
 

@@ -2,8 +2,8 @@ package org.xtext.example.ipl.viewgen.map;
 
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -218,26 +218,22 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	public static void main(String[] args) {
 		String path = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl/";
 		String viewTitle = "tasks_view";
-		// generate for each map
-		List<String> mapList = new ArrayList<String>();
-		mapList.add("map1");
-		mapList.add("map3");
+		// map names -> scaling factors
+		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
+		maps2Scaling.put("map1", 1.0);
+		maps2Scaling.put("map2", 1.0);
+		maps2Scaling.put("map3b", 5.0);
 		
 		// fixing speed to full for now
 		m_robotSpeed = ROBOT_FULL_SPEED_CONST; 
 
-		for (String mapName : mapList) {
-			// awkward historic scaling factors: map1 & map2 with 1, map3 with 5. 
-			if (mapName.equals("map1")){
-				BatteryPredictor.m_battery_scaling_factor = 1.0; 
-			}
-			
-			if (mapName.equals("map3")){
-				BatteryPredictor.m_battery_scaling_factor = 5.0; 
-			}
+		for (String mapName : maps2Scaling.keySet()) {
+			// awkward historic scaling factors: map0 & map1 & map2 with 1, map3a/b with 5. 
+			// cannot generate for map0 or map3a because missing input data
+			BatteryPredictor.m_battery_scaling_factor = maps2Scaling.get(mapName); 
 			
 			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_PROPKEY,
-					"/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/" + mapName + ".json");
+					"/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map/" + mapName + ".json");
 			setMap(new EnvMap(/* null, */ null));
 
 			// neither: no empties or rotations
