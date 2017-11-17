@@ -655,11 +655,5 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
 			exportTranslation(prismPath + fileFullName + ".prism", getMapTranslation());
 
 		}
-        
-        // String export_path="/Users/jcamara/Dropbox/Documents/Work/Projects/BRASS/rainbow-prototype/trunk/rainbow-brass/prismtmp/";
-
-        // Map<List, String> specifications = exportConstrainedTranslationsBetween (export_path, "ls", "l1");
-        // System.out.println(String.valueOf(specifications));
-
     }
 }
