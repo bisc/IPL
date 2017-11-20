@@ -34,10 +34,14 @@ class IPLValidator extends AbstractIPLValidator {
 	public static val UNDEFINED = 'undefined'
 	public static val INV_FLEXIBLE = 'invalidFlexible'
 
+	// FIXME this cache doesn't really work because formula objects aren't the same in consecutive invocations
 	private static val cache = new HashMap<Formula, IPLType>
+
+	// DO NOT reuse a type provider across many sessions because it saves the names in a cache
 
 	def IPLType getType(Formula f) {
 
+		// this cache doesn't work well because new formula objects are created every time
 		var type = cache.get(f)
 
 		if (type === null) {
@@ -167,7 +171,7 @@ class IPLValidator extends AbstractIPLValidator {
 
 	@Check
 	def checkTypes(Fun f) {
-		val paramTypesIt = (new IPLTypeProvider).getParamTypes(f).iterator()
+		val paramTypesIt = (new IPLTypeProvider).getDeclaredParamTypes(f).iterator()
 
 		for (a : f.args) {
 			if (!paramTypesIt.hasNext) {
@@ -201,7 +205,8 @@ class IPLValidator extends AbstractIPLValidator {
 	@Check
 	def checkDefined(ID id) {
 		// reusing the type-fetching to determine definition
-		if ((new IPLTypeProvider).typeOf(id) === null) {
+//		if ((new IPLTypeProvider).typeOf(id) === null) {
+		if (getType(id) === null) {	
 			// old version
 			//if (!(new IPLTypeProvider).isDef(id)) {
 			error("Undefined symbol " + id.id, IPLPackage.Literals.ID__ID, UNDEFINED)
@@ -244,4 +249,5 @@ class IPLValidator extends AbstractIPLValidator {
 
 // TODO check that no more than one model 
 // TODO check that declared and passed model parameters match 	
+// TODO check for name duplicates in declarations
 }

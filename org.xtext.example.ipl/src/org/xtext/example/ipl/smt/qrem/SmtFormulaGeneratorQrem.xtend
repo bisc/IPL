@@ -27,6 +27,7 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
+import org.xtext.example.ipl.iPL.ViewDecl
 import org.xtext.example.ipl.transform.PropAbstTransformer
 import org.xtext.example.ipl.transform.Var2FreeVarPartialTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
@@ -375,21 +376,25 @@ class SmtFormulaGeneratorQrem {
 	private def dispatch String generateFormula(PropertyExpression pe) {
 		'''(«pe.right.id» «generateFormula(pe.left)»)'''
 	}
-
+	
 	private def dispatch String generateFormula(ID id) {
 		val decl = spec.decls.findLast[
 			it instanceof TypedDecl && (it as TypedDecl).name == id.id
 		] as TypedDecl
 		
-		// only substitute values for global variables
-		// otherwise put ID as is 		
-		// doesn't even matter if a free var or a quantified one
-		if (decl !== null && decl instanceof VarDecl){
+		// Substitute IDs for values in the following cases: 
+		// 	- for global variables
+		// otherwise put ID as is: doesn't even matter if a free var or a quantified one
+		if (decl !== null && decl instanceof VarDecl){ // global "variable" case
 			val VarDecl varDecl = decl as VarDecl
 			if (varDecl.^val !== null)
 				generateFormula(varDecl.^val)
 			else
 				throw new UnexpectedException('Uninitialized global variable ' + id.id)
+//		} else if (decl !== null && decl instanceof ViewDecl) { // component/view name case
+		//  - for specific component names (currently supporting only views) 
+//			-- this is implemented differently, using constants for each name
+//			
 		} else
 			id.id // most cases use this branch
 	}

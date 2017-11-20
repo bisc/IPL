@@ -87,11 +87,11 @@ class IPLTypeProvider {
 		// TODO: do for all components and all properties at once? 
 	}
 	
+	// this function is only called for view type determination
 	def IPLType createTypeFromComponentImpl(ComponentImplementation ref) {
-		if (true)
-			throw new UnexpectedException("This function is not supposed to be called")
+//		if (true)
+//			throw new UnexpectedException("This function is not supposed to be called")
 			 
-		// this function never seems to be called...
 		if (ref instanceof SubprogramImplementation
 			|| ref instanceof SubprogramGroupImplementation) {
 			//Fail...
@@ -119,6 +119,7 @@ class IPLTypeProvider {
 		createTypeFromComponentInst(inst, prop_cache)
 	}
 	
+	// this function is only called for from view type determination, once a view instance has been acquired
 	def IPLType createTypeFromComponentInst(ComponentInstance inst, List<Property> prop_cache) {
 //		System::out.println(inst.children.map[switch (it) {
 //			ComponentInstance: it.name
@@ -132,6 +133,7 @@ class IPLTypeProvider {
 		// add subcomponent instances as members
 		inst.children.forEach[switch (it) {ComponentInstance: ct.addMember(it.name, createTypeFromComponentInst(it, prop_cache))}]
 
+		// add properties as members
 		for (prop : prop_cache) {
 			val propType = IPLUtils::typeFromPropType(prop.propertyType)
 			if (inst.acceptsProperty(prop) && propType !== null) {
@@ -215,7 +217,9 @@ class IPLTypeProvider {
 				VarDecl: IPLUtils::typesDecl2IPL(decl.type)
 				STVarDecl: IPLUtils::typesDecl2IPL(decl.type)
 				SortDecl: new SetType(createTypeFromComponentClassifier(decl.ref)) //used to be from ComponentImpl
-				ViewDecl: createTypeFromComponentImpl(decl.ref)
+				// trying a shortcut here for view type determination, without filling out the members of it (takes time for instantiating the model)
+				// which is ok because validation doesn't need to know its subcomponents or properties, at least for now
+				ViewDecl: new ComponentType(decl.ref.name)//createTypeFromComponentImpl(decl.ref)
 			}
 		// then check in free variable declarations, works when quantifiers are removed
 		} else if (freeVarTypes !== null && freeVarTypes.containsKey(name)) { 
@@ -338,7 +342,7 @@ class IPLTypeProvider {
 		}
 	}
 	
-	def getParamTypes(Fun fun) {		
+	def getDeclaredParamTypes(Fun fun) {		
 		fun.decl.paramTypes.map[IPLUtils::typesDecl2IPL(it)]
 	}
 	

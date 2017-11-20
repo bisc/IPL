@@ -42,8 +42,11 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 	private val cic = new ComponentIndexCache
 	// storage for component properties and their types; <prop name , prop type> -> (archelem index -> prop value)
 	// faces externally  
-	private var Map<String, Map<Integer, Object>> propValueMap = new HashMap
-	private var Map<String, IPLType> propTypeMap = new HashMap
+	private var Map<String, Map<Integer, Object>> propValueMap
+	// comp id -> subcomp id list
+	private var Map<String, IPLType> propTypeMap
+	// comp name -> comp id, for specific components 
+	private var Map<String, Integer> namedCompMap
 
 	// generates a preamble and AADL SMT; does not touch IPL formulas 
 	override public def String generateViewSmt(IPLSpec spec) {
@@ -68,33 +71,50 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 '''
 
 		// gather view declarations
-		val viewDecs = spec.eAllOfType(ViewDecl)
+		val viewDecls = spec.eAllOfType(ViewDecl)
 
-		if (viewDecs.size == 0)
+		if (viewDecls.size == 0)
 			return preamble
+			
+		// resetting state
 
-		val compMap = new HashMap<String, List<Integer>>
-		propTypeMap = new HashMap<String, IPLType>
+		// comp type name -> comp id list (that satisfy that type)
+		val compTypeMap = new HashMap<String, List<Integer>>
+		// propName -> prop type
 		propValueMap = new HashMap<String, Map<Integer, Object>>
+		// comp id -> subcomp id list
+		propTypeMap = new HashMap<String, IPLType>
+		// prop name -> (comp name -> value) 
 		val subCompMap = new HashMap<Integer, List<Integer>>
+		// comp name -> comp id
+		namedCompMap = new HashMap<String, Integer>
 
-		// parse aadl structures to prep for smt generation
-		viewDecs.forEach [ viewDecl |
-			populateAadlSmtStructures(viewDecl.ref, compMap, subCompMap)
+		// step 1: parse aadl structures to prep for smt generation
+		viewDecls.forEach [ viewDecl |
+			populateAadlSmtStructures(viewDecl, compTypeMap, subCompMap)
 		]
 
 		viewGenerated = true
 		println("Done populating AADL SMT")
 
-		// generate aadl->smt 
+		// step 2: generate aadl->smt code
 		var decls = "(define-sort ArchElem () Int)\n"
-		decls += compMap.keySet.map['''(declare-fun «it» (ArchElem) Bool)'''].join('\n')
+		decls += compTypeMap.keySet.map['''(declare-fun «it» (ArchElem) Bool)'''].join('\n')
 
-		val defns = compMap.entrySet.map [
-			if (value.
-				empty) '''(assert (forall ((x ArchElem)) (= («key» x) false)))''' else '''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
+		// list all possible archelems and their IDs 
+		val defns = compTypeMap.entrySet.map [
+			if (value.empty) 
+				'''(assert (forall ((x ArchElem)) (= («key» x) false)))''' 
+			else 
+				'''(assert (forall ((x ArchElem)) (= («key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR») )))'''
 		].join('\n')
 
+		// handle named archelems
+			// currently only view elements themselves, ones with names
+		val namedDefns = namedCompMap.entrySet.map [ nameIndexPair | 
+//			if (entry.name !== null )
+			'''(define-const «nameIndexPair.key» Int «nameIndexPair.value»)'''
+		].join('\n')
 		
 		val props = generateSmtForPropertiesUsingFunctions
 
@@ -113,6 +133,8 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 «decls»
 
 «defns»
+
+«namedDefns»
 
 ; Pre plugin terms
 «prePluginTerms»
@@ -145,6 +167,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 	// properties: SMT declarations & assertions
 	// the code below is quite complex due to different types of values that properties might take
 	// uses the array implementation of lists with length & containment functions
+	// DEPRECATED: doesn't work with lists
 	private def String generateSmtForPropertiesUsingArrays() { 
 		propTypeMap.keySet.map [ propName |
 			val type = propTypeMap.get(propName)
@@ -280,31 +303,38 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 	private def String generateSmtForSubcomponents(Map<Integer, List<Integer>> subCompMap) { 
 		return '(declare-fun isSubcomponentOf (ArchElem ArchElem) Bool)\n' + 
 			subCompMap.entrySet.map [
-			'''(assert (forall ((x ArchElem)) (= (isSubcomponentOf «key» x) (or«FOR elem : value» (= x «elem»)«ENDFOR»))))'''
+			'''(assert (forall ((x ArchElem)) (= (isSubcomponentOf x «key») (or«FOR elem : value» (= x «elem»)«ENDFOR»))))'''
 		].join('\n')
 	}
 
 	// populates the data structures from the aadl model to generate SMT code later
-	private def populateAadlSmtStructures(ComponentImplementation comp, Map<String, List<Integer>> typeMap,
+	private def populateAadlSmtStructures(ViewDecl viewDecl,  Map<String, List<Integer>> typeMap,
 		Map<Integer, List<Integer>> subCompMap) {
+		
+		val ComponentImplementation viewComp = viewDecl.ref
 
-		if (comp instanceof SubprogramImplementation || comp instanceof SubprogramGroupImplementation) {
+		if (viewComp instanceof SubprogramImplementation || viewComp instanceof SubprogramGroupImplementation) {
 			// Fail...
 			throw new RuntimeException("Can't instantiate subprogram")
 		}
 
 		// instantiate aadl model
-		val inst = InstantiateModel::buildInstanceModelFile(comp)
+		val viewCompInst = InstantiateModel::buildInstanceModelFile(viewComp)
+		
+		// add the 'view' component into the named components
+		// need an instance of it, so doing it here
+		if (viewDecl.name !== null)
+			namedCompMap.put(viewDecl.name, cic.indexForComp(viewCompInst))
 
 		// find a package and get all property set imports 
-		val AadlPackage cont = comp.getContainerOfType(AadlPackage)
+		val AadlPackage cont = viewComp.getContainerOfType(AadlPackage)
 		val pss = cont.ownedPublicSection.importedUnits.filter [
 			it instanceof PropertySet
 		].toList as List // up-casting to make the function swallow this list
-		inst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
+		viewCompInst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
 	}
 
-	// populates the cache of components and properties 
+	// populates the cache of components and properties
 	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map,
 		Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
 

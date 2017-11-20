@@ -20,7 +20,7 @@ Declaration:
 ;
  
 ViewDecl:
-	'use' 'view' ref=[aadl2::ComponentImplementation | QCREF] 'as' name=ID 
+	'use' 'view' ref=[aadl2::ComponentImplementation | QCREF] ('as' name=ID)? 
 ;
 
 ModelDecl:
