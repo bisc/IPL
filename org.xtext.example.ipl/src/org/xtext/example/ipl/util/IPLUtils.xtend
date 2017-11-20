@@ -29,6 +29,7 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.ListType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
+import org.xtext.example.ipl.iPL.TypeElem
 
 class IPLUtils { 
 	/**  
@@ -95,8 +96,9 @@ class IPLUtils {
 			AadlBoolean: new BoolType
 			AadlInteger: new IntType 
 			AadlReal: new RealType
-			ReferenceType: new ComponentType('REFERENCE') // a reference to an AADL architectural element, 
-												// could encode it as integers but this seems less broken
+			// a reference to an AADL architectural element, 
+			// could encode it as an integer but this seems less broken
+			ReferenceType: new ComponentType(propertyType.name) //'REFERENCE'
 			org.osate.aadl2.ListType: new ListType(typeFromPropType(propertyType.elementType))
 			default: null
 		}
@@ -108,8 +110,11 @@ class IPLUtils {
 			TypeInt: new IntType
 			TypeReal: new RealType
 			TypeBool: new BoolType
-			TypeSet: new SetType(IPLUtils.typesDecl2IPL((t as TypeSet).elem))
+			TypeSet: new SetType(IPLUtils.typesDecl2IPL((t as TypeSet).elem)) 
 			TypeLst: new ListType(IPLUtils.typesDecl2IPL((t as TypeLst).elem))
+			TypeElem: new ComponentType(ComponentType.DECLARATION_NAME) //'DECLARATION' 
+			default: 
+				throw new IllegalArgumentException("Unknown IPL decl type: " + t)
 		}
 	}
 	

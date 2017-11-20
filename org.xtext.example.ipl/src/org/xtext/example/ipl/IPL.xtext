@@ -20,7 +20,7 @@ Declaration:
 ;
  
 ViewDecl:
-	'use' 'view' ref=[aadl2::ComponentImplementation | CIREF] 'as' name=ID 
+	'use' 'view' ref=[aadl2::ComponentImplementation | QCREF] 'as' name=ID 
 ;
 
 ModelDecl:
@@ -51,19 +51,19 @@ WQCREF: // for imports
 	ID ('.' ID)* '.*'?
 ;
 
-QCREF: // not used
-	ID ('::' ID)*;
-
-CIREF: // for subcomponents?
+CIREF: // dot is used for implementations
 	ID ('.' ID)?
 ;
 
+QCREF: // for full names of implementations, with calling out the package
+	(ID '::')* ID ('.' ID)?;
+
 ElemDecl:
-	'elem' ref=[aadl2::ComponentImplementation | CIREF]
+	'elem' ref=[aadl2::ComponentImplementation | QCREF]
 ;
 
 SortDecl:
-	'set' name=ID ':' ref=[aadl2::ComponentClassifier | CIREF] // used to be ComponentImplementation
+	'set' name=ID ':' ref=[aadl2::ComponentClassifier | QCREF] // used to be ComponentImplementation
 ;
 
 FunDecl:

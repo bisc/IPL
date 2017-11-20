@@ -327,7 +327,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 					val scIndex = cic.indexForComp(it)
 					
 					// create a function with name of component and taking parent as an argument
-					propTypeMap.put(name, new ComponentType('SUBCOMP'))
+					propTypeMap.put(name, new ComponentType(comp.name)) // 'SUBCOMP'
 
 					if (propValueMap.get(name) === null)
 						propValueMap.put(name, new HashMap)

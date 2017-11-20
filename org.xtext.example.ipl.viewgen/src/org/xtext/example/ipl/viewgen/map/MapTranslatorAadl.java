@@ -258,6 +258,6 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
 		}
 
-		System.out.println("Done with AADL view generation");
+		System.out.println("Done with AADL views generation, exported to " + path + "*.aadl");
 	}
 }

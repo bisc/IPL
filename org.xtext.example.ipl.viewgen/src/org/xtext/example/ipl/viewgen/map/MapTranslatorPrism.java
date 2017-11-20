@@ -634,8 +634,9 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
 //        exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
     	
     	
-		String mapPath = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map/";
-		String prismPath = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/";
+    	String prismPath = System.getenv("PRISMOUTDIR");
+    	
+		String mapPath =  prismPath.replace("/prism/", "/map/"); // a dangerous non-portable trick, assumes that the path ends with a prism directory 
 		// map names -> scaling factors
 		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
 		maps2Scaling.put("map1", 1.0);
@@ -651,8 +652,9 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
 					mapPath + mapName + ".json");
 			setMap(new EnvMap(/* null, */ null));
 
-			String fileFullName = "prism_gen_" + mapName;
-			exportTranslation(prismPath + fileFullName + ".prism", getMapTranslation());
+			String fileFullPath= prismPath + "prism_gen_" + mapName + ".prism";
+			exportTranslation(fileFullPath, getMapTranslation());
+			System.out.println("Exported PRISM model to " + fileFullPath);
 
 		}
     }

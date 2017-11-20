@@ -9,6 +9,12 @@ class ComponentType extends IPLType {
 	private ComponentType superType = null;
 	private HashMap<String, IPLType> members = new HashMap;
 	
+	// the value of name when it's declared as an architectural element
+	// results in equality checks passing (because it can be a reference to any component type)
+	public static final String DECLARATION_NAME = 'DECLARATION' 
+	// name when the component's object wasn't found in an aadl model
+	public static final String NOT_FOUND_NAME = 'NOT_FOUND' 
+	
 	new (String name) {
 		this.name = name
 	}
@@ -38,14 +44,13 @@ class ComponentType extends IPLType {
 	
 	override equals(Object that) {
 		switch (that) {
-			ComponentType: name == that.name
+			ComponentType: name == that.name || name == DECLARATION_NAME || that.name == DECLARATION_NAME
 			default: false
 		}
 	}
 	
 	override toString() {
 		"ComponentType("+ this.name + ")"
-		//"ComponentType(" + this.name + ": " + members + ")" 
 	}
 
 }

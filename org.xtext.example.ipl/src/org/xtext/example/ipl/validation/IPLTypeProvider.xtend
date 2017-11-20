@@ -146,7 +146,7 @@ class IPLTypeProvider {
 		
 		val ct = new ComponentType(
 			if (ref.name === null) 
-				'NOTFOUND' 
+				ComponentType.NOT_FOUND_NAME
 			else 
 				ref.name
 		) 
