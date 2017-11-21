@@ -39,6 +39,7 @@ TypedDecl:
 	VarDecl | STVarDecl | SortDecl | ViewDecl | ModelDecl
 ;
 
+// TODO rename into const decl? 
 VarDecl:
 	'var' name=ID ':' type = Type (EQ val=Const)?
 ;
@@ -78,6 +79,7 @@ MFunDecl:
 	'mfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
 ;
 
+// TODO merge background and rigid functions into rigid? Not much distinction
 BFunDecl:
 	'bfun' name=ID '(' (paramTypes += Type)? (',' paramTypes += Type)* ')' IMP retType = Type
 ;
