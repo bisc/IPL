@@ -257,10 +257,20 @@ public class EnvMap {
             } catch (Exception e){
                 System.out.println("Error parsing coordinates in location "+id);
             }
+            
+            // is the charging flag set
+            boolean chargingFlag = jsonNode.get("charging") != null && 
+            			((Boolean)jsonNode.get("charging"));
+            // a location has a charging station if: 
+            // - the location has an explicit charging flag 
+            //	OR 
+            // - the location's id starts with "c"... maybe to be changed later 
+            // 			(for backward-compatibility) 
+            boolean hasChargingStaton = chargingFlag || id.indexOf("c") == 0;
 
-            AddNode(id, src_x, src_y, id.indexOf("c")==0?true:false); // The last parameter flags that this is a charging station
-            // if the location's id starts with "c"... maybe to be changed later
-            System.out.println("Added node " +id +" - X: " + String.valueOf(src_x) + " Y: " + String.valueOf(src_y)+(id.indexOf("c")==0?" (Charging Station)":""));
+            AddNode(id, src_x, src_y, hasChargingStaton); 
+            System.out.println("Added node " +id +" - X: " + String.valueOf(src_x) + " Y: " +
+            		String.valueOf(src_y)+ (hasChargingStaton?" (Charging Station)":""));
         }
     }
 

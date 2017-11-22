@@ -19,8 +19,10 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	private static String m_taskTypeLibName;
 	private static String m_viewFullName;
 	
+	// feature switches for the generated view
 	private static boolean m_includeRotation;
 	private static boolean m_includeEmpty;
+	private static boolean m_includeCharging;
 	private static String m_robotSpeed;
 
 	/**
@@ -34,7 +36,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	 * Generates a declaration for a task representing a given arc.
 	 */
 	public static String generateMotTaskDeclForArc(EnvMapArc a) {
-		return getMotTaskName(a) + ": process " + m_taskTypeLibName + "::Task;";
+		return getMotTaskName(a) + ": process " + m_taskTypeLibName + "::Task;\n";
 	}
 
 	/**
@@ -55,7 +57,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		res += m_taskPropertyLibName + "::task_type_enum => Forward" + appliesToArcName;
 		res += m_taskPropertyLibName + "::task_type => 0" + appliesToArcName;
 
-		return res;
+		return res + '\n';
 	}
 
 	/**
@@ -75,7 +77,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	public static String generateRotTaskDecl(EnvMapNode n, EnvMapArc arr, EnvMapArc dep) {
 		verifyValidRot(n, arr, dep);
 
-		return getRotTaskName(n, arr, dep) + ": process " + m_taskTypeLibName+ "::Task;";
+		return getRotTaskName(n, arr, dep) + ": process " + m_taskTypeLibName+ "::Task;\n";
 	}
 
 	public static String generateRotTask(EnvMapNode n, EnvMapArc arr, EnvMapArc dep, int id) {
@@ -99,7 +101,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		res += m_taskPropertyLibName + "::task_type_enum => Rotate" + appliesToRotTask;
 		res += m_taskPropertyLibName + "::task_type => 1" + appliesToRotTask;
 
-		return res;
+		return res + '\n';
 	}
 
 	/**
@@ -108,16 +110,16 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	public static String getEmptyTaskNameForNode(EnvMapNode n) {
 		return "e_" + n.getLabel();
 	}
-
+	
 	/**
 	 * Generates a declaration for an empty task in a given node.
 	 */
 	public static String generateEmptyTaskDeclForNode(EnvMapNode n) {
-		return getEmptyTaskNameForNode(n) + ": process " + m_taskTypeLibName + "::Task;";
+		return getEmptyTaskNameForNode(n) + ": process " + m_taskTypeLibName + "::Task;\n";
 	}
 
 	/**
-	 * Generates a task description for a given arc, assigning it a given ID.
+	 * Generates an empty task description for a given arc, assigning it a given ID.
 	 */
 	public static String generateEmptyTaskForNode(EnvMapNode n, int id) {
 		String res = "";
@@ -125,19 +127,61 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		res += m_taskPropertyLibName + "::task_id => " + id + appliesToTaskName;
 		res += m_taskPropertyLibName + "::start_loc => " + n.getId() + appliesToTaskName;
 		res += m_taskPropertyLibName + "::end_loc => " + n.getId() + appliesToTaskName;
-		// res += m_taskTypeLibName + "::start_head => " +
-		// findArcHeading(a).convertToInt() +
-		// appliesToTaskName;
-		// res += m_taskTypeLibName + "::end_head => " +
-		// findArcHeading(a).convertToInt() +
-		// appliesToTaskName;
+//		 res += m_taskTypeLibName + "::start_head => " +
+//		 findArcHeading(a).convertToInt() +
+//		 appliesToTaskName;
+//		 res += m_taskTypeLibName + "::end_head => " +
+//		 findArcHeading(a).convertToInt() +
+//		 appliesToTaskName;
 		res += m_taskPropertyLibName + "::energy => 0" + appliesToTaskName;
 		res += m_taskPropertyLibName + "::task_type_enum => Empty" + appliesToTaskName;
 		res += m_taskPropertyLibName + "::task_type => 2" + appliesToTaskName;
 
-		return res;
+		return res + '\n';
+	}
+	
+	/**
+	 * Generates a declaration for a charging task in a given node.
+	 */
+	public static String generateCharTaskDeclForNode(EnvMapNode n) {
+		if (n.isChargingStation()) 
+			return getCharTaskNameForNode(n) + ": process " + m_taskTypeLibName + "::Task;\n";
+		else 
+			return "";
 	}
 
+	/**
+	 * Creates an AADL name for a charging task in a given node.
+	 */
+	public static String getCharTaskNameForNode(EnvMapNode n) {
+		return "ch_" + n.getLabel();
+	}
+
+	/**
+	 * Generates a charging task description for a given arc, assigning it a given ID.
+	 */
+	public static String generateCharTaskForNode(EnvMapNode n, int id) {
+		if (!n.isChargingStation()) 
+			return "";
+		
+		String res = "";
+		String appliesToTaskName = " applies to " + getCharTaskNameForNode(n) + ";\n";
+		
+		res += m_taskPropertyLibName + "::task_id => " + id + appliesToTaskName;
+		res += m_taskPropertyLibName + "::start_loc => " + n.getId() + appliesToTaskName;
+		res += m_taskPropertyLibName + "::end_loc => " + n.getId() + appliesToTaskName;
+		res += m_taskPropertyLibName + "::energy => -" + String.valueOf( 
+				Math.round (BatteryPredictor.batteryCharge(ROBOT_CHARGING_TIME)))
+					+ appliesToTaskName; // set the charging energy as a negative value
+		res += m_taskPropertyLibName + "::task_type_enum => Charging" + appliesToTaskName;
+		res += m_taskPropertyLibName + "::task_type => 3" + appliesToTaskName;
+		
+		return res + '\n';
+	}
+	
+	/**
+	 * Get a complete aadl translation
+	 */
 	public static String getMapAadlTranslation() {
 		String preamble = "-- Generated by MapTranslatorAadl\n" + "package " + m_viewFullName + "\n" + "public\n"
 				+ "with " + m_taskPropertyLibName + ", " +  m_taskTypeLibName + ";\n\n" + "system TaskLibrary\n" + "end TaskLibrary;\n" + "system implementation TaskLibrary.fullspeed\n\n" + "subcomponents\n\n";
@@ -150,6 +194,8 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		String rotTasks = "";
 		String emptyTaskDecls = "";
 		String emptyTasks = "";
+		String chargingTaskDecls = "";
+		String chargingTasks = "";
 
 		if (m_includeRotation) {
 			rotTaskDecls = "-- Rotation task decls\n";
@@ -160,6 +206,11 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			emptyTaskDecls = "\n-- Empty task decls\n";
 			emptyTasks = "\n-- Empty tasks\n";
 		}
+		
+		if (m_includeCharging) {
+			chargingTaskDecls = "\n-- Charging task decls\n";
+			chargingTasks = "\n-- Charging tasks\n";
+		}
 
 		int taskIdCount = 0;
 
@@ -168,8 +219,8 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			for (int i = 0; i < m_map.getArcs().size(); i++) {
 				EnvMapArc a = m_map.getArcs().get(i);
 				if (a.isEnabled()) {
-					motionTaskDecls += generateMotTaskDeclForArc(a) + '\n';
-					motionTasks += generateMotTaskForArc(a, taskIdCount++) + '\n';
+					motionTaskDecls += generateMotTaskDeclForArc(a);
+					motionTasks += generateMotTaskForArc(a, taskIdCount++);
 				}
 			}
 
@@ -188,8 +239,8 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 							EnvMapArc dep = m_map.getArcs().get(j);
 							if (arr.getTarget().equals(nodeLabel) && dep.getSource().equals(nodeLabel)
 									&& findArcHeading(arr) != findArcHeading(dep)) {
-								rotTaskDecls += generateRotTaskDecl(n, arr, dep) + '\n';
-								rotTasks += generateRotTask(n, arr, dep, taskIdCount++) + '\n';
+								rotTaskDecls += generateRotTaskDecl(n, arr, dep);
+								rotTasks += generateRotTask(n, arr, dep, taskIdCount++);
 							}
 						}
 					}
@@ -201,13 +252,20 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			for (String nodeLabel : m_map.getNodes().keySet()) {
 				EnvMapNode n = m_map.getNodes().get(nodeLabel);
 				if (m_includeEmpty) {
-					emptyTaskDecls += generateEmptyTaskDeclForNode(n) + '\n';
-					emptyTasks += generateEmptyTaskForNode(n, taskIdCount++) + '\n';
+					emptyTaskDecls += generateEmptyTaskDeclForNode(n);
+					emptyTasks += generateEmptyTaskForNode(n, taskIdCount++);
+				}
+				
+				if (m_includeCharging) {
+					chargingTaskDecls += generateCharTaskDeclForNode(n);
+					chargingTasks += generateCharTaskForNode(n, taskIdCount++);
 				}
 			}
 		}
-		return preamble + motionTaskDecls + '\n' + rotTaskDecls + '\n' + emptyTaskDecls + '\n' + motionTasks + '\n'
-				+ rotTasks + '\n' + emptyTasks + '\n' + postamble;
+		return preamble + 
+				motionTaskDecls + '\n' + rotTaskDecls + '\n' + emptyTaskDecls + '\n' + chargingTaskDecls + '\n' +
+				motionTasks + '\n' + rotTasks + '\n' + emptyTasks + '\n' + chargingTasks + '\n' +
+				postamble;
 	}
 
 	/**
@@ -242,6 +300,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			m_viewFullName = viewTitle + '_' + mapName + '_' + "simple";
 			m_includeRotation = false;
 			m_includeEmpty = false;
+			m_includeCharging = false;
 			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
 
 			// with empty tasks
@@ -250,14 +309,34 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			m_viewFullName =  viewTitle + '_' + mapName + '_' + "wempty";
 			m_includeRotation = false;
 			m_includeEmpty = true;
+			m_includeCharging = false;
 			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
 			
-			// rotation + empty
+			// empty + charging
+			m_taskPropertyLibName = "Robot_Task_Properties";
+			m_taskTypeLibName = "Robot_Task_Types";
+			m_viewFullName =  viewTitle + '_' + mapName + '_' + "wempty_char";
+			m_includeRotation = false;
+			m_includeEmpty = true;
+			m_includeCharging = true;
+			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
+			
+			// empty + rotation
 			m_taskPropertyLibName = "Robot_Task_Properties";
 			m_taskTypeLibName = "Robot_Task_Types";
 			m_viewFullName =  viewTitle + '_' + mapName + '_' + "wempty_rot";
 			m_includeRotation = true;
 			m_includeEmpty = true;
+			m_includeCharging = false;
+			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
+			
+			// rotation + empty + charging
+			m_taskPropertyLibName = "Robot_Task_Properties";
+			m_taskTypeLibName = "Robot_Task_Types";
+			m_viewFullName =  viewTitle + '_' + mapName + '_' + "wempty_rot_char";
+			m_includeRotation = true;
+			m_includeEmpty = true;
+			m_includeCharging = true;
 			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
 		}
 

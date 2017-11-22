@@ -11,15 +11,16 @@ import org.xtext.example.ipl.iPL.FormulaOperation
 import org.xtext.example.ipl.iPL.Fun
 import org.xtext.example.ipl.iPL.ID
 import org.xtext.example.ipl.iPL.IPLPackage
+import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.iPL.PropertyExpression
 import org.xtext.example.ipl.iPL.QAtom
 import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
+import org.xtext.example.ipl.iPL.ViewDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
-import static extension org.xtext.example.ipl.validation.IPLRigidityProvider.*
 
 /**
  * This class contains custom validation rules. 
@@ -190,6 +191,11 @@ class IPLValidator extends AbstractIPLValidator {
 
 	@Check
 	def checkTypes(PropertyExpression p) {
+		val spec = p.getContainerOfType(IPLSpec)
+		// no using properties w/o views
+		if (spec.decls.findFirst[it instanceof ViewDecl] === null) 
+			error("Cannot use properties without a single view", IPLPackage.Literals.PROPERTY_EXPRESSION__LEFT, UNDEFINED)
+		
 		val type = getType(p.left)
 
 		switch (type) { 

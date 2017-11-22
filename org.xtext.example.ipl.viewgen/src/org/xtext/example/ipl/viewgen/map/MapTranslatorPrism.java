@@ -314,7 +314,7 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
         synchronized(m_map){
             for (Map.Entry<String, EnvMapNode> e: m_map.getNodes().entrySet()){
                 if (e.getValue().isChargingStation()){
-                    guard_can_charge +="|"+ROBOT_LOCATION_VAR+"="+e.getValue().getId();
+                    guard_can_charge +="|"+ROBOT_LOCATION_VAR+"="+e.getValue().getLabel();
 
                 }	
             }
