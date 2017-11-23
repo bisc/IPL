@@ -1,7 +1,7 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: org.xtext.example.ipl.prism
-Bundle-SymbolicName: org.xtext.example.ipl.prism
+Bundle-SymbolicName: org.xtext.example.ipl.prism.lib
 Bundle-Version: 1.0.0
 Bundle-ClassPath: jhoafparser.jar,
  prism.jar,

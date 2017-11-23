@@ -9,7 +9,7 @@ Require-Bundle: com.google.guava,
  org.eclipse.xtext.xbase.lib,
  org.eclipse.xtend.lib,
  org.eclipse.xtend.lib.macro,
- org.xtext.example.ipl.prism;bundle-version="1.0.0",
+ org.xtext.example.ipl.prism.lib;bundle-version="1.0.0",
  org.eclipse.xtext.generator;bundle-version="2.12.0",
  org.eclipse.core.runtime;bundle-version="3.12.0",
  org.eclipse.xtext.util;bundle-version="2.12.0"

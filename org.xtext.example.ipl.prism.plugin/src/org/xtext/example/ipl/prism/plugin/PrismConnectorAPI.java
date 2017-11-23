@@ -57,7 +57,7 @@ public class PrismConnectorAPI {
         		"/home/ivan/apps/prism-4.4.beta-linux64/etc/scripts/hoa/hoa-rabinizer3.1-dgra-for-prism");
         settings.set(PrismSettings.PRISM_LTL2DA_SYNTAX, "Rabinizer");
         m_prism.setSettings(settings);
-        /*try{
+        /*try{ 
             m_prism.setExportAdv(Prism.EXPORT_ADV_MDP);
         } catch (PrismException e){
             System.out.println("Could not change strategy export mode to MDP");

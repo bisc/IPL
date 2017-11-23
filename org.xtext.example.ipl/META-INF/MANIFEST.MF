@@ -19,7 +19,7 @@ Require-Bundle: org.eclipse.xtext,
  org.osate.aadl2.instantiation;bundle-version="1.0.0",
  org.osate.xtext.aadl2.properties;bundle-version="1.0.0",
  org.apache.log4j;bundle-version="1.2.15",
- org.xtext.example.ipl.prism;bundle-version="1.0.0",
+ org.xtext.example.ipl.prism.lib;bundle-version="1.0.0",
  org.xtext.example.ipl.prism.plugin;bundle-version="1.0.0"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Export-Package: org.xtext.example.ipl; uses:="org.eclipse.emf.ecore,  org.eclipse.xtext.nodemodel,  org.eclipse.xtext.linking.impl,  org.eclipse.xtext.scoping",
