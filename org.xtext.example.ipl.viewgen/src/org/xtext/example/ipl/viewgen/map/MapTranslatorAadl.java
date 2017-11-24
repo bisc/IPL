@@ -269,14 +269,17 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	}
 
 	/**
-	 * Class test
+	 * Standalone run of generating AADL from map*.json.
+	 * To run this test, set the following environment variables: 
+	 *
+	 *    MAP_DIR: where input map files are, e.g. /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map
+	 *    PRISM_OUT_DIR: where output prism files will go, e.g., /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism
+     *    AADL_OUT_DIR: where output aadl files will go, e.g., /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/aadl
 	 * 
-	 * @param args
 	 */
 	public static void main(String[] args) {
 		String path = PropertiesConnector.DEFAULT.getProperty(PropertiesConnector.AADL_OUTPUT_DIR_PROPKEY)
 				+ '/';
-				//"/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl";
 		String viewTitle = "tasks_view";
 		// map names -> scaling factors
 		Map<String, Double> maps2Scaling = new HashMap<String, Double>();

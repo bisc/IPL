@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.jdt.launching.localJavaApplication">
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/org.xtext.example.ipl.viewgen/src/org/xtext/example/ipl/viewgen/map/MapTranslatorAadl.java"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="1"/>
+</listAttribute>
+<mapAttribute key="org.eclipse.debug.core.environmentVariables">
+<mapEntry key="AADL_OUT_DIR" value="/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl"/>
+<mapEntry key="MAP_DIR" value="/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map"/>
+<mapEntry key="PRISM_OUT_DIR" value="/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism"/>
+</mapAttribute>
+<stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="org.xtext.example.ipl.viewgen.map.MapTranslatorAadl"/>
+<stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="org.xtext.example.ipl.viewgen"/>
+</launchConfiguration>

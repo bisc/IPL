@@ -19,12 +19,12 @@ public class PropertiesConnector {
     static {
     	// To use standalone Prism generation (outside of Rainbow), set the environment variables below in your system
     	// e.g. .bashrc or .profile
-    	String prismOutDir = System.getenv("PRISM_OUT_DIR"); // e.g., "/Users/jcamara/Dropbox/Documents/Work/Projects/BRASS/rainbow-prototype/trunk/rainbow-brass/prismtmp/";
+    	String prismOutDir = System.getenv("PRISM_OUT_DIR");
     	String aadlOutDir = System.getenv("AADL_OUT_DIR");
     	String mapDir = System.getenv("MAP_DIR");
     	
-    	if (prismOutDir == null || aadlOutDir == null ) //|| prismBin == null)
-    		System.out.println("Failed to initialize the default properties connector: environment variables not set");
+    	if (prismOutDir == null || aadlOutDir == null || mapDir == null ) 
+    		throw new IllegalArgumentException("Failed to initialize the default properties connector: environment variables not set");
     	
         DEFAULT.setProperty (PRISM_MODEL_PROPKEY, prismOutDir + "prismtmp.prism");
         DEFAULT.setProperty (PRISM_PROPERTIES_PROPKEY, prismOutDir + "mapbot.props");

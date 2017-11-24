@@ -621,16 +621,19 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
         return specifications;
     }
 
-    /**
-     * Class test
-     * @param args
-     */
+	/**
+	 * Standalone run of generating PRISM models from map*.json.
+	 * To run this test, set the following environment variables: 
+	 *
+	 *    MAP_DIR: where input map files are, e.g. /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map
+	 *    PRISM_OUT_DIR: where output prism files will go, e.g., /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism
+     *    AADL_OUT_DIR: where output aadl files will go, e.g., /home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/aadl
+	 * 
+	 */
     public static void main(String[] args) {
     	
     	String prismPath = PropertiesConnector.DEFAULT.getProperty(PropertiesConnector.PRISM_OUTPUT_DIR_PROPKEY); 
     	
-    	// FIXME a dangerous non-portable trick, assumes that the path ends with a prism directory 
-//		String mapPath =  prismPath.replace("/prism", "/map"); 
 		// map names -> scaling factors
 		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
 		maps2Scaling.put("map1", 1.0);
