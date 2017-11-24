@@ -16,6 +16,7 @@
 <mapAttribute key="org.eclipse.debug.core.environmentVariables">
 <mapEntry key="LD_LIBRARY_PATH" value="${workspace_loc:org.xtext.example.ipl.prism.lib}"/>
 <mapEntry key="PRISM_LIB_DIR" value="${workspace_loc:org.xtext.example.ipl.prism.lib}"/>
+<mapEntry key="Z3_BIN" value="${workspace_loc:org.xtext.example.ipl.z3}/z3"/>
 </mapAttribute>
 <stringAttribute key="org.eclipse.debug.ui.ATTR_CAPTURE_IN_FILE" value="${workspace_loc:/org.xtext.example.ipl/log}/${resource_name}.log"/>
 <listAttribute key="org.eclipse.debug.ui.favoriteGroups">

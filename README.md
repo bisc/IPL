@@ -18,11 +18,13 @@
     * Ignore the instructions to install Eclipse Mars, newer versions should work.
     
 3) Import this project into Eclipse: File → Import → Git → Projects from Git. 
+    * It along comes with its major dependencies: z3 SMT solver and Prism model checker. 
+    * z3 comes with a binary in org.xtext.example.ipl.z3, which is directly called by IPL. You can replace this binary with a different verion. 
+    * All the Prism model checker dependencies (including static and shared libraries) are provided in the ipl.prism.lib project. IPL is known to work with the version 4.4.beta of Prism. If you wish to adjust them, change variables LD_LIBRARY_PATH (should point to share library \*.so files) and PRISM_LIB_PATH (should point to the HOA script and a jar of the Rabinizer tool). 
 
 4) Build the IPL language infrastructure by running org.xtext.example.ipl/src/org/xtext/example/ipl/GenerateIPL.mwe2 script (Right-Click on the file -> Run as -> MWE2 Workflow). Refresh and clean all the projects. It should build automatically. 
 
 5) Use the provided launch file "IPL Eclipse Application.launch" to start an Eclipse version with IPL support.
-    * All the Prism model checker dependencies (including static and shared libraries) are provided in the ipl.prism.lib project. IPL is known to work with the version 4.4.beta of Prism. If you wish to adjust them, change variables LD_LIBRARY_PATH (should point to share library \*.so files) and PRISM_LIB_PATH (should point to the HOA script and a jar of the Rabinizer tool). 
 
 6) Download the IPL examples and import them in the launched verion of the Eclipse. 
 

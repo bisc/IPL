@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: org.xtext.example.ipl.z3
+Bundle-SymbolicName: org.xtext.example.ipl.z3
+Bundle-Version: 1.0.0
+Bundle-ClassPath: .
+Export-Package: .
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-ActivationPolicy: lazy

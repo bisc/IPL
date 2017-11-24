@@ -60,10 +60,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// caching view smt
 	private var String viewSmt = ''
 	
-	// storing for convenience
-	val DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-
-	val IPLPrettyPrinter pp = new IPLPrettyPrinter
+	// storing these for convenience
+	private val DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+	private val IPLPrettyPrinter pp = new IPLPrettyPrinter
+	private val String z3BinPath = System::getenv('Z3_BIN')
 
 	// standard IPL verification
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
@@ -140,7 +140,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		var z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 
 		TimeRecWall::startTimer("z3-check")
-		var z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+		var z3Res = IPLUtils.executeShellCommand(z3BinPath + " -smt2 " + z3FilePath, null)
 		TimeRecWall::stopTimer("z3-check")
 		// z3Res = z3Res.replaceAll("\\s+", ""); // remove whitespace
 		var z3ResLines = z3Res.split('\n')
@@ -208,7 +208,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 			val z3Filename = fsa.getURI(filenameWithExt)
 			val z3FilePath = FileLocator.toFileURL(new URL(z3Filename.toString)).path
 			TimeRecWall::startTimer("z3-modelfind")
-			val z3Res = IPLUtils.executeShellCommand("z3 -smt2 " + z3FilePath, null)
+			var z3Res = IPLUtils.executeShellCommand(z3BinPath + " -smt2 " + z3FilePath, null)
 			TimeRecWall::stopTimer("z3-modelfind")
 			val z3ResLines = z3Res.split('\n')
 			val z3ResFirstLine = z3ResLines.get(0)
