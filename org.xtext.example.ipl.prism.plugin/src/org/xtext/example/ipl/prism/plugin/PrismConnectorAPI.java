@@ -53,8 +53,14 @@ public class PrismConnectorAPI {
         m_prism.setGenStrat(false);
         PrismSettings settings = m_prism.getSettings();
         // TODO deliver this script and Rabinizer as part of IPL 
+        // TODO figure out how to refer to somewhere in source directories?
+        
         settings.set(PrismSettings.PRISM_LTL2DA_TOOL, 
-        		"/home/ivan/apps/prism-4.4.beta-linux64/etc/scripts/hoa/hoa-rabinizer3.1-dgra-for-prism");
+        		System.getenv("PRISM_LIB_DIR")+"/hoa-rabinizer3.1-dgra-for-prism");
+//        settings.set(PrismSettings.PRISM_LTL2DA_TOOL, 
+//        		"./hoa-rabinizer3.1-dgra-for-prism");
+//        settings.set(PrismSettings.PRISM_LTL2DA_TOOL, 
+//        		"/home/ivan/apps/prism-4.4.beta-linux64/etc/scripts/hoa/hoa-rabinizer3.1-dgra-for-prism");
         settings.set(PrismSettings.PRISM_LTL2DA_SYNTAX, "Rabinizer");
         m_prism.setSettings(settings);
         /*try{ 

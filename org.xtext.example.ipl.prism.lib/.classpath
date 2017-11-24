@@ -10,5 +10,6 @@
 	<classpathentry exported="true" kind="lib" path="colt.jar"/>
 	<classpathentry exported="true" kind="lib" path="log4j.jar"/>
 	<classpathentry exported="true" kind="lib" path="lpsolve55j.jar"/>
+	<classpathentry exported="true" kind="lib" path="rabinizer3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
