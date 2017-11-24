@@ -626,17 +626,11 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
      * @param args
      */
     public static void main(String[] args) {
-//        setMap(new EnvMap (/*null,*/ null));
-        //dummyMap.insertNode("newnode", "l1", "l2", 17.0, 69.0);
-        //setMap(dummyMap);
-    	// PRISM generation
-//        System.out.println(getMapTranslation()); // Class test
-//        exportMapTranslation("/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/prism/prism-out.prism", false);
     	
+    	String prismPath = PropertiesConnector.DEFAULT.getProperty(PropertiesConnector.PRISM_OUTPUT_DIR_PROPKEY); 
     	
-    	String prismPath = System.getenv("PRISMOUTDIR");
-    	
-		String mapPath =  prismPath.replace("/prism/", "/map/"); // a dangerous non-portable trick, assumes that the path ends with a prism directory 
+    	// FIXME a dangerous non-portable trick, assumes that the path ends with a prism directory 
+//		String mapPath =  prismPath.replace("/prism", "/map"); 
 		// map names -> scaling factors
 		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
 		maps2Scaling.put("map1", 1.0);
@@ -648,11 +642,11 @@ public class MapTranslatorPrism extends MapTranslatorUtil {
 			// cannot generate for map0 or map3a because missing input data
 			BatteryPredictor.m_battery_scaling_factor = maps2Scaling.get(mapName); 
 			
-			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_PROPKEY,
-					mapPath + mapName + ".json");
+			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_NAME_PROPKEY, 
+					mapName + ".json");
 			setMap(new EnvMap(/* null, */ null));
 
-			String fileFullPath= prismPath + "prism_gen_" + mapName + ".prism";
+			String fileFullPath= prismPath + "/prism_gen_" + mapName + ".prism";
 			exportTranslation(fileFullPath, getMapTranslation());
 			System.out.println("Exported PRISM model to " + fileFullPath);
 

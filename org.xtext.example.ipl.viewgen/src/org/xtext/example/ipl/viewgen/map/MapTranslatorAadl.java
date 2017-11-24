@@ -274,7 +274,9 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		String path = "/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl/";
+		String path = PropertiesConnector.DEFAULT.getProperty(PropertiesConnector.AADL_OUTPUT_DIR_PROPKEY)
+				+ '/';
+				//"/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/aadl";
 		String viewTitle = "tasks_view";
 		// map names -> scaling factors
 		Map<String, Double> maps2Scaling = new HashMap<String, Double>();
@@ -290,8 +292,8 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			// cannot generate for map0 or map3a because missing input data
 			BatteryPredictor.m_battery_scaling_factor = maps2Scaling.get(mapName); 
 			
-			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_PROPKEY,
-					"/home/ivan/Dropbox/cmu/research/ipl/IPLExamples/IPLRobotProp/model/map/" + mapName + ".json");
+			PropertiesConnector.DEFAULT.setProperty(PropertiesConnector.MAP_NAME_PROPKEY,
+					mapName + ".json");
 			setMap(new EnvMap(/* null, */ null));
 
 			// neither: no empties or rotations
@@ -301,7 +303,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 			m_includeRotation = false;
 			m_includeEmpty = false;
 			m_includeCharging = false;
-			exportTranslation(path + m_viewFullName + ".aadl", getMapAadlTranslation());
+			exportTranslation(path +  m_viewFullName + ".aadl", getMapAadlTranslation());
 
 			// with empty tasks
 			m_taskPropertyLibName = "Robot_Task_Properties";

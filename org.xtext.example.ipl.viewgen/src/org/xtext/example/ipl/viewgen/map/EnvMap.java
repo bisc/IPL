@@ -13,10 +13,6 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
-//import org.sa.rainbow.brass.adaptation.PrismConnector;
-//import org.sa.rainbow.core.models.ModelReference;
-
-
 /**
  * Created by camara on 12/20/2016.
  */
@@ -24,37 +20,27 @@ import org.json.simple.parser.JSONParser;
 public class EnvMap {
     private final float SAME_LOCATION_RADIUS = 1.75f;
 
-    public EnvMap (/*ModelReference model,*/ Properties props) {
+    public EnvMap (Properties props) {
         if (props == null) {
             props = PropertiesConnector.DEFAULT;
         }
-//        m_model = model;
         m_last_insertion = new NodeInsertion();
         m_nodes = new HashMap<> ();
         m_new_node_id=0;
         m_arcs = new LinkedList<EnvMapArc> ();
-        //initWithSimpleMap(); // TODO: Substitute hardwired version of the map by one parsed from file
-        loadFromFile (props.getProperty (PropertiesConnector.MAP_PROPKEY));
+        loadFromFile (props.getProperty(PropertiesConnector.MAP_DIR_PROPKEY) + '/' + 
+        		props.getProperty(PropertiesConnector.MAP_NAME_PROPKEY));
     }
 
-    public EnvMap (/*ModelReference model*/) {
-//        m_model = model;
+    public EnvMap () {
         m_last_insertion = new NodeInsertion ();
         m_nodes = new HashMap<> ();
         m_new_node_id = 0;
         m_arcs = new LinkedList<EnvMapArc> ();
     }
 
-//    public ModelReference getModelReference () {
-//        return m_model;
-//    }
-
     public synchronized EnvMap copy () {
-        //EnvMap m = new EnvMap (m_model);
         throw new IllegalStateException("Cannot copy");
-//    	m.m_nodes = new HashMap<String, EnvMapNode> (m_nodes);
-//        m.m_arcs = new LinkedList<EnvMapArc> (m_arcs);
-//        return m;
     }
 
     private Map<String, EnvMapNode> m_nodes;
