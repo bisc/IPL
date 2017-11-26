@@ -27,7 +27,7 @@ import org.xtext.example.ipl.iPL.Set
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.iPL.TypedDecl
 import org.xtext.example.ipl.iPL.VarDecl
-import org.xtext.example.ipl.iPL.ViewDecl
+import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
 import org.xtext.example.ipl.transform.PropAbstTransformer
 import org.xtext.example.ipl.transform.Var2FreeVarPartialTransformer
 import org.xtext.example.ipl.util.IPLPrettyPrinter
@@ -44,16 +44,32 @@ import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 import static extension org.eclipse.xtext.EcoreUtil2.*
 import static extension org.xtext.example.ipl.util.IPLUtils.*
 
-// implementation of formula generation with removal of quantifiers
-// not allowed to copy formulas
-// expected flow: genCheck -> remove quant -> genFind -> genCheck 
-// (no quant reset between quant and genFind)
-class SmtFormulaGeneratorQrem {
+/**  Implementation of SMT generation for IPL formulas using removal of quantifiers
+* 
+* Flow of verification: 
+* 	- validity check (with uninterpreted flexible abstractions)
+* 	- removal of quantifiers, replacement of quantified variables with free variables
+* 	- finding all models for free variables
+* 	- finding valuations of flexible abstractions (not done in this class)
+* 	- setting values of flexible abstractions 
+* 	- validity check (with extra interpretation of flexible abstractions)
+* 
+* Has two parts of state:
+* 	1. quantified state (has to do with quantified vars) 
+*	2. deep state (has to do with flexible abstractions and their values) 
+* This class is tightly coupled with SMT verifier, hence the abundance of state-access functions.
+* 
+* Invariants: 
+* 	only one formula per formula generator
+* 	this class not allowed to copy formulas
+* 	quantified state should not be reset between quantifier removal and finding models
+*/
+class SmtFormulaGeneratorQrem implements SmtFormulaGenerator {
 	// initialized in constructor
 	private var IPLSpec spec
 	private var IPLTypeProvider tp
 
-	// QUANT STATE: variables tracking quantifiers
+	// QUANTIFIED STATE: variables tracking quantifiers
 	// free constants replacing quantified variables: name, type
 	private var Map<String, IPLType> freeVarDecls = new HashMap
 	// list of parameters for each variable term. Empty list if no parameters
@@ -92,9 +108,10 @@ class SmtFormulaGeneratorQrem {
 		tp = new IPLTypeProvider(spec)
 	}
 
-	// generate a formula for finding models, with given types of free variables
-	// assumes the formula to be quantifier-free, free var declarations populated
-	public def String generateFormulaSmtFind(Formula fQF) {
+	/** Generate a formula for finding models, with given types of free variables,
+	* Assumes the formula to be quantifier-free, with free variable declarations populated
+	*/
+ 	public override def String generateFormulaSmtFind(Formula fQF) {
 		resetDeepState // no resetting quant state here!
 		// assuming that quantifiers were removed and free var decls were set 
 		// set free var types for the provider  
@@ -103,7 +120,7 @@ class SmtFormulaGeneratorQrem {
 		// create a propositional abstraction
 		val trans = new PropAbstTransformer
 		val fPropAbst = trans.performPropAbst(fQF.copy, tp)
-		println('Prop abst: ' + IPLPrettyPrinter::print_formula(fPropAbst))
+		println('Prop abst: ' + IPLPrettyPrinter::printIPL(fPropAbst))
 		val String fPropAbstSmt = generateFormula(fPropAbst)
 		val String propAbstDecls = trans.getPropAbstNames.map [
 			'(declare-const ' + it + ' Bool)'
@@ -133,8 +150,8 @@ class SmtFormulaGeneratorQrem {
 
 	}
 
-	// checks sat(neg formula) without creating terms 
-	public def String generateFormulaSmtCheck(Formula f) {
+	/** Checks validity (by SAT? of negated formula) without creating terms */ 
+	public override def String generateFormulaSmtCheck(Formula f) {
 		resetDeepState
 		resetQuantState // remove the possible carryover of free vars/ anon sets from model finding
 		// this populates anonymous sets
@@ -152,12 +169,13 @@ class SmtFormulaGeneratorQrem {
 		(assert (not «formulaStr»))'''
 	}
 
-	// removes quantifiers from a prenexed formula 
-	// (assumes that all QATOMS are in the front)
-	// replaces quantified variables with free constant terms
-	// populates freeVarDecls and freeVarTypeRests
-	// does not resolve terms -- they are all IDs
-	public def Formula removeQuants(Formula f) {
+	/** Removes quantifiers from a prenexed formula 
+	* Assumes that all QATOMS are in the front
+	* Replaces quantified variables with free constant terms
+	* Populates freeVarDecls and freeVarTypeRests
+	* Does not resolve terms -- they are all IDs
+	*/
+	public override def Formula removeQuants(Formula f) {
 		resetDeepState
 		resetQuantState
 
@@ -230,41 +248,46 @@ class SmtFormulaGeneratorQrem {
 
 	}
 
-	// set only for the final call
-	public def setFlexsVals(Map vals) {
-		flexsVals = vals
-	}
-
-	// returns the scope declaration
-	// won't clear it later
-	public def Map getFormulaVarDecls() {
+	public override def Map getFormulaVarDecls() {
 		freeVarDecls
 	}
 
-	// won't clear it later
-	public def Map getFormulaFlexDecls() {
+	public override def Map getFormulaFlexDecls() {
 		flexDecls
 	}
 
-	// won't clear it later
-	public def Map getFormulaFlexClauses() {
+	public override def Map getFormulaFlexClauses() {
 		flexClauses
 	}
 
-	// won't clear it later
-	public def Map<String, List<String>> getFormulaFlexArgs() {
+	public override def Map<String, List<String>> getFormulaFlexArgs() {
 		flexArgs
 	}
 
-	public def Map getTransferClausesSmt() {
+	public override def Map getTransferClausesSmt() {
 		transferClausesSmt
 	}
 
-	public def Map getTransferClausesTypes() {
+	public override def Map getTransferClausesTypes() {
 		transferClausesType
 	}
+	
+	/** Set flexible values, only for the final call*/
+	public override setFlexsVals(Map vals) {
+		flexsVals = vals
+	}
+	
+	/** Generates blocking clauses for a given list of sets of values*/
+	public override def String generateBlockingClauses(List<Map<String, Object>> blockingList) {
+		blockingList.map [ nameValueMap |
+			'(assert (or ' + nameValueMap.keySet.map [ termName |
+				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
+			].join(' ') + '))'
+		].join('\n') + '\n'
+	}
 
-	// === RIGID GENERATION FUNCTIONS ===
+	// === SMT GENERATION FUNCTIONS ===
+	
 	private def dispatch String generateFormula(FormulaOperation fop) {
 
 		val op = if (fop.op == '&' || fop.op == '^' || fop.op == 'and') {
@@ -322,31 +345,12 @@ class SmtFormulaGeneratorQrem {
 					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» «setExpansionExp» 
 	«generateFormula(q.exp)»))'''
 
-					// older implementation: a fixed constant -- without set expansion 
-//					val setMbFunName = generateSetMemberFn(q.dom as Expression);
-//
-//					// actual quantified expression
-//					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) («quantOp» (and («setMbFunName» «q.^var»)) 
-//	«generateFormula(q.exp)»))'''
-
 				} else { // here we just have a non-restrictive 'int' or 'real' without an anon set
 				// actual quantified expression
 					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
 	«generateFormula(q.exp)»)'''
 				}
 			}
-			
-			
-//			IntType, RealType, BoolType: {
-//				if (qdomType instanceof SetType) { // these types require an anon set
-
-//
-//				} else { // here we just have an int without an anon set
-//				// actual quantified expression
-//					'''(«quant» ((«q.^var» «varType.typesIPL2Smt»)) 
-//	«generateFormula(q.exp)»)'''
-//				}
-//			}
 			
 			default:
 				'; Unimplemented set member type'
@@ -391,10 +395,6 @@ class SmtFormulaGeneratorQrem {
 				generateFormula(varDecl.^val)
 			else
 				throw new UnexpectedException('Uninitialized global variable ' + id.id)
-//		} else if (decl !== null && decl instanceof ViewDecl) { // component/view name case
-		//  - for specific component names (currently supporting only views) 
-//			-- this is implemented differently, using constants for each name
-//			
 		} else
 			id.id // most cases use this branch
 	}
@@ -407,16 +407,11 @@ class SmtFormulaGeneratorQrem {
 		r.value.toString
 	}
 
-	/*def dispatch String generateFormula(EDouble r) {
-	 * 	r.toString
-	 }*/
 	private def dispatch String generateFormula(Bool b) {
 		b.value.toString
 	}
 
-	// === FLEXIBLE GENERATION FUNCTIONS ===
 	private def dispatch String generateFormula(ModelExpr mdex) {
-
 		// normal flow: 
 		// poll downstream for type & generate an abstraction
 		val String abst = createFlexAbstraction(mdex, tp.typeOf(mdex))
@@ -445,37 +440,22 @@ class SmtFormulaGeneratorQrem {
 	}
 
 	// === HELPER FUNCTIONS === 
-	// generates declarations of free variables; empty if none
-	// needs to be populated with terms already, after generating for formula
+	
+	/** Generates declarations of free variables; empty if none
+	* Assumes: quant state is populated with terms already, after generating for formula
+	*/
 	private def String generateSmtTermDecl() {
-		/*termDecls.keySet.map[ termName |
-		 * '''(declare-fun «termName» «{
-		 * 	val params = termParams.get(termName)
-		 * 	'(' + params.map[it.value.typesIPL2Smt].join(' ')+ ')'
-		 * 	}» «termDecls.get(termName).typesIPL2Smt»)'''
-		 ].join('\n')*/
 		freeVarDecls.keySet.map [ termName |
 			'''(declare-const «termName» «freeVarDecls.get(termName).typesIPL2Smt»)'''
 		].join('\n')
 	}
 
+	/** Generates an SMT function for checking membership in a given component type*/
 	private def String getArchElemMbFun(ComponentType ct) {
 		'is' + ct.name.replace('.', '_')
 	}
 
-	public def String generateBlockingClauses(List<Map<String, Object>> blockingList) {
-		blockingList.map [ nameValueMap |
-			'(assert (or ' + nameValueMap.keySet.map [ termName |
-				'(distinct ' + termName + ' ' + nameValueMap.get(termName) + ')'
-			].join(' ') + '))'
-		].join('\n') + '\n'
-	}
-
-	// infers the type of a quantified variable -- depending on whether it's a set or an explicit type (e.g. int)
-	private def IPLType getQuantVarType(QAtom q) {
-	}
-
-	// creates a new symbol for an abstraction of a flexible clause
+	/** Creates a new symbol for an abstraction of a flexible clause */ 
 	private def String createFlexAbstraction(ModelExpr mdex, IPLType type) {
 
 		val String abstrName = '''_flex«flexNum++»''' 
@@ -485,9 +465,9 @@ class SmtFormulaGeneratorQrem {
 		abstrName
 	}
 
-	// generates the var parameter list (not model params) of a given flexible abstraction  
-	// by finding all contents of expression that are also terms/vars
-	// has to be called once the quant/free var data is populated already
+	/** Generates the variable parameter list (not model params) of a given flexible abstraction  
+		* by finding all contents of expression that are also quantified or free variables
+	* Assumes: the quant/free var state is populated already */
 	private def List<String> createArgListForFlexAbst(ModelExpr mdex, Map<String, IPLType> varDecls) {
 		val List argList = new ArrayList<String>
 		mdex.eAll.filter(ID).forEach [ 
@@ -497,15 +477,11 @@ class SmtFormulaGeneratorQrem {
 			}
 		]
 		argList
-	// old, brute force way: 	
-	/*paramDecls.forEach [ varName, varType |
-	 * 	flexArgs.get(abstrName).add(varName)
-	 */
 	}
 
-	// creates smt declarations & constraints for flexible abstractions
-	// precondition: the class needs to be populated with proper abstractions 
-	// (so call after generating for formula)
+	/**  Generates SMT declarations & constraints for flexible abstractions
+	* Assumes: the flex abstraction state is populated  
+	* Called after generating the formula */
 	private def String generateSmtFlexDecl() {
 
 		val Map<String, IPLType> paramDecls = determineParamDeclsForFlex
@@ -548,32 +524,30 @@ class SmtFormulaGeneratorQrem {
 				}
 			].join('\n')
 
-		} // flexsVals ?= null
+		} // endif flexsVals ?= null
 		funDecls + asserts
 	}
 
-	// decides which parameter declarations to use in flexible abstractions 
-	// options: 
-	// - free vars -- if those are available (which means we're in model finding mode) 
-	// - quant vars -- if we are in checking mode (which is when free vars have to be empty)
+	/**  decides which parameter declarations to use in flexible abstractions 
+	* options: 
+	* - free vars -- if those are available (which means we're in model finding mode) 
+	* - quant vars -- if we are in checking mode (which is when free vars have to be empty)
+	* Sometimes both are used if not all variables are removed. 
+	*/
 	private def Map<String, IPLType> determineParamDeclsForFlex() {
-		// TODO fix this, perhaps return a union? 
-//		if (!freeVarDecls.empty && !quantVarDecls.empty)
-//			throw new UnexpectedException("Error: both free vars and quant vars are considered")
+		// if removing quantifiers, it is an error to have both kinds of variables 
+		if (IPLConfig::REMOVE_ALL_QUANTS && !freeVarDecls.empty && !quantVarDecls.empty)
+			throw new UnexpectedException("Error: both free vars and quant vars are considered")
 
 		if (!freeVarDecls.empty)
 			freeVarDecls
 		else 
 			quantVarDecls // if both are empty, this returns an empty one
 			
-//		else if (!quantVarDecls.empty)
-//			quantVarDecls
-//		else
-//			new HashMap // neither: then no parameters for the abstraction
 	}
 
-	// reset the parsing state of the quantifiers/free variables
-	// includes anonymous sets because they describe restrictions on free variables
+	/** Reset the parsing state of the quantifiers/free variables
+	 * Includes anonymous sets because they describe restrictions on free variables */
 	private def resetQuantState() {
 		freeVarDecls = new HashMap
 		freeVarTypeRests = ''
@@ -583,7 +557,7 @@ class SmtFormulaGeneratorQrem {
 		anonSetCount = 0
 	}
 
-	// reset the parsing state of the formula's 'depths'
+	/** Resets the parsing state of the formula's 'depths' like flexible and transfer clauses */ 
 	private def resetDeepState() {
 		// creating new storages to be independent from its clients
 		flexDecls = new HashMap // flexDecls.clear
@@ -595,10 +569,11 @@ class SmtFormulaGeneratorQrem {
 		flexNum = 0
 	}
 
-	// helper function to generate anonymous sets, returning membership f-n name
-	// TODO issue with current impl: during rigid verif, using quant vars is impossible here 
-	// 			since set f-n declaration is outside of their scope 
-	// potential change: introduce a flag that enables returning of the whole expression, without declaration 
+	/** A helper function to generate anonymous sets, returning membership f-n name
+	* TODO issue with current impl: during rigid verif, using quant vars is impossible here 
+	* 			since set f-n declaration is outside of their scope 
+	* TODO Potential change: introduce a flag that enables returning of the whole expression, without declaration 
+	*/
 	private def String generateSetMemberFn(Expression set) {
 		val elemType = (tp.typeOf(set) as SetType).elemType;
 		switch (set) {
@@ -627,9 +602,10 @@ class SmtFormulaGeneratorQrem {
 		}
 	}
 	
-	// a helper function to generate a statement equivalent to set membership of varName in set
-	// explicitly unrolls each element of the set, comparing it to varName
-	// only works on explicitly sets, not on view sorts (which are defined implicitly from views)
+	/** A helper function to generate a statement equivalent to set membership of varName in set
+	* 		explicitly unrolls each element of the set, comparing it to varName
+	* Only works on explicit sets, not on view sorts (which are defined implicitly from views)
+	*/
 	private def String generateSetMbExpansion(Expression set, String varName) {
 		if (! (set instanceof Set))	
 			throw new IllegalArgumentException('SMT generation error: cannot expand non-explicit sets')

@@ -20,11 +20,13 @@ import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
-// transforms a formula into its prenex normal form
+/** Transforms a formula into its prenex normal form 
+  by moving all quantifiers to the beginning/top of the formula.*/
 class PrenexTransformer {
 	
 	private QAtom curQuant
 	
+	/** Convert f to its prenext form */
 	def Formula toPrenexNormalForm(Formula f) { 
 		// flow:
 		// find the insertion point  

@@ -8,6 +8,9 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 import java.io.FileNotFoundException
 import java.rmi.UnexpectedException
 
+/**
+ * A plugin to invoke behavioral model checking by Prism. 
+ */
 class PrismPlugin {
 	val String relativePrismLoc = "../model/prism/"
 	
@@ -83,15 +86,5 @@ class PrismPlugin {
 			
 		println('Prism result: ' + res)
 		res
-	// val res = PrismConnectorAPI.modelCheckFromFileS(myModel,myProps, myPolicy)
-	/*var URL templateUrl = FileLocator.toFileURL(
-	 * 	Platform.getBundle(Activator.PLUGIN_ID).getResource("model/")
-	 * )
-	 System::out.println(templateUrl)*/
-	// getResource("res/sched/sched-model-template.pml"))
 	}
-	
-	/*public def double verifyRewardQuery(){
-		1.0
-	}*/
 }

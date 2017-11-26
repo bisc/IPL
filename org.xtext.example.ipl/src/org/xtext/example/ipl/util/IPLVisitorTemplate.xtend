@@ -18,6 +18,9 @@ import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
+/**
+ * An unused template to simplify creation of new transformations/visitors by copy-paste. 
+ */
 class IPLVisitorTemplate {
 	dispatch def visit(Formula f) { 
 		

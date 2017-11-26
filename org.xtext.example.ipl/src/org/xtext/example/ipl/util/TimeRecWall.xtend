@@ -9,6 +9,10 @@ import java.util.Map
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 
+/**
+ * Implementation of time tracking based on wall time. 
+ * Less accurate but has no issues tracking SMT calls. 
+ */
 class TimeRecWall {
 	
 	private static Map<String, Long> timers = new HashMap

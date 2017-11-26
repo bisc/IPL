@@ -5,6 +5,8 @@ generate iPL "http://www.xtext.org/example/ipl/IPL"
 import "http://aadl.info/AADL/2.0" as aadl2
 import "http://www.eclipse.org/emf/2002/Ecore" as ecore
 
+// The grammar for the IPL specification language 
+
 IPLSpec:
 	(imports += Import ';')*
 	(decls += Declaration ';')*

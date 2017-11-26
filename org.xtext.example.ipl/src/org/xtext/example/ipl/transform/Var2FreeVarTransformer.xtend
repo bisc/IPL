@@ -23,12 +23,15 @@ import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.validation.IPLType
 
-// replaces vars with free constants
-// eliminates quantifiers
+/**  Eliminates quantifiers of all quantified variables 
+ by replacing them with free constants
+ * DEPRECATED: not used, using the partial version of this instead.
+*/
 class Var2FreeVarTransformer {
 	
 	private var Map<String, String> var2Term  
 	
+	/** Eliminate quantifiers in formula f*/
 	def EObject replaceVarsWithTerms(Formula f, Map _var2Term) { 
 		var2Term =  _var2Term
 		

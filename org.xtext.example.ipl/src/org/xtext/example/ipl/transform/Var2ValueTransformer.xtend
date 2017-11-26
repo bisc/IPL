@@ -23,8 +23,9 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
-// replaces values of rigid variables/constants in IPL formulas
-// useful inside flexible subformulas
+/** Replaces rigid variables/constants with provided values 
+* Useful inside flexible subformulas
+*/
 class Var2ValueTransformer {
 
 	var Map<String, Object> vals
@@ -33,8 +34,8 @@ class Var2ValueTransformer {
 	var Map<String, IPLType> propTypeMap
 	var Map<String, Map<Integer, Object>> propValueMap
 
-	// replaces all occurences of variables with their valuations
-	// returns the next object (potentially changed if on top
+	/**  Replaces all occurrences of variables with their valuations
+	 * Returns the next object (potentially changed if on top*/
 	public def EObject replaceVarsWithValues(EObject f, Map<String, Object> valuation, 
 		Map<String, IPLType> declarations, Map propertyTypeMap, Map propertyValueMap
 	) {
@@ -100,34 +101,8 @@ class Var2ValueTransformer {
 		// the actual replacement 
 		if (vals.containsKey(f.id)) {
 			// replace with a value from switch, depending on the type
-			val v = IPLUtils::createEcoreValueFromIPL(decls.get(f.id), vals.get(f.id)) /*  switch () {
-				BoolType: {
-					val EClass eb = IPLPackage.eINSTANCE.bool
-					val Bool i = EcoreUtil::create(eb) as Bool
-					i.value = vals.get(f.id).toString
-					i
-				}
-				IntType: {
-					val EClass ei = IPLPackage.eINSTANCE.int
-					val Int i = EcoreUtil::create(ei) as Int
-					i.value = vals.get(f.id) as Integer
-					i
-				}
-				RealType:{
-					val EClass er = IPLPackage.eINSTANCE.real
-					val Real i = EcoreUtil::create(er) as Real
-					i.value = vals.get(f.id) as Float
-					i
-				}
-				ComponentType:{ // replacing component references with integers
-					val EClass ei = IPLPackage.eINSTANCE.int
-					val Int i = EcoreUtil::create(ei) as Int
-					i.value = vals.get(f.id) as Integer
-					i
-				}
-				default: throw new UnexpectedException("Unknown type")
-			}*/
-			
+			val v = IPLUtils::createEcoreValueFromIPL(decls.get(f.id), vals.get(f.id))
+				
 			// TODO not sure if need to delete f here
 			EcoreUtil::replace(f, v)
 			return v
@@ -141,11 +116,6 @@ class Var2ValueTransformer {
 		
 		val propName = f.right.id
 		val propType = propTypeMap.get(propName)
-		// need replace with a property value, if in place
-		// dig through the property map defensively
-		/*val Pair<String, IPLType> prop = propMap.keySet.findFirst[ 
-			Pair<String, IPLType> p | p.key == propName
-		]*/
 		
 		if(propType === null)
 			throw new UnexpectedException('Cannot find property ' + propName + ' in property map ' + propTypeMap)

@@ -20,10 +20,7 @@ import org.xtext.example.ipl.viewgen.map.dijkstra.Graph;
 import org.xtext.example.ipl.viewgen.map.dijkstra.Vertex;
 
 /**
- * @author jcamara
- *
- * Eventually, the MapTranslator might be moved into a more general
- * translator incorporating elements from the architecture model, etc.
+ * Contains constants shared between Prism and AADL generation. 
  */
 
 

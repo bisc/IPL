@@ -4,11 +4,10 @@ import java.util.Objects;
 
 import org.xtext.example.ipl.viewgen.map.MapTranslatorPrism;
 
-// To be relocated
 
 /**
+ * Determines energy expenditure for robot tasks. 
  * @author jcamara
- *
  */
 public class BatteryPredictor {
 

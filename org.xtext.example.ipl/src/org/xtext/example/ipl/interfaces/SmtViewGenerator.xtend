@@ -3,17 +3,22 @@ package org.xtext.example.ipl.interfaces
 import java.util.Map
 import org.xtext.example.ipl.iPL.IPLSpec
 
-// view -> SMT generator 
+/** API for a class that generates an SMT translation of an AADL view  */
 interface SmtViewGenerator { 
 	
-	// generate SMT for AADL views 
+	/** Generate SMT for AADL views described in the spec */ 
 	public def String generateViewSmt(IPLSpec spec)
 
+	/** Checks if view has been generated previously */
 	public def boolean isViewGenerated() 
 	
-	// product of background generation; resets it itself
+	/** Returns the map <property name, type> 
+	 * A product of view generation 
+	 */
 	public def Map getPropTypeMap() 
 
-	// same
+	/** Returns the map <property name, value> 
+	 * A product of view generation 
+	 */
 	public def Map getPropValueMap()
 }

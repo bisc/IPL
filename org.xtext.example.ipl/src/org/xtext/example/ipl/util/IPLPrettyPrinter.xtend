@@ -28,126 +28,119 @@ import org.xtext.example.ipl.iPL.TypeElem
 import org.xtext.example.ipl.iPL.TypeInt
 import org.xtext.example.ipl.iPL.TypeReal
 
+/** Prints out an IPL formula - in a format that Prism and human can easily understand */
 class IPLPrettyPrinter {
-	/*dispatch def print(Formula f) { 
-		
-	}*/
 	
-	public static def String print_formula(EObject f) { 
+	/** Print out an IPL object (may be a formula or something else) */
+	public static def String printIPL(EObject f) { 
 		(new IPLPrettyPrinter).print(f) as String
 	}
 		
-	dispatch def String print(FormulaOperation f){ 
+	dispatch private def String print(FormulaOperation f){ 
 		val left = if (f.left instanceof Formula) '(' + print(f.left) + ')' else print(f.left)
 		val right = if (f.right instanceof Formula) '(' + print(f.right) + ')' else print(f.right)
 			
 		'''«left» «f.op» «right»'''
 	}
 	
-	dispatch def String print(Negation f){
+	dispatch private def String print(Negation f){
 		'''!(«print(f.child)»)'''
 	}
 	
-	dispatch def String print(QAtom f){ 
+	dispatch private def String print(QAtom f){ 
 		'''«f.op» «f.^var»: «print(f.dom)» | «print(f.exp)»'''
 	}
 	
-	dispatch def String print(TAtomUnary f){ 
+	dispatch private def String print(TAtomUnary f){ 
 		'''«f.op» («print(f.exp)»)''' // extra parentheses for prism
 	}
 	
-	dispatch def String print(TAtomBinary f){ 
+	dispatch private def String print(TAtomBinary f){ 
 		'''(«print(f.left)») «f.op» («print(f.right)»)''' // extra parentheses for prism
 	}
-	/*dispatch def print(Const f){
-		'''«f.»''' 
-	}*/
-	dispatch def String print(Set f){
+	
+	dispatch private def String print(Set f){
 		'''{«f.members.map[print(it)].join(', ')»}'''
 	}
 	
-	dispatch def String print(Lst f){
+	dispatch private def String print(Lst f){
 		'''<<«f.members.map[print(it)].join(', ')»>>'''
 	}
 	
-	dispatch def String print(Int f){
+	dispatch private def String print(Int f){
 		f.getValue.toString
 	}
 	
-	dispatch def String print(Real f){
+	dispatch private def String print(Real f){
 		f.getValue.toString
 	}
 	
-	dispatch def String print(Bool f){
+	dispatch private def String print(Bool f){
 		f.getValue.toString
 	}
 	
-	dispatch def String print(TypeInt f){
+	dispatch private def String print(TypeInt f){
 		'int'
 	}
 	
-	dispatch def String print(TypeReal f){
+	dispatch private def String print(TypeReal f){
 		'real'
 	}
 	
-	dispatch def String print(TypeBool f){
+	dispatch private def String print(TypeBool f){
 		'bool'
 	}
 	
-	dispatch def String print(TypeElem f){
+	dispatch private def String print(TypeElem f){
 		'elem'
 	}
 	
-	dispatch def String print(ExprOperation f){
+	dispatch private def String print(ExprOperation f){
 		'''«print(f.left)» «f.op» «print(f.right)»''' 
 	}
 	
-	dispatch def String print(Fun f){ 
+	dispatch private def String print(Fun f){ 
 		'''«f.decl.name»(«f.args.map[print(it)].join(', ')»)'''
 	}
 	
-	dispatch def String print(ID f){ 
+	dispatch private def String print(ID f){ 
 		f.id
 	}
 	
-	dispatch def String print(PropertyExpression f){
+	dispatch private def String print(PropertyExpression f){
 		'''«print(f.left)»::«print(f.right)»''' 
 	}
 	
-	dispatch def String print(Prop f){
+	dispatch private def String print(Prop f){
 		'''«f.id»''' 
 	}
 	
-	dispatch def String print(TermOperation f){ 
+	dispatch private def String print(TermOperation f){ 
 		'''«print(f.left)» «f.op» «print(f.right)»''' 
 	}
 	
-	dispatch def String print(ModelParamExpr f){
+	dispatch private def String print(ModelParamExpr f){
 		'''{|«f.vals.map[print(it)].join(', ')»|}'''
 	}	
 	
-	dispatch def String print(ModelExpr f){
+	dispatch private def String print(ModelExpr f){
 		 // intentionally not printing the parameters
 		 print(f.expr)
 	}
 	
-	dispatch def String print(QM f){
+	dispatch private def String print(QM f){
 		 '?'
 	}
 	
-	dispatch def String print(ProbQuery f){
+	dispatch private def String print(ProbQuery f){
 		val mm = f.minmax?.^val ?: ''
-		//var mm = if (f.minmax !== null)	f.minmax.^val else ''
 			
 		'''P«mm»«f.comp»«print(f.value)»[«print(f.expr)»]'''
 	}
 	
-	dispatch def String print(RewardQuery f){ 
+	dispatch private def String print(RewardQuery f){ 
 		val mm = f.minmax?.^val ?: ''
 		'''R{«f.rewardName»}«mm»«f.comp»«print(f.value)» [«print(f.expr)»]'''
 	}
 	
-	/*dispatch def print(PrismValue f){
-		print(f)	 
-	}*/
 }

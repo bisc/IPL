@@ -7,7 +7,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * @author iruchkin Generates an aadl view from a map.
+ * Generates an aadl view from a map.
+ * @author iruchkin 
  */
 
 public class MapTranslatorAadl extends MapTranslatorUtil {

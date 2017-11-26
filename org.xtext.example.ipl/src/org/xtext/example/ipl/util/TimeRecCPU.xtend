@@ -9,6 +9,10 @@ import java.util.Map
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 
+/**
+ * Implementation of time recording based on CPU time. 
+ * Has issues tracking the time spent on SMT calls. 
+ */
 class TimeRecCPU {
 	
 	private static Map<String, Pair<Long, Long>> timers = new HashMap

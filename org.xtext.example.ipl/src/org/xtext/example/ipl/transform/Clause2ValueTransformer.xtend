@@ -21,19 +21,18 @@ import org.xtext.example.ipl.iPL.TermOperation
 import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.validation.IPLType
 
-// transforms arbitrary clauses (subformulas) into their provided values 
+/** Transforms arbitrary clauses (subformulas) into their provided values 
+ * Does not touch any other clauses. */  
 class Clause2ValueTransformer {
 
 	private Map<Formula, IPLType> formulaTypes
 	private Map<Formula, Object> formulaValues
 
+	/** Replaces all occurrences of _values.keys in f with _values.values */
 	def public EObject replaceClausesWithValues(Formula f, Map<Formula, Object> _values, Map<Formula, IPLType> _types) {
 		formulaValues = _values
 		formulaTypes = _types
 
-//		if (formulaValues.containsKey(f))
-//			return valueForFormula(f)
-//		else 
 		return replace(f)
 	}
 

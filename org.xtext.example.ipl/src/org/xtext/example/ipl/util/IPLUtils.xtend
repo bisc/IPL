@@ -58,7 +58,9 @@ class IPLUtils {
 		return output.toString()
 	}
 
-	// helper to create ecore values
+	/**
+	 * A helper function to create ecore values from IPL type and object value.
+	 */
 	public def static EObject createEcoreValueFromIPL(IPLType type, Object value) {
 		switch (type) {
 			BoolType: {
@@ -90,7 +92,7 @@ class IPLUtils {
 		}
 	}
 	
-	// type conversion: AADL -> IPL
+	/** Type conversion: AADL -> IPL*/
 	public def static IPLType typeFromPropType(PropertyType propertyType) {
 		switch (propertyType) {
 			AadlBoolean: new BoolType
@@ -104,7 +106,7 @@ class IPLUtils {
 		}
 	}
 	
-	// type conversion: type declaration -> IPL
+	/** Type conversion: IPL type declaration -> IPL */ 
 	public static def IPLType typesDecl2IPL(Type t) {
 		switch (t) {
 			TypeInt: new IntType
@@ -119,7 +121,7 @@ class IPLUtils {
 	}
 	
 	
-	// type conversion: IPL -> SMT
+	/** Type conversion: IPL -> SMT */ 
 	public def static String typesIPL2Smt(IPLType t) {
 		switch (t) {
 			BoolType: 'Bool'
@@ -130,14 +132,17 @@ class IPLUtils {
 		}
 	}
 	
-	// var name to free var name
+	/** A function that establishes correspondence between 
+	 * 		quantified variable and free variable names */
 	public def static String freeVar(String varName) {
 		varName + '_free'
 	}
 	
-	// var name to propositional abstraction name
-	public def static String propAbst(String varName) {
-		varName + '_propAbst'
+	/** A function that establishes correspondence between
+	 * any names and propositional abstraction names
+	 */ 
+	public def static String propAbst(String name) {
+		name + '_propAbst'
 	}
 	
 }
