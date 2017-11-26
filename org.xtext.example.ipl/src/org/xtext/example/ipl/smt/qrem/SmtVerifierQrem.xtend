@@ -19,7 +19,9 @@ import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.iPL.ModelExpr
+import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
 import org.xtext.example.ipl.interfaces.SmtVerifier
+import org.xtext.example.ipl.interfaces.SmtViewGenerator
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.transform.Clause2ValueTransformer
 import org.xtext.example.ipl.transform.PrenexTransformer
@@ -35,12 +37,20 @@ import org.xtext.example.ipl.validation.RealType
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
-// implementation of generation by removing quants and mapping ArchElem -> Int
-// makes copies of formula and manages mappings between them
+/** Implementation of SMT-based verification by removing quantifiers and mapping ArchElem -> Int.
+*  Makes copies of formula and manages mappings between them.
+*  Flow of verification: 
+* 	- validity check (with uninterpreted flexible abstractions)
+* 	- removal of quantifiers, replacement of quantified variables with free variables (done in SMT formula generator)
+* 	- finding all models for free variables
+* 	- finding valuations of flexible abstractions
+* 	- setting values of flexible abstractions 
+* 	- validity check (with extra interpretation of flexible abstractions)
+*/
 public class SmtVerifierQrem implements SmtVerifier {
 
-	private val SmtViewGeneratorQrem smtViewGenerator = new SmtViewGeneratorQrem
-	private var SmtFormulaGeneratorQrem smtFormulaGenerator = null // initialized on call
+	private val SmtViewGenerator smtViewGenerator = new SmtViewGeneratorQrem
+	private var SmtFormulaGenerator smtFormulaGenerator = null // initialized on call
 	// declarations of quantified variables
 	private var Map<String, IPLType> freeVarDecls
 	// each map in the list is an valuation of all declared variables
@@ -56,16 +66,15 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private var Map<Formula, String> transferClausesSmt
 	private var Map<Formula, IPLType> transferClausesTypes
 	private var Map<Map<String, Object>, Map<Formula, Object>> transferClauseVals = new HashMap
-	// private var Map<Formula, Formula> transferClausesPNF2QF
 	// caching view smt
 	private var String viewSmt = ''
 	
 	// storing these for convenience
-	private val DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-	private val IPLPrettyPrinter pp = new IPLPrettyPrinter
+//	private val DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+//	private val IPLPrettyPrinter pp = new IPLPrettyPrinter
 	private val String z3BinPath = System::getenv('Z3_BIN')
 
-	// standard IPL verification
+	/** standard IPL verification */
 	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa) {
 		freeVarVals.clear
@@ -78,11 +87,11 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// transform to prenex normal form; make a copy to not mess with IPLSpec
 		val fPNF = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
-		println('Prenex normal form: ' + pp.print(fPNF))
+		println('Prenex normal form: ' + IPLPrettyPrinter::printIPL(fPNF))
 
 		// remove quantifiers and populate freeVarDecls
 		val Formula fQF = smtFormulaGenerator.removeQuants(fPNF.copy)
-		println('Quantifiers removed: ' + IPLPrettyPrinter::print_formula(fQF))
+		println('Quantifiers removed: ' + IPLPrettyPrinter::printIPL(fQF))
 
 		// find models: candidate valuations for sat of negformula
 		// populate transfer clauses 
@@ -101,7 +110,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		smtFormulaGenerator.flexsVals = findFlexsVals(md, filename, fsa)
 
 		// run the ultimate smt here
-		println('Final verification after MCs: ' + pp.print(fPNF))
+		println('Final verification after MCs: ' + IPLPrettyPrinter::printIPL(fPNF))
 		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa)
 		fQF.delete(true)
 		fPNF.delete(true)
@@ -109,8 +118,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 		return res
 	}
 
-	// simple verification of negated formula
-	// touches: scopeDecls  (but not flexDecls)
+	/**  simple verification of negated formula
+	 * touches: scopeDecls (but not flexDecls)*/
 	override public def boolean verifyRigidFormula(Formula f, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
 		TimeRecWall::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
@@ -157,9 +166,10 @@ public class SmtVerifierQrem implements SmtVerifier {
 			throw new UnexpectedException("z3 error: " + z3ResLines.join('\n'))
 	}
 
-	// finds all variable assignments that satisfy a QF formula
-	// @returns true if managed to find all models, false otherwise 
-	// implicit result: populates termDecls, flexDecls, clauses, termVals 
+	/**  finds all variable assignments that satisfy a QF formula
+	* @returns true if managed to find all models, false otherwise 
+	* implicit result: populates termDecls, flexDecls, clauses, termVals 
+	*/
 	override public Boolean findModels(Formula fQF, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
 		freeVarVals.clear
 
@@ -237,19 +247,16 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 	}
 
-	// find valuations for each flexible variable
-	// implicitly works on references to the QF instance of the formula
-	// returns a map: term evaluation -> flex values 
-	// Map<Map<String, Object>, Map<String, Object>> 
+	/** Find valuations for each flexible variable
+	* Implicitly works on references to the QF instance of the formula
+	* Returns a map: term evaluation -> flex values, i.e. Map<Map<String, Object>, Map<String, Object>> 
+	*/
 	private def Map findFlexsVals(ModelDecl md, String filename, IFileSystemAccess2 fsa) {
 		// now the current formula state is populated: 
 
 		// flex name -> <(var name, value) -> flex value>
 		val Map<String, Map<Map<String, Object>, Object>> flexsVals = new HashMap
 
-		// cache of values projected on parameters, to not repeat MC several times 
-		// flex name ->  (proj val -> flex value) 
-		// val Map<String, Map< Map<String, Object>, Object>> flexsFilteredValueCache = new HashMap
 		// init the checker
 		TimeRecWall::startTimer("new PrismPlugin")
 		val PrismPlugin prism = new PrismPlugin(md.name, fsa)
@@ -275,6 +282,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 				// (varname, varvalue) -> flex value
 				val Map<Map<String, Object>, Object> flexVals = new HashMap
+				// cache of values projected on parameters, to not repeat MC several times 
+				// flex name ->  (proj val -> flex value) 
 				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
 				var int count = 1;
 				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
@@ -302,8 +311,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 						// potential issue here: the background/view functions lose their references to declarations
 						// so printing from old formula
-						println('Flexible formula before replacement: ' + pp.print(origFlexExpr) + ", params: " +
-							origFlexExpr.params.vals.map[pp.print(it)])
+						println('Flexible formula before replacement: ' + IPLPrettyPrinter::printIPL(origFlexExpr) + ", params: " +
+							origFlexExpr.params.vals.map[IPLPrettyPrinter::printIPL(it)])
 
 						// construct clauseVal and clauseType with updated references to newFlexExpr
 						val Map<Formula, Object> clauseValUpd = new HashMap
@@ -332,8 +341,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 						) as ModelExpr
 
 						// set up prism data
-						val prop = pp.print(newFlexExpr)
-						val paramVals = newFlexExpr.params.vals.map[pp.print(it)]
+						val prop = IPLPrettyPrinter::printIPL(newFlexExpr)
+						val paramVals = newFlexExpr.params.vals.map[IPLPrettyPrinter::printIPL(it)]
 						// prop = prop.substring(1, prop.length-1) // remove $
 						// don't need the copied formula anymore
 						newFlexExpr.delete(true)
@@ -365,8 +374,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		flexsVals
 	}
 
-	// get (additional) variable evaluations from the model (z3 output)
-	// touches: modelFound, scopeVals; reads: scopeDecls
+	/** Get (additional) variable and clause evaluations from the model (z3 output)
+	* touches: modelFound, scopeVals; reads: scopeDecls
+	*/
 	private def Boolean populateEvals(String[] z3ResAfterFirst) {
 		// find the string with value with regex
 		var modelFound = true // assume so until proven otherwise
@@ -427,7 +437,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		modelFound
 	}
 
-	// returns a regex parsing pattern for free variable values (complex enough that deserves its own function) 
+	/**  returns a regex parsing pattern for free variable values (complex enough that deserves its own function)*/ 
 	private def String varValueParsingPattern() {
 		// decoding: beginning of input, two escaped parentheses, basically any name with alphanum and underscores 
 		// then whitespace, then the value (alphanumeric, with possible dots, 2nd group)
@@ -439,7 +449,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 	// '''(?s)\A\((\((.*?)\)\s?\s?)*\)\z''' // '''\((\(.*\)\s?)*\)'''//define-fun «Pattern.quote(varName)»(!\d*)* \(.*\) (\w*)\s*([\p{Alnum}\.]*)\)'''
 	}
 
-	// returns a regex parsing pattern for value transfer clauses (complex enough that deserves its own function) 
+	/** returns a regex parsing pattern for value transfer clauses (complex enough that deserves its own function) */ 
 	private def String clauseValueParsingPattern() {
 		// decoding: beginning of input, two escaped parentheses, then anything 
 		// then whitespace, 
@@ -458,8 +468,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		'''\A\(\(.*\s(([\p{Alnum}\.]*)|(\((-\s[\p{Alnum}\.]*)\)))\)\)\z'''
 	}
 
-	// helper function: adds a value to a valuation, doing all the checks as well 
-	// the map is from the Object type (String, Formula, ...) to Object (Value)
+	/** A helper function: adds a value to a valuation, doing all the checks as well 
+	*  The map is from the Object type (String, Formula, ...) to Object (Value)
+	*/
 	private def addValueToEval(Map eval, Object key, String valueSmt, IPLType termType) {
 		// if evals don't have a var, add a list
 		// if (!eval.containsKey(varName))

@@ -20,13 +20,12 @@ import org.xtext.example.ipl.viewgen.map.dijkstra.Graph;
 import org.xtext.example.ipl.viewgen.map.dijkstra.Vertex;
 
 /**
+ * Generates a prism program from a map. s
  * @author jcamara
  *
  * Eventually, the MapTranslator might be moved into a more general
  * translator incorporating elements from the architecture model, etc.
  */
-
-
 public class MapTranslatorPrism extends MapTranslatorUtil {
 
     public static final String VERSION_STR = "V0.4 - Oct 2017";

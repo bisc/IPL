@@ -54,11 +54,12 @@ import org.xtext.example.ipl.util.IPLUtils
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
-// a version of the type provider combines looking up and setting IPL spec up front
-// creates IPL types: 
-// - from component instance
-// - from component classifier (used for aadl mdls)
-// - from component implementation (deprecated)
+/**  a version of the type provider combines looking up and setting IPL spec up front
+* Creates IPL types: 
+* - from component instance
+* - from component classifier (used for aadl mdls)
+* - from component implementation (deprecated)
+*/
 class IPLTypeProvider {
 	
 	HashMap<ComponentClassifier, List<Property>> classifierPropCache = new HashMap

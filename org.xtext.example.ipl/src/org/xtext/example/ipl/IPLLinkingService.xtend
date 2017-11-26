@@ -21,6 +21,9 @@ import org.eclipse.xtext.scoping.IScopeProvider
 import org.eclipse.xtext.scoping.impl.AbstractGlobalScopeDelegatingScopeProvider
 import org.eclipse.xtext.scoping.impl.IDelegatingScopeProvider
 
+/**
+ * Provides links to named objects, scopes, and imported name adapter. 
+ */
 class IPLLinkingService extends AbstractLinkingService {
 	
 	val logger = Logger.getLogger(IPLLinkingService)

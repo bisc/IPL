@@ -25,7 +25,7 @@ import static extension org.eclipse.xtext.EcoreUtil2.*
 /**
  * This class contains custom validation rules. 
  * 
- * Be careful with using class variables: this validator is run on many programs. 
+ * Be careful with (re)using class variables: this validator is run on many programs that are consecutive versions of each other. 
  * 
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#validation
  */

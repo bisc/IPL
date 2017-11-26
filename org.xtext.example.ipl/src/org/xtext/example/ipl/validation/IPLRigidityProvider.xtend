@@ -23,6 +23,9 @@ import org.xtext.example.ipl.iPL.VarDecl
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
+/**
+ * Determines rigidity of given formulas. 
+ */
 class IPLRigidityProvider {
 	
 	private IPLSpec spec = null 

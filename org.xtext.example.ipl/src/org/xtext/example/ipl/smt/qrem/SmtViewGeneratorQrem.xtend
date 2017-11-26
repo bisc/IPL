@@ -34,11 +34,17 @@ import static java.lang.Math.toIntExact
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
 
+/**
+ * An implementation of SMT view generation. 
+ * Works with formula generator that is based on quantifier removal.
+ * This class can be reused across formulas (because they share a view anyway)
+ */
 class SmtViewGeneratorQrem implements SmtViewGenerator {
 
-	// to not run background generation every time when looking for models
+	// a flag to not run view generation every time when looking for models
 	private var viewGenerated = false
 
+	// caching component -> its index
 	private val cic = new ComponentIndexCache
 	// storage for component properties and their types; <prop name , prop type> -> (archelem index -> prop value)
 	// faces externally  
@@ -48,7 +54,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 	// comp name -> comp id, for specific components 
 	private var Map<String, Integer> namedCompMap
 
-	// generates a preamble and AADL SMT; does not touch IPL formulas 
+	/** generates a preamble and AADL SMT; does not touch IPL formulas */  
 	override public def String generateViewSmt(IPLSpec spec) {
 		TimeRecCPU::startTimer("generateBackgroundSmt")
 
@@ -124,7 +130,7 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		println("Done generating AADL SMT")
 
 		TimeRecCPU::stopTimer("generateBackgroundSmt")
-		// background generation output
+		// view generation output
 		'''; Preamble
 «preamble»
 
@@ -153,20 +159,19 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		viewGenerated
 	}
 
-	// product of background generation; resets it itself
 	override public def Map getPropTypeMap() {
 		propTypeMap
 	}
 
-	// same
 	override public def Map getPropValueMap() {
 		propValueMap
 	}
 
-	// properties: SMT declarations & assertions
-	// the code below is quite complex due to different types of values that properties might take
-	// uses the array implementation of lists with length & containment functions
-	// DEPRECATED: doesn't work with lists
+	/** Generation for AADL properties: SMT declarations & assertions
+	* the code below is quite complex due to different types of values that properties might take
+	* uses the array implementation of lists with length & containment functions
+	* DEPRECATED VERSION: doesn't work well with list values of properties
+	*/
 	private def String generateSmtForPropertiesUsingArrays() {
 		propTypeMap.keySet.map [ propName |
 			val type = propTypeMap.get(propName)
@@ -216,10 +221,10 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 		].join + '\n'
 	}
 
-	// properties: SMT declarations & assertions
-	// the code below is quite complex due to different types of values that properties might take
-	// uses a straightforward implementation of lists with an abstract sort and functions sort x int-> res
-	// limitation: cannot do lists of lists. Perhaps fixable.
+	/** Generation for AADL properties: SMT declarations & assertions
+	* The code below is quite complex due to different types of values that properties might take
+	* Uses a straightforward implementation of lists with an abstract sort and functions sort x int-> res
+	* Limitation: cannot do lists of lists. TODO: check if fixable.*/
 	private def String generateSmtForPropertiesUsingFunctions() {
 		val listSortName = 'listsort'
 		val listContainsIndexFn = 'list_contains_index'
@@ -293,165 +298,165 @@ class SmtViewGeneratorQrem implements SmtViewGenerator {
 				].join('\n')
 			}
 
-			// populates the data structures from the aadl model to generate SMT code later
-			private def populateAadlSmtStructures(ViewDecl viewDecl, Map<String, List<Integer>> typeMap,
-				Map<Integer, List<Integer>> subCompMap) {
+	/** Populates the data structures from the aadl model to generate SMT code later*/ 
+	private def populateAadlSmtStructures(ViewDecl viewDecl, Map<String, List<Integer>> typeMap,
+		Map<Integer, List<Integer>> subCompMap) {
 
-				val ComponentImplementation viewComp = viewDecl.ref
+		val ComponentImplementation viewComp = viewDecl.ref
 
-				if (viewComp instanceof SubprogramImplementation || viewComp instanceof SubprogramGroupImplementation) {
-					// Fail...
-					throw new RuntimeException("Can't instantiate subprogram")
+		if (viewComp instanceof SubprogramImplementation || viewComp instanceof SubprogramGroupImplementation) {
+			// Fail...
+			throw new RuntimeException("Can't instantiate subprogram")
+		}
+
+		// instantiate aadl model
+		val viewCompInst = InstantiateModel::buildInstanceModelFile(viewComp)
+
+		// add the 'view' component into the named components
+		// need an instance of it, so doing it here
+		if (viewDecl.name !== null)
+			namedCompMap.put(viewDecl.name, cic.indexForComp(viewCompInst))
+
+		// find a package and get all property set imports 
+		val AadlPackage cont = viewComp.getContainerOfType(AadlPackage)
+		val pss = cont.ownedPublicSection.importedUnits.filter [
+			it instanceof PropertySet
+		].toList as List // up-casting to make the function swallow this list
+		viewCompInst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
+	}
+
+	/** Populates the cache of components and properties */
+	private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map,
+		Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
+
+		val compIndex = cic.indexForComp(comp)
+
+		map.add('isArchElem', compIndex)
+		map.add('is' + comp.category.toString.toFirstUpper, compIndex)
+		InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended.forEach [
+			map.add('is' + name, compIndex)
+		]
+
+		val ci = InstanceUtil::getComponentImplementation(comp, 0, null)
+		if (ci !== null) {
+			map.add('is' + ci.name.replace('.', '_'), compIndex)
+		}
+
+		// handling subcomponents
+		comp.children.forEach [
+			switch (it) {
+				ComponentInstance: {
+					val scIndex = cic.indexForComp(it)
+
+					// create a function with name of component and taking parent as an argument
+					propTypeMap.put(name, new ComponentType(comp.name)) // 'SUBCOMP'
+					if (propValueMap.get(name) === null)
+						propValueMap.put(name, new HashMap)
+
+					propValueMap.get(name).put(compIndex, scIndex)
+
+					// create a subcomponent assertion isSubcomp of parent  
+					// propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
+					// index, scIndex.toString
+					subCompMap.add(compIndex, scIndex)
 				}
-
-				// instantiate aadl model
-				val viewCompInst = InstantiateModel::buildInstanceModelFile(viewComp)
-
-				// add the 'view' component into the named components
-				// need an instance of it, so doing it here
-				if (viewDecl.name !== null)
-					namedCompMap.put(viewDecl.name, cic.indexForComp(viewCompInst))
-
-				// find a package and get all property set imports 
-				val AadlPackage cont = viewComp.getContainerOfType(AadlPackage)
-				val pss = cont.ownedPublicSection.importedUnits.filter [
-					it instanceof PropertySet
-				].toList as List // up-casting to make the function swallow this list
-				viewCompInst.allComponentInstances.forEach[populateComponentInst(it, typeMap, subCompMap, pss)]
 			}
+		]
 
-			// populates the cache of components and properties
-			private def populateComponentInst(ComponentInstance comp, Map<String, List<Integer>> map,
-				Map<Integer, List<Integer>> subCompMap, List<PropertySet> propsets) {
+		// handling properties more parsimoniously
+		for (ps : propsets)
+			for (prop : ps.ownedProperties) { // each property
+				if (comp.acceptsProperty(prop)) { // if accepts, add to the map
+					val type = IPLUtils::typeFromPropType(prop.propertyType)
+					if (type !== null) { // only considering the types we know 
+					// put the type in right away, regardless of the values
+						propTypeMap.put(prop.name, type)
+						val value = if (type instanceof ListType) { // a list property type
+								val ListValue listVal = try {
+										val propExp = PropertyUtils::getSimplePropertyListValue(comp, prop)
+										if(propExp instanceof ListValue) propExp else null
+									} catch (PropertyNotPresentException e) {
+										null
+									}
+								// TODO need to control that we don't add lots of nulls to lists
+								if (listVal !== null) {
+									val outputList = new ArrayList
+									listVal.ownedListElements.forEach [
+										outputList.add(aadlSimpleValue2Object(it))
+									]
+									outputList
+								} else
+									null
 
-				val compIndex = cic.indexForComp(comp)
-
-//		println(compIndex + ") " + comp.category.toString + ': ' + InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended + ' ' + comp.name)
-				map.add('isArchElem', compIndex)
-				map.add('is' + comp.category.toString.toFirstUpper, compIndex)
-				InstanceUtil::getComponentType(comp, 0, null).selfPlusAllExtended.forEach [
-					map.add('is' + name, compIndex)
-				]
-
-				val ci = InstanceUtil::getComponentImplementation(comp, 0, null)
-				if (ci !== null) {
-					map.add('is' + ci.name.replace('.', '_'), compIndex)
-				}
-
-				// handling subcomponents
-				comp.children.forEach [
-					switch (it) {
-						ComponentInstance: {
-							val scIndex = cic.indexForComp(it)
-
-							// create a function with name of component and taking parent as an argument
-							propTypeMap.put(name, new ComponentType(comp.name)) // 'SUBCOMP'
-							if (propValueMap.get(name) === null)
-								propValueMap.put(name, new HashMap)
-
-							propValueMap.get(name).put(compIndex, scIndex)
-
-							// create a subcomponent assertion isSubcomp of parent  
-							// propMap.add(new Pair(name,  as IPLType/*tp.typeOf(comp) -- cannot handle systemInstance yet*/), 
-							// index, scIndex.toString
-							subCompMap.add(compIndex, scIndex)
-						}
-					}
-				]
-
-				// handling properties more parsimoniously
-				for (ps : propsets)
-					for (prop : ps.ownedProperties) { // each property
-						if (comp.acceptsProperty(prop)) { // if accepts, add to the map
-							val type = IPLUtils::typeFromPropType(prop.propertyType)
-							if (type !== null) { // only considering the types we know 
-							// put the type in right away, regardless of the values
-								propTypeMap.put(prop.name, type)
-								val value = if (type instanceof ListType) { // a list property type
-										val ListValue listVal = try {
-												val propExp = PropertyUtils::getSimplePropertyListValue(comp, prop)
-												if(propExp instanceof ListValue) propExp else null
-											} catch (PropertyNotPresentException e) {
-												null
-											}
-										// TODO need to control that we don't add lots of nulls to lists
-										if (listVal !== null) {
-											val outputList = new ArrayList
-											listVal.ownedListElements.forEach [
-												outputList.add(aadlSimpleValue2Object(it))
-											]
-											outputList
-										} else
-											null
-
-									} else { // a simple, non-list property 
-										val PropertyExpression propExp = try {
-												PropertyUtils::getSimplePropertyValue(comp, prop)
-											} catch (PropertyNotPresentException e) {
-												null
-											}
-
-										aadlSimpleValue2Object(propExp)
+							} else { // a simple, non-list property 
+								val PropertyExpression propExp = try {
+										PropertyUtils::getSimplePropertyValue(comp, prop)
+									} catch (PropertyNotPresentException e) {
+										null
 									}
 
-								if (value !== null) {
-									if (propValueMap.get(prop.name) === null)
-										propValueMap.put(prop.name, new HashMap)
-
-									propValueMap.get(prop.name).put(compIndex, value)
-								}
+								aadlSimpleValue2Object(propExp)
 							}
+
+						if (value !== null) {
+							if (propValueMap.get(prop.name) === null)
+								propValueMap.put(prop.name, new HashMap)
+
+							propValueMap.get(prop.name).put(compIndex, value)
 						}
 					}
-			}
-
-			static class ComponentIndexCache {
-				var next = 0
-				val map = new HashMap<ComponentInstance, Integer>
-
-				def indexForComp(ComponentInstance comp) {
-					val entry = map.get(comp)
-					if (entry === null) {
-						map.put(comp, next)
-						next++
-					} else {
-						entry
-					}
-				}
-
-			}
-
-			// converts an AADL simple value into a Java object
-			// assumes a populated component index cache for instance reference values
-			private def aadlSimpleValue2Object(PropertyExpression propExp) {
-				// have to go through this dance because otherwise does not get cast
-				switch propExp {
-					BooleanLiteral:
-						propExp.getValue()
-					IntegerLiteral:
-						toIntExact(propExp.getValue()) // it returns long
-					RealLiteral:
-						propExp.getValue()
-					InstanceReferenceValue: {
-						// only deal with component instances
-						val refObject = propExp.referencedInstanceObject
-						if (refObject instanceof ComponentInstance)
-							cic.indexForComp(refObject) // more concrete than just ReferenceValue
-						else
-							null
-					}
-					default:
-						null
 				}
 			}
+	}
 
-			private def <K, V> add(Map<K, List<V>> map, K key, V item) {
-				if (map.get(key) === null) {
-					map.put(key, new ArrayList<V>)
-				}
-
-				map.get(key).add(item)
+	/** Converts an AADL simple value into a Java object
+	* Assumes a populated component index cache for instance reference values  */
+	private def aadlSimpleValue2Object(PropertyExpression propExp) {
+		// have to go through this dance because otherwise does not get cast
+		switch propExp {
+			BooleanLiteral:
+				propExp.getValue()
+			IntegerLiteral:
+				toIntExact(propExp.getValue()) // it returns long
+			RealLiteral:
+				propExp.getValue()
+			InstanceReferenceValue: {
+				// only deal with component instances
+				val refObject = propExp.referencedInstanceObject
+				if (refObject instanceof ComponentInstance)
+					cic.indexForComp(refObject) // more concrete than just ReferenceValue
+				else
+					null
 			}
-
+			default:
+				null
 		}
-		
+	}
+
+	/** Adds a value to a list in a map of key -> lists */
+	private def <K, V> add(Map<K, List<V>> map, K key, V item) {
+		if (map.get(key) === null) {
+			map.put(key, new ArrayList<V>)
+		}
+
+		map.get(key).add(item)
+	}
+	
+	/** A class to keep track of indices of component instances in AADL model */
+	static class ComponentIndexCache {
+		var next = 0
+		val map = new HashMap<ComponentInstance, Integer>
+
+		def indexForComp(ComponentInstance comp) {
+			val entry = map.get(comp)
+			if (entry === null) {
+				map.put(comp, next)
+				next++
+			} else {
+				entry
+			}
+		}
+
+	}
+
+}

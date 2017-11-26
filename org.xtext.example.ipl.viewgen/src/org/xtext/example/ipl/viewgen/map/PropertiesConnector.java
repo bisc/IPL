@@ -2,6 +2,9 @@ package org.xtext.example.ipl.viewgen.map;
 
 import java.util.Properties;
 
+/** 
+ * Contains platform-specific values for Prism/AADL generation. 
+ */
 public class PropertiesConnector {
 
     public static final String PRISM_ADV_EXPORT_PROPKEY = "prism.adv.export";

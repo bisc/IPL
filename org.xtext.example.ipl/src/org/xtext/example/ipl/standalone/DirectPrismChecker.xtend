@@ -4,7 +4,9 @@ import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.util.TimeRecWall
 
-// uses prism directly to check properties
+/** A class that uses Prism directly to check properties, with exhaustive search for values.
+ * Not part of IPL; a benchmark against which to compare, instead.
+ */
 class DirectPrismChecker {
 	
 	def directCheck(IFileSystemAccess2 fsa){ 

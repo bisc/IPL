@@ -28,14 +28,17 @@ import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.TimeRecWall
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
-//import org.xtext.example.ipl.iPL.EDouble
-
+/**
+ * Values to indicate the result of verification
+ */
 enum VerificationResult { 
 	Valid, Invalid, Error
 }
 
 /**
- * Generates code from your model files on save.
+ * A class that serves as an entry point to IPL verification. 
+ * 
+ * Triggered by building model files.
  * 
  * See https://www.eclipse.org/Xtext/documentation/303_runtime_concepts.html#code-generation
  */
@@ -43,7 +46,9 @@ class IPLGenerator extends AbstractGenerator {
 	
 	private val Map<URI, List<IMarker>> markers = new HashMap
 	
-	// setting up for timing 
+	/**
+	 * Called before generation, for timing setup. 
+	 */  
 	override public void beforeGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		// set up timing
 		var mxb = ManagementFactory.getThreadMXBean()
@@ -57,14 +62,18 @@ class IPLGenerator extends AbstractGenerator {
 		deleteMarkers(resource)
 	}
 
+	/**
+	 * Called on build. Performs verification of each formula in the file, and marks the results with icons. 
+	 */
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
-		// have to make a new instance of Verifier for every formula to not carry over Generator's state
+		// have to make a new instance of Verifier for every formula 
+		// 		to not carry over Generator's state
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
-				println('\n\nVerifying ' + IPLPrettyPrinter::print_formula(f))
+				println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
 				val node = NodeModelUtils::getNode(f) // for marker creation
 				try { 
 					if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
@@ -106,7 +115,9 @@ class IPLGenerator extends AbstractGenerator {
 		TimeRecWall::exportAllTimers(resource.URI.trimFileExtension.lastSegment, fsa)
 	}
 	
-	// creates a marker with a verification result
+	/**
+	 *  Creates a marker with a verification result for a given resource. 
+	 */
 	def private createMarker(Resource resource, int line, VerificationResult result, String text) { 
 		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
 		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
@@ -139,6 +150,9 @@ class IPLGenerator extends AbstractGenerator {
 			throw new UnexpectedException('Failed to create a result marker')
 	}
 	
+	/**
+	 * Removes all markers for a resource
+	 */
 	def private deleteMarkers(Resource resource) { 
 		// delete own markers
 		if (markers.containsKey(resource.URI))
@@ -149,16 +163,11 @@ class IPLGenerator extends AbstractGenerator {
 		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
 		file.deleteMarkers(IMarker.PROBLEM, true, 0)
 	}
-	
+
+	/**
+	 * Called after generation. Currently not used.
+	 */	
 	override public void afterGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
-		/*var z3FilePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(z3FilePath))
-		val marker = file.createMarker('org.xtext.example.ipl.marker')
-		marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO);
-		marker.setAttribute(IMarker.MESSAGE, 'testmessage');
-		marker.setAttribute(IMarker.LINE_NUMBER, 5); 
-		marker.setAttribute(IMarker.CHAR_START,0);
-		marker.setAttribute(IMarker.CHAR_END,5);*/
 	}
 	
 }

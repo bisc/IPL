@@ -3,8 +3,8 @@ package org.xtext.example.ipl.viewgen.map;
 import java.util.Objects;
 
 /**
+ * Determines the times of robot motion based on speeds.  
  * @author jcamara
- *
  */
 public class SpeedPredictor {
 

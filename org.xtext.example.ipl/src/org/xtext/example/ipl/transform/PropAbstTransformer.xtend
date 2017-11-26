@@ -28,7 +28,7 @@ import org.xtext.example.ipl.validation.IPLTypeProvider
 
 import static extension org.eclipse.emf.ecore.util.EcoreUtil.*
 
-// replaces the topmost flexible formula with a propositional constant
+/** Replaces the topmost flexible formulas with propositional constants */ 
 class PropAbstTransformer {
 	
 	private var IPLTypeProvider tp
@@ -37,6 +37,7 @@ class PropAbstTransformer {
 	private int propAbstCt = 0 
 	private Map<Formula, Formula> replacedFormulas = new HashMap 
 	
+	/** Carries out propositional abstraction on the given formula */
 	public def Formula performPropAbst(Formula f, IPLTypeProvider _tp) {
 		tp = _tp 
 		visit(f)

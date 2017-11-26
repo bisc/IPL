@@ -23,12 +23,14 @@ import org.xtext.example.ipl.iPL.TAtomBinary
 import org.xtext.example.ipl.iPL.TAtomUnary
 import org.xtext.example.ipl.iPL.TermOperation
 
-// replaces indicated vars with free constants
-// eliminates their quantifiers, leaving others intact
+/** Eliminates quantifiers of indicated variables  
+*  by replacing them vars with free variables
+* Leaving non-indicated variables intact */
 class Var2FreeVarPartialTransformer {
 	
 	private var Map<String, String> var2FreeVar  
 	
+	/** Replace variables in the map with free terms in the given formula */
 	def EObject replaceVarsWithTerms(Formula f, Map _var2FreeVar) { 
 		var2FreeVar =  _var2FreeVar
 		
@@ -66,20 +68,11 @@ class Var2FreeVarPartialTransformer {
 			// if the parent is null, it still needs to be assigned, which is not done by Ecore
 			if (parent === null) {
 				EcoreUtil::remove(exp) // removes the argument from its container (doesn't delete the arg)
-				// other attempts 
-//				val EReference feature = exp.eContainmentFeature //	exp.eContainingFeature
-//				EcoreUtil::remove(exp, exp.eContainingFeature, f)
-//				exp.eSet(feature, null)
 			}
-			// 
+			
 			EcoreUtil::delete(f, false) // non-recursive, looks for usages and containments to remove refs
 			return replaceVars(exp)
-//			if (parent !== null) { // deeper into the tree, returning parent
-//				replaceVars(exp)
-//				return parent 
-//			} else { // if top of the tree, then returning itself 
-//				return replaceVars(exp)
-//			}
+			
 		} else { // not removing quantification, returning itself
 			replaceVars(exp)
 			return f
