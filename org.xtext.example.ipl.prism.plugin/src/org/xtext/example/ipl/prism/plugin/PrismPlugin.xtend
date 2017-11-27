@@ -10,6 +10,7 @@ import java.rmi.UnexpectedException
 
 /**
  * A plugin to invoke behavioral model checking by Prism. 
+ * Assumes that Prism models are on a hardcoded relative path from the generated IPL files. 
  */
 class PrismPlugin {
 	val String relativePrismLoc = "../model/prism/"
