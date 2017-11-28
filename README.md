@@ -37,3 +37,10 @@
 ## User build setup
 
 TBA.
+
+## Contacts
+ * Ivan Ruchkin iruchkin@cs.cmu.edu
+ * Grant Iraci grantira@buffalo.edu
+ * Josh Sunshine sunshine@cs.cmu.edu
+ * Bradley Schmerl schmerl@cs.cmu.edu
+ * David Garlan garlan@cs.cmu.edu
