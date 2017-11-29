@@ -409,4 +409,62 @@
 			type="text">
 		</fileTypes>
 	</extension>
+	
+	<!-- commands & handlers -->
+	 <extension
+       point="org.eclipse.ui.commands">
+    <category
+          id="org.xtext.example.ipl.commands.category"
+          name="IPL Category">
+    </category>
+    <command
+          categoryId="org.xtext.example.ipl.commands.category"
+          id="org.xtext.example.ipl.commands.iplVerifyCommand"
+          name="Start IPL Verification">
+    </command>
+ </extension>
+ <extension
+       point="org.eclipse.ui.handlers">
+    <handler 
+          class="org.xtext.example.ipl.ui.IPLExecutableExtensionFactory:org.xtext.example.ipl.ui.handlers.IPLVerifyHandler"
+          commandId="org.xtext.example.ipl.commands.iplVerifyCommand">
+    </handler>
+ </extension>
+ <extension
+       point="org.eclipse.ui.bindings">
+    <key
+          commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
+          contextId="org.eclipse.ui.contexts.window"
+          schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+          sequence="M1+6">
+    </key>
+ </extension>
+ <extension
+       point="org.eclipse.ui.menus">
+    <menuContribution
+          locationURI="menu:org.eclipse.ui.main.menu?after=additions">
+       <menu
+             id="org.xtext.example.ipl.menus.iplMenu"
+             label="IPL"
+             mnemonic="M">
+          <command
+                commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
+                id="org.xtext.example.ipl.menus.iplVerifyCommand"
+                mnemonic="S">
+          </command>
+       </menu>
+    </menuContribution>
+    <menuContribution
+          locationURI="toolbar:org.eclipse.ui.main.toolbar?after=additions">
+       <toolbar
+             id="org.xtext.example.ipl.toolbars.iplToolbar">
+          <command
+                commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
+                icon="icons/sample.gif"
+                id="org.xtext.example.ipl.toolbars.iplVerifyCommand"
+                tooltip="Start IPL Verification">
+          </command>
+       </toolbar>
+    </menuContribution>
+ </extension>
 </plugin>

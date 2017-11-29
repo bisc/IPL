@@ -13,7 +13,7 @@ import java.util.Objects;
 
 public class MapTranslatorAadl extends MapTranslatorUtil {
 
-	public static final String VERSION_STR = "V0.4 - Oct 2017";
+	public static final String VERSION_STR = "V0.5 - Dec 2017";
 
 	// parameters for generation
 	private static String m_taskPropertyLibName;
@@ -128,6 +128,7 @@ public class MapTranslatorAadl extends MapTranslatorUtil {
 		res += m_taskPropertyLibName + "::task_id => " + id + appliesToTaskName;
 		res += m_taskPropertyLibName + "::start_loc => " + n.getId() + appliesToTaskName;
 		res += m_taskPropertyLibName + "::end_loc => " + n.getId() + appliesToTaskName;
+		// should not prescribe start/end headings because then each location has to have 8 empty tasks
 //		 res += m_taskTypeLibName + "::start_head => " +
 //		 findArcHeading(a).convertToInt() +
 //		 appliesToTaskName;
