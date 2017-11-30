@@ -17,7 +17,10 @@ import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Path
 import org.eclipse.emf.common.util.URI
 import org.eclipse.emf.ecore.resource.Resource
+import org.eclipse.jface.dialogs.MessageDialog
 import org.eclipse.swt.widgets.Display
+import org.eclipse.ui.IWorkbenchWindow
+import org.eclipse.ui.PlatformUI
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
@@ -165,20 +168,32 @@ class IPLGenerator extends AbstractGenerator {
 	 * Removes all markers for a resource
 	 */
 	def private deleteMarkers(Resource resource) { 
-		// delete own markers
-		if (markers.containsKey(resource.URI))
-			markers.get(resource.URI).forEach[it.delete]
-		
-		// in case markers carried over from an earlier session
-		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
-		file.deleteMarkers(IMarker.PROBLEM, true, 0)
+		Display.getDefault().syncExec(new Runnable() {
+			override public run() {
+				// delete own markers
+				if (markers.containsKey(resource.URI))
+					markers.get(resource.URI).forEach[it.delete]
+				
+				// in case markers carried over from an earlier session
+				var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+				val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
+				file.deleteMarkers(IMarker.PROBLEM, true, 0)
+			}				    
+		});
 	}
 
 	/**
 	 * Called after generation. Currently not used.
 	 */	
 	override public void afterGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
+		// Don't necessarily want to spam dialogs when going through many files
+//					Display.getDefault().asyncExec(new Runnable() {
+//						override public run() {
+//						val IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+//						MessageDialog.openInformation(window.getShell(), "IPL Status", "IPL Verification for " +
+//								resource.URI + " is complete");	
+//						}
+//					});
 	}
 	
 }

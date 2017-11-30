@@ -410,7 +410,7 @@
 		</fileTypes>
 	</extension>
 	
-	<!-- commands & handlers -->
+	<!-- IPL commands & handlers -->
 	 <extension
        point="org.eclipse.ui.commands">
     <category
@@ -446,7 +446,7 @@
        <menu
              id="org.xtext.example.ipl.menus.iplMenu"
              label="IPL"
-             mnemonic="M">
+             mnemonic="I">
           <command
                 commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
                 id="org.xtext.example.ipl.menus.iplVerifyCommand"
@@ -462,7 +462,7 @@
                 commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
                 icon="icons/sample.gif"
                 id="org.xtext.example.ipl.toolbars.iplVerifyCommand"
-                tooltip="Start IPL Verification">
+                tooltip="Start IPL verification on the current selection">
           </command>
        </toolbar>
     </menuContribution>
