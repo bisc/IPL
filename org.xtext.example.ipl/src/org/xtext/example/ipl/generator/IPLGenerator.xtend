@@ -17,6 +17,7 @@ import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Path
 import org.eclipse.emf.common.util.URI
 import org.eclipse.emf.ecore.resource.Resource
+import org.eclipse.swt.widgets.Display
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
@@ -76,33 +77,37 @@ class IPLGenerator extends AbstractGenerator {
 				println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
 				val node = NodeModelUtils::getNode(f) // for marker creation
 				try { 
-					if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
+					val boolean res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
 						// find a model declaration
 						val mdls = spec.decls.filter[it instanceof ModelDecl]
 						if (mdls.size == 0) {
 							throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
 						} else {  
 							TimeRecWall::startTimer("verifyNonRigidFormula")
-							val boolean res = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+							val boolean resNR = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
 							TimeRecWall::stopTimer("verifyNonRigidFormula")
 							
-							println("IPL non-rigid formula verified, result: " + res)
-							if (res)
-								createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
-							else
-								createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
+							println("IPL non-rigid formula verified, result: " + resNR)
+							resNR
 						} 
 					} else { //rigid, shortcut
-							val res = (new SmtVerifierQrem).verifyRigidFormula(f, spec, filename, fsa)
-							println("IPL rigid formula verified, result: " + res)
-							if (res)
-								createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
-							else
-								createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
+						val boolean resR = (new SmtVerifierQrem).verifyRigidFormula(f, spec, filename, fsa)
+						println("IPL rigid formula verified, result: " + resR)
+						resR
 					}
+					
+					// show markers in a different thread
+					if (res)
+						createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
+					else
+						createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
+   					
+					
 				} catch (UnexpectedException e) { 
 					println("IPL verification error: " + e)
 					e.printStackTrace
+					
+					// show marker in a different thread
 					createMarker(resource, node.startLine, VerificationResult::Error, 'Verification error: ' + e.message)
 				}
 			]
@@ -116,38 +121,44 @@ class IPLGenerator extends AbstractGenerator {
 	}
 	
 	/**
-	 *  Creates a marker with a verification result for a given resource. 
+	 *  Shows a marker with a verification result for a given resource.
+	 *  Uses async exec to interact with UI properly.   
 	 */
 	def private createMarker(Resource resource, int line, VerificationResult result, String text) { 
-		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
-		
-		// create a marker
-		val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
-		
-		var markerList = markers.get(resource.URI) 
-		if (markerList === null) { 
-			markerList = new LinkedList
-			markers.put(resource.URI, markerList)
-		}
-		markerList.add(marker)
-		
-		// set marker attributes
-		if (marker.exists()) {
-			marker.setAttribute(IMarker.MESSAGE, text);
-			marker.setAttribute(IMarker.LINE_NUMBER, line); 
-			switch (result) {
-				case VerificationResult::Valid: 
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+		Display.getDefault().syncExec(new Runnable() {
+			override public run() {
 				
-				case VerificationResult::Invalid:  
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+				var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+				val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
 				
-				case VerificationResult::Error: 
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
-			}
-		} else 
-			throw new UnexpectedException('Failed to create a result marker')
+				// create a marker
+				val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
+				
+				var markerList = markers.get(resource.URI) 
+				if (markerList === null) { 
+					markerList = new LinkedList
+					markers.put(resource.URI, markerList)
+				}
+				markerList.add(marker)
+				
+				// set marker attributes
+				if (marker.exists()) {
+					marker.setAttribute(IMarker.MESSAGE, text);
+					marker.setAttribute(IMarker.LINE_NUMBER, line); 
+					switch (result) {
+						case VerificationResult::Valid: 
+							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+						
+						case VerificationResult::Invalid:  
+							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+						
+						case VerificationResult::Error: 
+							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+					}
+				} else 
+					throw new UnexpectedException('Failed to create a result marker')
+			}				    
+		});
 	}
 	
 	/**

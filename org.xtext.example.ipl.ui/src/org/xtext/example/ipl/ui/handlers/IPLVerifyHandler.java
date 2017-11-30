@@ -7,7 +7,9 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.ICoreRunnable;
 import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
@@ -79,8 +81,17 @@ public class IPLVerifyHandler extends AbstractHandler {
 				Resource r = rs.getResource(uri, true);
 				
 				
-				// run the IPL generator
-				generator.doGenerate(r, fsa, new GeneratorContext());
+				Job job = Job.create("Update table", (ICoreRunnable) monitor -> {
+					// run the IPL generator
+					GeneratorContext ctx = new GeneratorContext();
+					generator.beforeGenerate(r, fsa, ctx);
+					generator.doGenerate(r, fsa, ctx);
+					generator.afterGenerate(r, fsa, ctx);
+				
+				});
+				job.schedule();
+				
+
 			}
 		}
 
