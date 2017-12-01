@@ -2,8 +2,6 @@ package org.xtext.example.ipl.smt.qrem;
 
 import java.net.URL
 import java.rmi.UnexpectedException
-import java.text.DateFormat
-import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.util.ArrayList
 import java.util.Arrays
@@ -15,6 +13,7 @@ import java.util.regex.Pattern
 import org.eclipse.core.runtime.FileLocator
 import org.eclipse.emf.ecore.util.EcoreUtil.Copier
 import org.eclipse.xtext.generator.IFileSystemAccess2
+import org.eclipse.xtext.util.CancelIndicator
 import org.xtext.example.ipl.iPL.Formula
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
@@ -22,6 +21,7 @@ import org.xtext.example.ipl.iPL.ModelExpr
 import org.xtext.example.ipl.interfaces.SmtFormulaGenerator
 import org.xtext.example.ipl.interfaces.SmtVerifier
 import org.xtext.example.ipl.interfaces.SmtViewGenerator
+import org.xtext.example.ipl.interfaces.VerificationResult
 import org.xtext.example.ipl.prism.plugin.PrismPlugin
 import org.xtext.example.ipl.transform.Clause2ValueTransformer
 import org.xtext.example.ipl.transform.PrenexTransformer
@@ -75,15 +75,15 @@ public class SmtVerifierQrem implements SmtVerifier {
 	private val String z3BinPath = System::getenv('Z3_BIN')
 
 	/** standard IPL verification */
-	override public def boolean verifyNonRigidFormula(Formula origFormula, ModelDecl md, IPLSpec spec, String filename,
-		IFileSystemAccess2 fsa) {
+	override public def VerificationResult verifyNonRigidFormula(Formula origFormula, ModelDecl md, 
+		IPLSpec spec, String filename, IFileSystemAccess2 fsa, CancelIndicator ci) {
 		freeVarVals.clear
 		smtFormulaGenerator = new SmtFormulaGeneratorQrem(spec)
 
 		// check if it's valid in its current form with any interpretation of flexible terms
 		println('Checking if rigid verification discharges the formula')
-		if (verifyRigidFormula(origFormula, spec, filename, fsa))
-			return true
+		if (verifyRigidFormula(origFormula, spec, filename, fsa, ci).isValid)
+			return VerificationResult::valid
 
 		// transform to prenex normal form; make a copy to not mess with IPLSpec
 		val fPNF = (new PrenexTransformer).toPrenexNormalForm(origFormula.copy)
@@ -111,7 +111,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + IPLPrettyPrinter::printIPL(fPNF))
-		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa)
+		val res = verifyRigidFormula(fPNF, spec, filename + "-final", fsa, ci)
 		fQF.delete(true)
 		fPNF.delete(true)
 
@@ -120,7 +120,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 	/**  simple verification of negated formula
 	 * touches: scopeDecls (but not flexDecls)*/
-	override public def boolean verifyRigidFormula(Formula f, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
+	override public def VerificationResult verifyRigidFormula(Formula f, IPLSpec spec, String filename,
+		IFileSystemAccess2 fsa, CancelIndicator ci) {
 		TimeRecWall::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if (!smtViewGenerator.isViewGenerated)
@@ -158,19 +159,20 @@ public class SmtVerifierQrem implements SmtVerifier {
 		TimeRecWall::stopTimer("verifyRigidFormula")
 		if (z3ResFirstLine == "unsat") {
 			println("unsat, formula is valid")
-			true
+			VerificationResult::valid
 		} else if (z3ResFirstLine == "sat") {
 			println("sat, formula is invalid")
-			false
-		} else 
-			throw new UnexpectedException("z3 error: " + z3ResLines.join('\n'))
+			VerificationResult::invalid
+		} else
+			VerificationResult::error("z3 error: " + z3ResLines.join('\n')) 
+//			throw new UnexpectedException("z3 error: " + z3ResLines.join('\n'))
 	}
 
 	/**  finds all variable assignments that satisfy a QF formula
 	* @returns true if managed to find all models, false otherwise 
 	* implicit result: populates termDecls, flexDecls, clauses, termVals 
 	*/
-	override public Boolean findModels(Formula fQF, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
+	override public boolean findModels(Formula fQF, IPLSpec spec, String filename, IFileSystemAccess2 fsa) {
 		freeVarVals.clear
 
 		// optimization: not rerun AADL generation for every model find

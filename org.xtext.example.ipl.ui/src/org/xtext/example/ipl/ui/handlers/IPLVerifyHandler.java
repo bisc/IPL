@@ -8,6 +8,7 @@ import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.ICoreRunnable;
+import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.emf.common.util.URI;
@@ -27,6 +28,7 @@ import org.eclipse.xtext.generator.GeneratorContext;
 import org.eclipse.xtext.generator.IGenerator2;
 import org.eclipse.xtext.resource.IResourceDescriptions;
 import org.eclipse.xtext.ui.resource.IResourceSetProvider;
+import org.eclipse.xtext.util.CancelIndicator;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -109,9 +111,12 @@ public class IPLVerifyHandler extends AbstractHandler {
 		Resource r = rs.getResource(uri, true);
 		
 		
-		Job job = Job.create("Update table", (ICoreRunnable) monitor -> {
+		Job job = Job.create("IPL verification", (ICoreRunnable) runnablePM -> {
 			// run the IPL generator
 			GeneratorContext ctx = new GeneratorContext();
+			// bridging: this job's progress monitor connected to the generator's cancel indicator
+			// (all because xtext generators don't use progress monitors) 
+			ctx.setCancelIndicator(new IPLCancelIndicator(runnablePM));
 			generator.beforeGenerate(r, fsa, ctx);
 			generator.doGenerate(r, fsa, ctx);
 			generator.afterGenerate(r, fsa, ctx);
@@ -123,9 +128,6 @@ public class IPLVerifyHandler extends AbstractHandler {
 						file.getName() + " is complete.");	
 				}
 			});
-//					IWorkbenchWindow window = HandlerUtil.getActiveWorkbenchWindowChecked(event);
-//					MessageDialog.openInformation(window.getShell(), "IPL Status", "IPL Verification for " +
-//							file.getName());
 		});
 		job.schedule();
 
@@ -148,5 +150,25 @@ public class IPLVerifyHandler extends AbstractHandler {
 		// fsa.setOutputConfigurations(outputs);
 
 		return null;
+	}
+	
+	/**
+	 * A convenience class to respond to cancellation requests. 
+	 * An instance of this class is passed to the IPL Generator.  
+	 */
+	class IPLCancelIndicator implements CancelIndicator {
+		
+		IProgressMonitor pm;
+		
+		IPLCancelIndicator(IProgressMonitor _pm) { 
+			pm = _pm;
+		}
+
+		@Override
+		public boolean isCanceled() {
+			return pm.isCanceled();
+		} 
+
+		
 	}
 }

@@ -17,27 +17,22 @@ import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Path
 import org.eclipse.emf.common.util.URI
 import org.eclipse.emf.ecore.resource.Resource
-import org.eclipse.jface.dialogs.MessageDialog
 import org.eclipse.swt.widgets.Display
-import org.eclipse.ui.IWorkbenchWindow
-import org.eclipse.ui.PlatformUI
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
+import org.xtext.example.ipl.interfaces.VerificationResult
 import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
 import org.xtext.example.ipl.util.TimeRecWall
 import org.xtext.example.ipl.validation.IPLRigidityProvider
 
-/**
- * Values to indicate the result of verification
- */
-enum VerificationResult { 
-	Valid, Invalid, Error
-}
+//enum VerificationResult { 
+//	Valid, Invalid, Error
+//}
 
 /**
  * A class that serves as an entry point to IPL verification. 
@@ -67,7 +62,11 @@ class IPLGenerator extends AbstractGenerator {
 	}
 
 	/**
-	 * Called on build. Performs verification of each formula in the file, and marks the results with icons. 
+	 * Performs verification of each formula in the file, and marks the results with line icons.
+	 * Called on build and on IPL verification button/menu activation.
+	 * @argument resource File containing an IPL spec
+	 * @argument fsa Access to the filesystem context 
+	 * @argument context Access to the generator's context with a cancel indicator.  
 	 */
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
@@ -76,42 +75,43 @@ class IPLGenerator extends AbstractGenerator {
 		// 		to not carry over Generator's state
 		specs.forEach[ spec |
 			spec.formulas.forEach[ f, i |
+//				println('\n\nCancelled context: ' + context.cancelIndicator.isCanceled)
 				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
 				println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
+//				println('\n\nCancelled context: ' + context.cancelIndicator.isCanceled)
+//				println('\n\nCancelled fsa mon: ' + fsa.)
 				val node = NodeModelUtils::getNode(f) // for marker creation
 				try { 
-					val boolean res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
+					val VerificationResult res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
 						// find a model declaration
 						val mdls = spec.decls.filter[it instanceof ModelDecl]
 						if (mdls.size == 0) {
 							throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
 						} else {  
 							TimeRecWall::startTimer("verifyNonRigidFormula")
-							val boolean resNR = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
+							val VerificationResult resNR = (new SmtVerifierQrem).verifyNonRigidFormula(
+								f, mdls.get(0) as ModelDecl, spec, filename, fsa, context.cancelIndicator)
 							TimeRecWall::stopTimer("verifyNonRigidFormula")
 							
-							println("IPL non-rigid formula verified, result: " + resNR)
+							println("IPL non-rigid formula verified, result: " + resNR.message)
 							resNR
 						} 
 					} else { //rigid, shortcut
-						val boolean resR = (new SmtVerifierQrem).verifyRigidFormula(f, spec, filename, fsa)
-						println("IPL rigid formula verified, result: " + resR)
+						val VerificationResult  resR = (new SmtVerifierQrem).verifyRigidFormula(
+							f, spec, filename, fsa, context.cancelIndicator)
+						println("IPL rigid formula verified, result: " + resR.message)
 						resR
 					}
 					
-					// show markers in a different thread
-					if (res)
-						createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
-					else
-						createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
-   					
+					// create a line marker
+					createMarker(resource, node.startLine, res)
 					
 				} catch (UnexpectedException e) { 
 					println("IPL verification error: " + e)
 					e.printStackTrace
 					
-					// show marker in a different thread
-					createMarker(resource, node.startLine, VerificationResult::Error, 'Verification error: ' + e.message)
+					// show error 
+					createMarker(resource, node.startLine, VerificationResult::error('IPL verification error: ' + e.message))
 				}
 			]
 		]
@@ -127,7 +127,7 @@ class IPLGenerator extends AbstractGenerator {
 	 *  Shows a marker with a verification result for a given resource.
 	 *  Uses async exec to interact with UI properly.   
 	 */
-	def private createMarker(Resource resource, int line, VerificationResult result, String text) { 
+	def private createMarker(Resource resource, int line, VerificationResult result) { 
 		Display.getDefault().syncExec(new Runnable() {
 			override public run() {
 				
@@ -146,18 +146,15 @@ class IPLGenerator extends AbstractGenerator {
 				
 				// set marker attributes
 				if (marker.exists()) {
-					marker.setAttribute(IMarker.MESSAGE, text);
+					marker.setAttribute(IMarker.MESSAGE, result.message);
 					marker.setAttribute(IMarker.LINE_NUMBER, line); 
-					switch (result) {
-						case VerificationResult::Valid: 
-							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+					if (result.isError) //error
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+					else if (result.isValid) // valid 
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+					else // invalid 
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
 						
-						case VerificationResult::Invalid:  
-							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
-						
-						case VerificationResult::Error: 
-							marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
-					}
 				} else 
 					throw new UnexpectedException('Failed to create a result marker')
 			}				    
