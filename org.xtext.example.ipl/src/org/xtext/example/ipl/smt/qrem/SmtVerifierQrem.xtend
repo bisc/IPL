@@ -51,6 +51,8 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 	private val SmtViewGenerator smtViewGenerator = new SmtViewGeneratorQrem
 	private var SmtFormulaGenerator smtFormulaGenerator = null // initialized on call
+	private var CancelIndicator cancelIndicator = null
+	
 	// declarations of quantified variables
 	private var Map<String, IPLType> freeVarDecls
 	// each map in the list is an valuation of all declared variables
@@ -79,6 +81,7 @@ public class SmtVerifierQrem implements SmtVerifier {
 		IPLSpec spec, String filename, IFileSystemAccess2 fsa, CancelIndicator ci) {
 		freeVarVals.clear
 		smtFormulaGenerator = new SmtFormulaGeneratorQrem(spec)
+		cancelIndicator = ci
 
 		// check if it's valid in its current form with any interpretation of flexible terms
 		println('Checking if rigid verification discharges the formula')
@@ -122,6 +125,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 	 * touches: scopeDecls (but not flexDecls)*/
 	override public def VerificationResult verifyRigidFormula(Formula f, IPLSpec spec, String filename,
 		IFileSystemAccess2 fsa, CancelIndicator ci) {
+		if (cancelIndicator !== ci)// may have been set by non-rigid already
+			cancelIndicator = ci
+			
 		TimeRecWall::startTimer("verifyRigidFormula")
 		// optimization: not rerun AADL generation for every model find
 		if (!smtViewGenerator.isViewGenerated)
@@ -144,6 +150,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 
 		System::out.println("Done generating SMT, see file " + filenameWithExt +
 			" at " + LocalDateTime.now())
+			
+		// see if were asked to stop before calling smt 
+		IPLUtils::checkUserCancel(cancelIndicator)
 
 		// call smt 
 		var z3Filename = fsa.getURI(filenameWithExt)
@@ -202,6 +211,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		val filenameWithExt = filename + '.smt'
 		var String blockingClauses = ''
 		while (true) {
+			
+			// check if were asked to stop 
+			IPLUtils::checkUserCancel(cancelIndicator)
 
 			fsa.generateFile(filenameWithExt, viewSmt + formulaSmt + '\n\n' + '''  
 				; Blocking 
@@ -289,6 +301,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 				var Map<Map<String, Object>, Object> flexFilteredCache = new HashMap // flexsFilteredValueCache.get(flexName) 
 				var int count = 1;
 				for (varVal : myFreeVarVals /*.immutableCopy*/ ) {
+					
+					IPLUtils::checkUserCancel(cancelIndicator)
+					
 					println("Considering valuation #" + count++ + " of " + flexName + ":" + varVal +
 						" at " + LocalDateTime.now())
 

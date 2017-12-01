@@ -27,12 +27,9 @@ import org.xtext.example.ipl.iPL.ModelDecl
 import org.xtext.example.ipl.interfaces.VerificationResult
 import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
+import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.util.TimeRecWall
 import org.xtext.example.ipl.validation.IPLRigidityProvider
-
-//enum VerificationResult { 
-//	Valid, Invalid, Error
-//}
 
 /**
  * A class that serves as an entry point to IPL verification. 
@@ -73,48 +70,66 @@ class IPLGenerator extends AbstractGenerator {
 		
 		// have to make a new instance of Verifier for every formula 
 		// 		to not carry over Generator's state
-		specs.forEach[ spec |
-			spec.formulas.forEach[ f, i |
-//				println('\n\nCancelled context: ' + context.cancelIndicator.isCanceled)
-				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
-				println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
-//				println('\n\nCancelled context: ' + context.cancelIndicator.isCanceled)
-//				println('\n\nCancelled fsa mon: ' + fsa.)
-				val node = NodeModelUtils::getNode(f) // for marker creation
-				try { 
-					val VerificationResult res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
-						// find a model declaration
-						val mdls = spec.decls.filter[it instanceof ModelDecl]
-						if (mdls.size == 0) {
-							throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
-						} else {  
-							TimeRecWall::startTimer("verifyNonRigidFormula")
-							val VerificationResult resNR = (new SmtVerifierQrem).verifyNonRigidFormula(
-								f, mdls.get(0) as ModelDecl, spec, filename, fsa, context.cancelIndicator)
-							TimeRecWall::stopTimer("verifyNonRigidFormula")
-							
-							println("IPL non-rigid formula verified, result: " + resNR.message)
-							resNR
-						} 
-					} else { //rigid, shortcut
-						val VerificationResult  resR = (new SmtVerifierQrem).verifyRigidFormula(
-							f, spec, filename, fsa, context.cancelIndicator)
-						println("IPL rigid formula verified, result: " + resR.message)
-						resR
+		try {
+			IPLUtils::checkUserCancel(context.cancelIndicator)
+			
+			specs.forEach[ spec |
+				spec.formulas.forEach[ f, i |
+					val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
+					println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
+	
+					val node = NodeModelUtils::getNode(f) // for marker creation
+					 
+					try {
+						IPLUtils::checkUserCancel(context.cancelIndicator)
+		
+						val VerificationResult res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
+							// find a model declaration
+							val mdls = spec.decls.filter[it instanceof ModelDecl]
+							if (mdls.size == 0) {
+								throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
+							} else {  
+								TimeRecWall::startTimer("verifyNonRigidFormula")
+								val VerificationResult resNR = (new SmtVerifierQrem).verifyNonRigidFormula(
+									f, mdls.get(0) as ModelDecl, spec, filename, fsa, context.cancelIndicator)
+								TimeRecWall::stopTimer("verifyNonRigidFormula")
+								
+								println("IPL non-rigid formula verified, result: " + resNR.message)
+								resNR
+							} 
+						} else { //rigid, shortcut
+							val VerificationResult  resR = (new SmtVerifierQrem).verifyRigidFormula(
+								f, spec, filename, fsa, context.cancelIndicator)
+							println("IPL rigid formula verified, result: " + resR.message)
+							resR
+						}
+						
+						// create a line marker
+						createMarker(resource, node.startLine, res)
+						
+					} catch (UnexpectedException e) { 
+						val explanation = "IPL verification error: " + e.message
+						println(explanation)
+						e.printStackTrace
+						
+						// show error 
+						createMarker(resource, node.startLine, VerificationResult::error(explanation))
+						// and continue verifying
+					} catch (InterruptedException e){
+						val explanation = 'IPL verification interrupted: ' + e.message
+						println("IPL verification interrupted: " + e.message)
+						
+						// show error 
+						createMarker(resource, node.startLine, VerificationResult::error(explanation))
+						// propagate the desire to stop
+						throw e
 					}
-					
-					// create a line marker
-					createMarker(resource, node.startLine, res)
-					
-				} catch (UnexpectedException e) { 
-					println("IPL verification error: " + e)
-					e.printStackTrace
-					
-					// show error 
-					createMarker(resource, node.startLine, VerificationResult::error('IPL verification error: ' + e.message))
-				}
+				]
 			]
-		]
+			
+		} catch (InterruptedException e){
+			println("Stopped IPL verification: " + e.message)
+		}
 		
 		//direct check in comparison
 		//(new DirectPrismChecker).directCheck(fsa)

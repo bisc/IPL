@@ -7,6 +7,7 @@ import java.rmi.UnexpectedException
 import org.eclipse.emf.ecore.EClass
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.util.EcoreUtil
+import org.eclipse.xtext.util.CancelIndicator
 import org.osate.aadl2.AadlBoolean
 import org.osate.aadl2.AadlInteger
 import org.osate.aadl2.AadlReal
@@ -18,6 +19,7 @@ import org.xtext.example.ipl.iPL.Int
 import org.xtext.example.ipl.iPL.Real
 import org.xtext.example.ipl.iPL.Type
 import org.xtext.example.ipl.iPL.TypeBool
+import org.xtext.example.ipl.iPL.TypeElem
 import org.xtext.example.ipl.iPL.TypeInt
 import org.xtext.example.ipl.iPL.TypeLst
 import org.xtext.example.ipl.iPL.TypeReal
@@ -29,7 +31,6 @@ import org.xtext.example.ipl.validation.IntType
 import org.xtext.example.ipl.validation.ListType
 import org.xtext.example.ipl.validation.RealType
 import org.xtext.example.ipl.validation.SetType
-import org.xtext.example.ipl.iPL.TypeElem
 
 class IPLUtils { 
 	/**  
@@ -143,6 +144,15 @@ class IPLUtils {
 	 */ 
 	public def static String propAbst(String name) {
 		name + '_propAbst'
+	}
+	
+	/**
+	 * A function to succinctly check if a cancel indicator was triggered. 
+	 * If yes, throws an InterruptedException. If no, no side effects. 
+	 */   
+	public def static void checkUserCancel(CancelIndicator ci) /*throws InterruptedException*/ { 
+		if(ci.canceled) 
+			throw new InterruptedException("User asked to stop")
 	}
 	
 }
