@@ -13,13 +13,4 @@ src-gen
 xtend-gen
 .antlr-generator-*.jar
 .DS_Store
-/org.xtext.example.ipl/
-/org.xtext.example.ipl.ide/
-/org.xtext.example.ipl.prism.lib/
-/org.xtext.example.ipl.prism.plugin/
-/org.xtext.example.ipl.target/
-/org.xtext.example.ipl.tests/
-/org.xtext.example.ipl.ui/
-/org.xtext.example.ipl.ui.tests/
-/org.xtext.example.ipl.viewgen/
-/org.xtext.example.ipl.web/
+org.xtext.example.ipl/log/

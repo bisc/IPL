@@ -17,23 +17,19 @@ import org.eclipse.core.runtime.FileLocator
 import org.eclipse.core.runtime.Path
 import org.eclipse.emf.common.util.URI
 import org.eclipse.emf.ecore.resource.Resource
+import org.eclipse.swt.widgets.Display
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils
 import org.xtext.example.ipl.iPL.IPLSpec
 import org.xtext.example.ipl.iPL.ModelDecl
+import org.xtext.example.ipl.interfaces.VerificationResult
 import org.xtext.example.ipl.smt.qrem.SmtVerifierQrem
 import org.xtext.example.ipl.util.IPLPrettyPrinter
+import org.xtext.example.ipl.util.IPLUtils
 import org.xtext.example.ipl.util.TimeRecWall
 import org.xtext.example.ipl.validation.IPLRigidityProvider
-
-/**
- * Values to indicate the result of verification
- */
-enum VerificationResult { 
-	Valid, Invalid, Error
-}
 
 /**
  * A class that serves as an entry point to IPL verification. 
@@ -63,50 +59,77 @@ class IPLGenerator extends AbstractGenerator {
 	}
 
 	/**
-	 * Called on build. Performs verification of each formula in the file, and marks the results with icons. 
+	 * Performs verification of each formula in the file, and marks the results with line icons.
+	 * Called on build and on IPL verification button/menu activation.
+	 * @argument resource File containing an IPL spec
+	 * @argument fsa Access to the filesystem context 
+	 * @argument context Access to the generator's context with a cancel indicator.  
 	 */
 	override public void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val specs = resource.allContents.filter(IPLSpec).toList
 		
 		// have to make a new instance of Verifier for every formula 
 		// 		to not carry over Generator's state
-		specs.forEach[ spec |
-			spec.formulas.forEach[ f, i |
-				val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
-				println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
-				val node = NodeModelUtils::getNode(f) // for marker creation
-				try { 
-					if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
-						// find a model declaration
-						val mdls = spec.decls.filter[it instanceof ModelDecl]
-						if (mdls.size == 0) {
-							throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
-						} else {  
-							TimeRecWall::startTimer("verifyNonRigidFormula")
-							val boolean res = (new SmtVerifierQrem).verifyNonRigidFormula(f, mdls.get(0) as ModelDecl, spec, filename, fsa)
-							TimeRecWall::stopTimer("verifyNonRigidFormula")
-							
-							println("IPL non-rigid formula verified, result: " + res)
-							if (res)
-								createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
-							else
-								createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
-						} 
-					} else { //rigid, shortcut
-							val res = (new SmtVerifierQrem).verifyRigidFormula(f, spec, filename, fsa)
-							println("IPL rigid formula verified, result: " + res)
-							if (res)
-								createMarker(resource, node.startLine, VerificationResult::Valid, 'Formula valid') 
-							else
-								createMarker(resource, node.startLine, VerificationResult::Invalid, 'Formula invalid')
+		try {
+			IPLUtils::checkUserCancel(context.cancelIndicator)
+			
+			specs.forEach[ spec |
+				spec.formulas.forEach[ f, i |
+					val filename = resource.URI.trimFileExtension.lastSegment + '-f' + i // no extension, smt generator adds it
+					println('\n\nVerifying ' + IPLPrettyPrinter::printIPL(f))
+	
+					val node = NodeModelUtils::getNode(f) // for marker creation
+					 
+					try {
+						IPLUtils::checkUserCancel(context.cancelIndicator)
+		
+						val VerificationResult res = if(!(new IPLRigidityProvider(spec)).isRigid(f)) { // non-rigid, full-scale IPL
+							// find a model declaration
+							val mdls = spec.decls.filter[it instanceof ModelDecl]
+							if (mdls.size == 0) {
+								throw new UnexpectedException('Cannot verify non-rigid formulas without a model')
+							} else {  
+								TimeRecWall::startTimer("verifyNonRigidFormula")
+								val VerificationResult resNR = (new SmtVerifierQrem).verifyNonRigidFormula(
+									f, mdls.get(0) as ModelDecl, spec, filename, fsa, context.cancelIndicator)
+								TimeRecWall::stopTimer("verifyNonRigidFormula")
+								
+								println("IPL non-rigid formula verified, result: " + resNR.message)
+								resNR
+							} 
+						} else { //rigid, shortcut
+							val VerificationResult  resR = (new SmtVerifierQrem).verifyRigidFormula(
+								f, spec, filename, fsa, context.cancelIndicator)
+							println("IPL rigid formula verified, result: " + resR.message)
+							resR
+						}
+						
+						// create a line marker
+						createMarker(resource, node.startLine, res)
+						
+					} catch (UnexpectedException e) { 
+						val explanation = "IPL verification error: " + e.message
+						println(explanation)
+						e.printStackTrace
+						
+						// show error 
+						createMarker(resource, node.startLine, VerificationResult::error(explanation))
+						// and continue verifying
+					} catch (InterruptedException e){
+						val explanation = 'IPL verification interrupted: ' + e.message
+						println("IPL verification interrupted: " + e.message)
+						
+						// show error 
+						createMarker(resource, node.startLine, VerificationResult::error(explanation))
+						// propagate the desire to stop
+						throw e
 					}
-				} catch (UnexpectedException e) { 
-					println("IPL verification error: " + e)
-					e.printStackTrace
-					createMarker(resource, node.startLine, VerificationResult::Error, 'Verification error: ' + e.message)
-				}
+				]
 			]
-		]
+			
+		} catch (InterruptedException e){
+			println("Stopped IPL verification: " + e.message)
+		}
 		
 		//direct check in comparison
 		//(new DirectPrismChecker).directCheck(fsa)
@@ -116,58 +139,73 @@ class IPLGenerator extends AbstractGenerator {
 	}
 	
 	/**
-	 *  Creates a marker with a verification result for a given resource. 
+	 *  Shows a marker with a verification result for a given resource.
+	 *  Uses async exec to interact with UI properly.   
 	 */
-	def private createMarker(Resource resource, int line, VerificationResult result, String text) { 
-		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
-		
-		// create a marker
-		val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
-		
-		var markerList = markers.get(resource.URI) 
-		if (markerList === null) { 
-			markerList = new LinkedList
-			markers.put(resource.URI, markerList)
-		}
-		markerList.add(marker)
-		
-		// set marker attributes
-		if (marker.exists()) {
-			marker.setAttribute(IMarker.MESSAGE, text);
-			marker.setAttribute(IMarker.LINE_NUMBER, line); 
-			switch (result) {
-				case VerificationResult::Valid: 
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+	def private createMarker(Resource resource, int line, VerificationResult result) { 
+		Display.getDefault().syncExec(new Runnable() {
+			override public run() {
 				
-				case VerificationResult::Invalid:  
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+				var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+				val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
 				
-				case VerificationResult::Error: 
-					marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
-			}
-		} else 
-			throw new UnexpectedException('Failed to create a result marker')
+				// create a marker
+				val marker = file.createMarker(IMarker.PROBLEM/*'org.xtext.example.ipl.marker'*/)
+				
+				var markerList = markers.get(resource.URI) 
+				if (markerList === null) { 
+					markerList = new LinkedList
+					markers.put(resource.URI, markerList)
+				}
+				markerList.add(marker)
+				
+				// set marker attributes
+				if (marker.exists()) {
+					marker.setAttribute(IMarker.MESSAGE, result.message);
+					marker.setAttribute(IMarker.LINE_NUMBER, line); 
+					if (result.isError) //error
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+					else if (result.isValid) // valid 
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_INFO)
+					else // invalid 
+						marker.setAttribute(IMarker.SEVERITY, IMarker::SEVERITY_WARNING)
+						
+				} else 
+					throw new UnexpectedException('Failed to create a result marker')
+			}				    
+		});
 	}
 	
 	/**
 	 * Removes all markers for a resource
 	 */
 	def private deleteMarkers(Resource resource) { 
-		// delete own markers
-		if (markers.containsKey(resource.URI))
-			markers.get(resource.URI).forEach[it.delete]
-		
-		// in case markers carried over from an earlier session
-		var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
-		val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
-		file.deleteMarkers(IMarker.PROBLEM, true, 0)
+		Display.getDefault().syncExec(new Runnable() {
+			override public run() {
+				// delete own markers
+				if (markers.containsKey(resource.URI))
+					markers.get(resource.URI).forEach[it.delete]
+				
+				// in case markers carried over from an earlier session
+				var absolutePath = FileLocator.toFileURL(new URL(resource.URI.toString)).path
+				val IFile file = ResourcesPlugin::workspace.root.getFileForLocation(new Path(absolutePath))
+				file.deleteMarkers(IMarker.PROBLEM, true, 0)
+			}				    
+		});
 	}
 
 	/**
 	 * Called after generation. Currently not used.
 	 */	
 	override public void afterGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
+		// Don't necessarily want to spam dialogs when going through many files
+//					Display.getDefault().asyncExec(new Runnable() {
+//						override public run() {
+//						val IWorkbenchWindow window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+//						MessageDialog.openInformation(window.getShell(), "IPL Status", "IPL Verification for " +
+//								resource.URI + " is complete");	
+//						}
+//					});
 	}
 	
 }

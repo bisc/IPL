@@ -256,4 +256,5 @@ class IPLValidator extends AbstractIPLValidator {
 // TODO check that no more than one model 
 // TODO check that declared and passed model parameters match 	
 // TODO check for name duplicates in declarations
+// TODO check that all names of functions are declared
 }
