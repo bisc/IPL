@@ -2,9 +2,9 @@
 
 ## Development build setup 
 
-Prerequisites to have before installing IPL: Java 1.8 
+Prerequisites to have before installing IPL: Java 1.8.
 
-Prerequisites to be installed: Eclipse Oxygen 4.7.1a, EMF 2.13.0, Xtext SDK 2.12.0, OSATE 2.3.0.
+Prerequisites to be installed below: Eclipse Oxygen 4.7.1a, EMF 2.13.0, Xtext SDK 2.12.0, OSATE 2.3.0.
 
 1) Download an appropriate [Eclipse Installer](https://wiki.eclipse.org/Eclipse_Installer) for your system. 
 
@@ -34,6 +34,19 @@ Steps 1-3 are also described in more detail with minor deviations (a different i
 ## User build setup
 
 TBA.
+
+## Troubleshooting
+
+Q: Which OSATE projects are necesary to run IPL?  
+A: All of the projects in the osate2-core working set and all in the osate-ge set _except_ org.osate.ge.ba and org.osate.ge.errormodel. All the other working sets/repos from the Oomph setup are optional.
+
+
+Q: I am getting bundle and compiler errors in OSATE2 code, including being unable to resolve eclipse.jdt.core.  
+A: Try switching the target platform in Preferences -> Plug-in Development -> Target Platform from "Modular Target" to "Running Platform." If this fixes the errors, you will want to make this change permanent by preventing Oomph from running the startup task that sets the target platform back to "Modular Target." Although that can be done in various ways, the easiest one is to delete two Eclipse plugins: Oomph Targlets and Oomph Setup Targlets. 
+
+Q: I am getting parameter value and artifact transfer errors related to Maven and/or Tycho.  
+A: Delete the failed artifacts and update IPL main project's Maven as described in [this post](https://stackoverflow.com/questions/5074063/maven-error-failure-to-transfer).
+      
 
 ## Contacts
  * Ivan Ruchkin iruchkin@cs.cmu.edu
