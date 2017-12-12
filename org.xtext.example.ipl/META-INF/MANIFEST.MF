@@ -35,4 +35,3 @@ Export-Package: org.xtext.example.ipl; uses:="org.eclipse.emf.ecore,  org.eclips
  org.xtext.example.ipl.services;uses:="org.eclipse.xtext.common.services,org.eclipse.xtext.service,org.eclipse.xtext",
  org.xtext.example.ipl.validation; uses:="org.osate.aadl2,  org.eclipse.emf.ecore,  org.xtext.example.ipl.iPL,  org.osate.aadl2.instance"
 Bundle-ClassPath: .
-Import-Package: org.apache.log4j

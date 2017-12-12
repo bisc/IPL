@@ -436,7 +436,7 @@
           commandId="org.xtext.example.ipl.commands.iplVerifyCommand"
           contextId="org.eclipse.ui.contexts.window"
           schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
-          sequence="M1+6">
+          sequence="F10">
     </key>
  </extension>
  <extension

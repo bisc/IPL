@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry exported="true" kind="lib" path="log4j.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
 	<classpathentry exported="true" kind="lib" path="jhoafparser.jar"/>
@@ -8,7 +9,6 @@
 	<classpathentry exported="true" kind="lib" path="jas.jar"/>
 	<classpathentry exported="true" kind="lib" path="jcommon.jar"/>
 	<classpathentry exported="true" kind="lib" path="colt.jar"/>
-	<classpathentry exported="true" kind="lib" path="log4j.jar"/>
 	<classpathentry exported="true" kind="lib" path="lpsolve55j.jar"/>
 	<classpathentry exported="true" kind="lib" path="rabinizer3.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
