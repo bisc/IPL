@@ -110,7 +110,9 @@ public class SmtVerifierQrem implements SmtVerifier {
 		flexClauses = smtFormulaGenerator.formulaFlexClauses
 
 		// find valuations for each flexible abstraction
+		TimeRecWall::startTimer("findFlexsVals")
 		smtFormulaGenerator.flexsVals = findFlexsVals(md, filename, fsa)
+		TimeRecWall::stopTimer("findFlexsVals")
 
 		// run the ultimate smt here
 		println('Final verification after MCs: ' + IPLPrettyPrinter::printIPL(fPNF))
