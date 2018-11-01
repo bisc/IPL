@@ -23,7 +23,7 @@ Steps 1-3 are also described in more detail with minor deviations (a different i
 
 6) Use the provided launch file "IPL Eclipse Application" run configuration to start an Eclipse version with IPL support.
 
-7) Download [IPL examples](https://github.com/bisc/IPLExamples) and import them in the launched verion of the Eclipse.
+7) Download [IPL projects](https://github.com/bisc/IPLProjects) and import them in the launched verion of the Eclipse.
 
 8) To run IPL verification, you can click the IPL verification button while a .ipl file is open or selected. Alternatively, you can use the native Eclipse build. It is recommended that you turn off automatic building and target specific files since verification can take some time. 
 
